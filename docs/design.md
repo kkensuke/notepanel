@@ -86,7 +86,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 | 純粋関数 | `NotepanelCore/Logic.swift` | 高さの計算、表示名、`Untitled N` の命名、名前の検証、衝突時の名前 |
 | エディタ | `editor/src/main.js`、`logic.js` | CodeMirror 6 の設定、ノートごとの状態保持、切替画面、文字数、Esc の最終処理 |
 
-`NotepanelCore` は Foundation だけに依存するライブラリにし、XCTest で確かめられるようにする。
+`NotepanelCore` は Foundation と CoreGraphics だけに依存するライブラリにし、`NotepanelChecks` で確かめられるようにする。
 
 ## 5. 動作仕様
 
@@ -374,11 +374,11 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 
 テスト：
 
-- `NotepanelCore`（高さの計算、表示名、命名、名前の検証、保存・衝突・名前変更）は XCTest で確かめる（`swift test`）。
+- `NotepanelCore`（高さの計算、表示名、命名、名前の検証、保存・衝突・名前変更）は、アサーションで確かめる実行ファイル `NotepanelChecks` で確かめる（`swift run NotepanelChecks`）。XCTest は Xcode にしか含まれず、Command Line Tools だけでは使えないため。
 - エディタの純粋関数（あいまい一致と並べ替え、URL の抽出、上への行挿入、文字数）は Node の `node --test` で確かめる。
 - R1〜R6 と IME は、README の確認項目に沿って実機で確かめる。
 
-ビルド：Xcode プロジェクトは作らない。SwiftPM と `scripts/bundle.sh`（.app の生成と ad-hoc 署名）を使う。エディタは `editor/` で `npm run build` を実行し、`web/editor.js` を出力する。`web/editor.js` はリポジトリに含めるので、エディタを変更しない限り Node は不要。
+ビルド：Xcode プロジェクトは作らない。SwiftPM と `scripts/bundle.sh`（.app の生成と ad-hoc 署名）を使い、Command Line Tools だけでビルドできるようにする。そのため、Xcode にしか実装（マクロのプラグイン）が含まれない SwiftUI のマクロ（macOS 27 SDK の `@State` など）は使わず、状態は `@Observable` のモデルに持たせる。エディタは `editor/` で `npm run build` を実行し、`web/editor.js` を出力する。`web/editor.js` はリポジトリに含めるので、エディタを変更しない限り Node は不要。
 
 ```
 notepanel/
@@ -386,8 +386,8 @@ notepanel/
 ├── Sources/
 │   ├── Notepanel/          # App.swift, NotePanel.swift, PanelController.swift,
 │   │                       # HotKeys.swift, EditorBridge.swift, Settings.swift
-│   └── NotepanelCore/      # NoteStore.swift, Logic.swift
-├── Tests/NotepanelCoreTests/
+│   ├── NotepanelCore/      # NoteStore.swift, Logic.swift
+│   └── NotepanelChecks/    # main.swift（swift run NotepanelChecks）
 ├── web/                    # index.html, style.css, editor.js（生成物）
 ├── editor/                 # package.json, src/main.js, src/logic.js, test/
 ├── scripts/bundle.sh

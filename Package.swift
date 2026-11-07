@@ -7,6 +7,8 @@ let package = Package(
     targets: [
         .target(name: "NotepanelCore"),
         .executableTarget(name: "Notepanel", dependencies: ["NotepanelCore"]),
-        .testTarget(name: "NotepanelCoreTests", dependencies: ["NotepanelCore"]),
+        // Assertion-based checks instead of a test target: XCTest needs Xcode, not just the
+        // Command Line Tools. Run with `swift run NotepanelChecks`.
+        .executableTarget(name: "NotepanelChecks", dependencies: ["NotepanelCore"]),
     ]
 )

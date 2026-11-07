@@ -3,7 +3,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-swift build -c release
+swift build -c release --product Notepanel
 bin="$(swift build -c release --show-bin-path)"
 app="build/notepanel.app"
 
