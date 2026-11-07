@@ -14,6 +14,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private var contentHeight: CGFloat = 0
     private var maxHeight: CGFloat = 640
     private var options: NSDictionary = [:]
+    /// Old names of renamed notes, so text the page sent under an old name still lands.
+    private var renamed: [String: String] = [:]
 
     private static let frameName = "Note Panel"
     private static let minHeight: CGFloat = 120
@@ -28,8 +30,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
         configurePanel()
         store.onStatus = { [weak self] message in self?.bridge.send("status", message ?? "") }
         store.onConflict = { [weak self] from, to in
-            self?.bridge.send("renamed", ["from": from, "to": to])
-            self?.rememberCurrent()
+            self?.noteRenamed(from, to)
             self?.updateTitle()
         }
         bridge.onMessage = { [weak self] type, body in self?.handle(type, body) }
@@ -117,9 +118,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private func handle(_ type: String, _ body: [String: Any]) {
         switch type {
         case "ready":
+            // Also after the page reloads, so it gets its options and a note again.
+            bridge.send("options", options)
             openSomeNote()
         case "changed":
-            guard let id = body["id"] as? String, id == store.current, let text = body["text"] as? String
+            // The page sends the whole text, so text sent under an old name is still current.
+            guard let sent = body["id"] as? String, (renamed[sent] ?? sent) == store.current,
+                let text = body["text"] as? String
             else { return }
             store.edit(text)
             updateTitle()
@@ -187,8 +192,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
     private func rename(_ old: String, to proposed: String) {
         do {
             let new = try store.rename(old, to: proposed)
-            if new != old { bridge.send("renamed", ["from": old, "to": new]) }
-            rememberCurrent()
+            if new != old { noteRenamed(old, new) }
         } catch NoteStoreError.exists {
             store.notify("A note named “\(proposed.trimmingCharacters(in: .whitespaces))” already exists.")
         } catch NoteStoreError.invalidName {
@@ -225,6 +229,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSTextFieldDelegate {
                 "text": text,
             ]
         }
+    }
+
+    private func noteRenamed(_ old: String, _ new: String) {
+        renamed[old] = new
+        for (from, to) in renamed where to == old { renamed[from] = new }
+        bridge.send("renamed", ["from": old, "to": new])
+        rememberCurrent()
     }
 
     private func rememberCurrent() {

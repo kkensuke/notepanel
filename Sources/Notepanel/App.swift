@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = PanelController(store: NoteStore(folder: Prefs.folder))
         controller.openSettings = { [weak self] in self?.settingsWindow.show() }
+        NSApp.mainMenu = mainMenu()
         setUpStatusItem()
         applySettings()
         let center = NotificationCenter.default
@@ -62,6 +63,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             { [weak self] in self?.controller.search() },
         ]
         hotKeys.set(zip(shortcuts, actions).compactMap { shortcut, action in shortcut.map { ($0, action) } })
+    }
+
+    /// Never shown, since the app has no menu bar of its own, but it gives the settings window
+    /// cut, copy, paste and close while the app is active. Undo and Select All stay out: in the
+    /// editor they must reach CodeMirror, not WebKit.
+    private func mainMenu() -> NSMenu {
+        let edit = NSMenu(title: "Edit")
+        edit.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        let window = NSMenu(title: "Window")
+        window.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let menu = NSMenu()
+        for submenu in [NSMenu(title: "notepanel"), edit, window] {
+            menu.addItem(withTitle: submenu.title, action: nil, keyEquivalent: "").submenu = submenu
+        }
+        return menu
     }
 
     // MARK: - Menu bar icon

@@ -47,6 +47,13 @@ final class EditorBridge: NSObject, WKScriptMessageHandler, WKNavigationDelegate
         onMessage(type, body)
     }
 
+    // If WebKit's page process dies, the page reloads and says "ready" again, and the controller
+    // reopens the note. The note's text is safe: the store already has everything the page sent.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        ready = false
+        webView.reload()
+    }
+
     // Only the editor page loads in the view. Links open in the browser through `openURL`,
     // and a file dropped on the view must not replace the page.
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction) async
