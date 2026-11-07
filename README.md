@@ -20,7 +20,8 @@ open build/notepanel.app
 ```
 
 The app lives in the menu bar. Press <kbd>⌃⌘N</kbd> to show or hide it, or click the menu bar icon.
-Right-click the icon for New Note, Search Notes, Settings, the backups folder and Quit.
+Right-click the icon for New Note, Search Notes, Settings, the backups folder and Quit. ⌘Q in the
+panel or in Settings also quits.
 You can hide the icon in Settings; then press ⌘, in the panel, or open notepanel again, to get to
 Settings.
 
@@ -68,6 +69,7 @@ listed there.
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text (the interface text size is in Settings) |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
+| ⌘Q | Quit (it saves first, and asks if something couldn't be saved) |
 | ⌘⌫ | Delete to the line start; at the start of a line, join it with the line above |
 | ⌘← / ⌘→ | Line start (after the indentation first) / line end |
 | ⌥↑ / ⌥↓, ⇧⌥↑ / ⇧⌥↓ | Move lines, copy lines |

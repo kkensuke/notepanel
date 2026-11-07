@@ -291,11 +291,6 @@ struct SettingsView: View {
                 Text(loginError).font(.caption).foregroundStyle(.red)
             }
         }
-        // Also here, since the menu bar icon's menu can be hidden.
-        HStack {
-            Spacer()
-            Button("Quit notepanel") { NSApp.terminate(nil) }
-        }
     }
 
     private func chooseFolder() {
