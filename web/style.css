@@ -2,8 +2,8 @@
   color-scheme: light dark;
   --font: "SF Mono", ui-monospace, Menlo, monospace;
   --size: 14px;
-  /* Sizes everything but the note's text; set from the Interface size setting. */
-  --ui-scale: 1.5;
+  /* Text size for everything but the note; set from the interface text size setting. */
+  --ui-size: 15px;
   --bg: Canvas;
   --fg: CanvasText;
   --muted: GrayText;
@@ -26,7 +26,7 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--fg);
-  font: calc(13px * var(--ui-scale)) -apple-system, BlinkMacSystemFont, sans-serif;
+  font: var(--ui-size) -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 body {
@@ -45,7 +45,7 @@ footer {
   justify-content: space-between;
   gap: 12px;
   padding: 2px 12px 6px;
-  font-size: calc(11px * var(--ui-scale));
+  font-size: calc(var(--ui-size) * 0.8);
   color: var(--muted);
   -webkit-user-select: none;
   user-select: none;
@@ -66,6 +66,8 @@ footer {
   position: absolute;
   inset: 0;
   background: var(--bg);
+  display: flex;
+  flex-direction: column;
 }
 
 #switcher[hidden] {
@@ -73,11 +75,14 @@ footer {
 }
 
 .box {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   padding: 4px 8px 8px;
 }
 
-#query,
-.rename {
+#query {
   box-sizing: border-box;
   width: 100%;
   padding: 6px 8px;
@@ -85,17 +90,17 @@ footer {
   border-radius: 6px;
   background: var(--panel);
   color: var(--fg);
-  font: calc(14px * var(--ui-scale)) -apple-system, BlinkMacSystemFont, sans-serif;
+  font: var(--ui-size) -apple-system, BlinkMacSystemFont, sans-serif;
   outline: none;
 }
 
-#query:focus,
-.rename:focus {
+#query:focus {
   border-color: var(--accent);
 }
 
 #results {
-  max-height: calc(320px * var(--ui-scale));
+  flex: 1;
+  min-height: 0;
   margin: 6px 0 0;
   padding: 0;
   overflow-y: auto;
@@ -104,7 +109,7 @@ footer {
 
 #results li {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   column-gap: 8px;
   padding: 5px 8px;
@@ -123,37 +128,21 @@ footer {
   white-space: nowrap;
 }
 
-.meta {
-  color: var(--muted);
-  font-size: calc(11px * var(--ui-scale));
-}
-
 .snippet {
   grid-column: 1 / -1;
   color: var(--muted);
-  font-size: calc(12px * var(--ui-scale));
+  font-size: calc(var(--ui-size) * 0.85);
 }
 
-/* Rename and Trash replace the date on the selected row and the row under the pointer. */
 .actions {
-  display: none;
-  gap: calc(4px * var(--ui-scale));
-}
-
-#results li:hover .actions,
-#results li[aria-selected="true"] .actions {
   display: flex;
-}
-
-#results li:hover .meta,
-#results li[aria-selected="true"] .meta {
-  display: none;
+  gap: calc(var(--ui-size) * 0.25);
 }
 
 .action {
   display: grid;
   place-items: center;
-  padding: calc(3px * var(--ui-scale));
+  padding: calc(var(--ui-size) * 0.2);
   border: none;
   border-radius: 5px;
   background: none;
@@ -170,9 +159,17 @@ footer {
   color: var(--error);
 }
 
+.action.pin[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.action.pin[aria-pressed="true"] svg {
+  fill: currentColor;
+}
+
 .action svg {
-  width: calc(14px * var(--ui-scale));
-  height: calc(14px * var(--ui-scale));
+  width: var(--ui-size);
+  height: var(--ui-size);
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
