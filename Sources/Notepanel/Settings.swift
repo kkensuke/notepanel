@@ -221,19 +221,27 @@ struct SettingsView: View {
                     .onTapGesture { model.tab = model.tab == .general ? .shortcuts : .general }
             }
             .padding(.top, 12)
-            Form {
-                switch model.tab {
-                case .general: general
-                case .shortcuts: shortcuts
-                }
+            ZStack(alignment: .top) {
+                page(.general) { general }
+                page(.shortcuts) { shortcuts }
             }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
         }
         .font(.system(size: uiFontSize))
         .controlSize(uiFontSize >= 17 ? .large : .regular)
         .frame(width: uiFontSize * 26)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Both tabs are laid out and the other one is hidden, so the window is as tall as the taller
+    /// tab and keeps its height when the tab changes.
+    private func page<Content: View>(_ tab: SettingsTab, @ViewBuilder _ content: () -> Content) -> some View {
+        let shown = model.tab == tab
+        return Form(content: content)
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .opacity(shown ? 1 : 0)
+            .disabled(!shown)
+            .accessibilityHidden(!shown)
     }
 
     @ViewBuilder private var shortcuts: some View {
