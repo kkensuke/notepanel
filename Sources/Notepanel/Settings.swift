@@ -243,12 +243,14 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var general: some View {
-        Section("Notes folder") {
+        Section {
             Text(folder)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .textSelection(.enabled)
+        } header: {
             HStack {
+                Text("Notes folder")
                 Spacer()
                 Button("Use Default") { folder = Prefs.defaultFolder }
                     .disabled(folder == Prefs.defaultFolder)
