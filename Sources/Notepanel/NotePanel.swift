@@ -6,6 +6,9 @@ final class NotePanel: NSPanel {
     var commands: [String: () -> Void] = [:]
     /// Cmd-plus and Cmd-minus (+1 and -1, repeating while held) and Cmd-0 (0, to reset).
     var onZoom: (Int) -> Void = { _ in }
+    /// Shortcuts set in Settings that work only while the panel is in front, such as cycling
+    /// through notes. They come before the editor, so one can be any key, and repeat while held.
+    var shortcuts: [(Shortcut, () -> Void)] = []
 
     override var canBecomeKey: Bool { true }
 
@@ -31,6 +34,14 @@ final class NotePanel: NSPanel {
             }
         }
         return super.performKeyEquivalent(with: event)
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, let action = shortcuts.first(where: { $0.0.matches(event) })?.1 {
+            action()
+            return
+        }
+        super.sendEvent(event)
     }
 
     // A double-click on the title bar would otherwise zoom the panel to fill the screen.

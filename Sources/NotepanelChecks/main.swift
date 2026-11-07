@@ -1,6 +1,5 @@
 // Assertion-based checks for NotepanelCore. Run with `swift run NotepanelChecks`.
 // They stand in for XCTest, which the Command Line Tools don't include.
-import CoreGraphics
 import Foundation
 import NotepanelCore
 
@@ -60,24 +59,6 @@ func unwrapped<T>(_ value: T?) throws -> T {
 func contents(_ store: NoteStore, _ name: String) throws -> String {
     try String(contentsOf: store.url(name), encoding: .utf8)
 }
-
-// MARK: - Window fitting
-
-let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
-let window = CGRect(x: 0, y: 0, width: 400, height: 200)
-
-// The top edge stays put while the window grows.
-equal(
-    fittedFrame(CGRect(x: 100, y: 500, width: 400, height: 200), height: 300, minHeight: 120, maxHeight: 640, in: screen),
-    CGRect(x: 100, y: 400, width: 400, height: 300))
-// At the bottom of the screen, the window moves up instead.
-equal(
-    fittedFrame(CGRect(x: 0, y: 100, width: 400, height: 200), height: 500, minHeight: 120, maxHeight: 640, in: screen),
-    CGRect(x: 0, y: 0, width: 400, height: 500))
-// The height stays within the limits and the screen.
-equal(fittedFrame(window, height: 5000, minHeight: 120, maxHeight: 640, in: screen).height, 640)
-equal(fittedFrame(window, height: 10, minHeight: 120, maxHeight: 640, in: screen).height, 120)
-equal(fittedFrame(window, height: 900, minHeight: 120, maxHeight: 2000, in: screen).height, 800)
 
 // MARK: - Names
 

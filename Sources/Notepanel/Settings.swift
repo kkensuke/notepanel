@@ -8,6 +8,10 @@ struct Shortcut: Codable, Equatable {
     /// Carbon modifier flags, as `RegisterEventHotKey` takes them.
     var modifiers: Int
     var display: String
+
+    func matches(_ event: NSEvent) -> Bool {
+        Int(event.keyCode) == keyCode && carbonModifiers(event.modifierFlags) == modifiers
+    }
 }
 
 extension Notification.Name {
@@ -20,12 +24,17 @@ enum Prefs {
     static let defaultFolder = "~/Library/Application Support/notepanel/Notes"
     static let defaultFontSize = 14.0
     static let fontSizes = 9.0...36.0
-    /// Sizes everything but the note's text: the title bar, the switcher, the footer and the
-    /// settings window.
-    static let defaultUIScale = 1.5
-    static let uiScales = 1.0...2.0
+    /// The text size of everything but the note: the title bar, the switcher, the footer and the
+    /// settings window. The toolbar's symbols follow it.
+    static let defaultUIFontSize = 15.0
+    static let uiFontSizes: [Double] = [12, 13, 14, 15, 16, 17, 18, 20]
+    /// Global shortcuts, which work from any app.
     static let hotKeyNames = ["hotkey.toggle", "hotkey.create", "hotkey.search"]
-    static let defaultToggle = Shortcut(keyCode: kVK_ANSI_N, modifiers: controlKey | cmdKey, display: "⌃⌘N")
+    static let defaultShortcuts: [String: Shortcut] = [
+        "hotkey.toggle": Shortcut(keyCode: kVK_ANSI_N, modifiers: controlKey | cmdKey, display: "⌃⌘N"),
+        "shortcut.nextNote": Shortcut(keyCode: kVK_Tab, modifiers: controlKey, display: "⌃⇥"),
+        "shortcut.previousNote": Shortcut(keyCode: kVK_Tab, modifiers: controlKey | shiftKey, display: "⌃⇧⇥"),
+    ]
 
     static var folder: URL {
         let path = UserDefaults.standard.string(forKey: "folder") ?? defaultFolder
@@ -38,15 +47,24 @@ enum Prefs {
 
     /// A shortcut that was never set has its default; one stored as an empty string is off.
     static func shortcut(_ name: String) -> Shortcut? {
-        guard let stored = UserDefaults.standard.string(forKey: name) else {
-            return name == "hotkey.toggle" ? defaultToggle : nil
-        }
+        guard let stored = UserDefaults.standard.string(forKey: name) else { return defaultShortcuts[name] }
         return try? JSONDecoder().decode(Shortcut.self, from: Data(stored.utf8))
     }
 
     static func setShortcut(_ shortcut: Shortcut?, for name: String) {
         let json = shortcut.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) }
         UserDefaults.standard.set(json ?? "", forKey: name)
+    }
+
+    /// Pinned notes by name, kept per notes folder. Not in the folder, so the notes stay plain files.
+    static func pinned(in folder: URL) -> [String] {
+        (UserDefaults.standard.dictionary(forKey: "pinned")?[folder.path] as? [String]) ?? []
+    }
+
+    static func setPinned(_ names: [String], in folder: URL) {
+        var all = UserDefaults.standard.dictionary(forKey: "pinned") ?? [:]
+        all[folder.path] = names.isEmpty ? nil : names
+        UserDefaults.standard.set(all, forKey: "pinned")
     }
 }
 
@@ -85,6 +103,8 @@ final class SettingsModel {
     let toggleShortcut = ShortcutRecorder(name: "hotkey.toggle")
     let createShortcut = ShortcutRecorder(name: "hotkey.create")
     let searchShortcut = ShortcutRecorder(name: "hotkey.search")
+    let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", global: false)
+    let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", global: false)
 
     /// The login item can be changed in System Settings too, so it's read each time the window shows.
     func refresh() {
@@ -111,12 +131,16 @@ final class SettingsModel {
 @Observable
 final class ShortcutRecorder {
     let name: String
+    /// A global shortcut needs Command, Control or Option, so typing can't trigger it. One that
+    /// works only in the panel may use Shift alone.
+    let global: Bool
     private(set) var shortcut: Shortcut?
     private(set) var recording = false
     @ObservationIgnored private var monitor: Any?
 
-    init(name: String) {
+    init(name: String, global: Bool = true) {
         self.name = name
+        self.global = global
         shortcut = Prefs.shortcut(name)
     }
 
@@ -154,7 +178,8 @@ final class ShortcutRecorder {
             return
         }
         let flags = event.modifierFlags.intersection([.control, .option, .shift, .command])
-        guard !flags.isDisjoint(with: [.control, .option, .command]) else {
+        guard !flags.isDisjoint(with: global ? [.control, .option, .command] : [.control, .option, .command, .shift])
+        else {
             NSSound.beep()
             return
         }
@@ -173,14 +198,18 @@ struct SettingsView: View {
     @AppStorage("folder") private var folder = Prefs.defaultFolder
     @AppStorage("fontFamily") private var fontFamily = ""
     @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
-    @AppStorage("uiScale") private var uiScale = Prefs.defaultUIScale
+    @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
 
     var body: some View {
         Form {
-            Section("Shortcuts") {
+            Section("Shortcuts from any app") {
                 ShortcutField(title: "Show or hide notes", recorder: model.toggleShortcut)
                 ShortcutField(title: "New note", recorder: model.createShortcut)
                 ShortcutField(title: "Search notes", recorder: model.searchShortcut)
+            }
+            Section("Shortcuts in the panel") {
+                ShortcutField(title: "Next note", recorder: model.nextShortcut)
+                ShortcutField(title: "Previous note", recorder: model.previousShortcut)
             }
             Section("Notes folder") {
                 Text(folder)
@@ -199,9 +228,12 @@ struct SettingsView: View {
                 Stepper("Size: \(Int(fontSize)) pt  (⌘+ / ⌘− / ⌘0)", value: $fontSize, in: Prefs.fontSizes)
             }
             Section("Interface") {
-                // Verbatim, so the "%" isn't read as a format specifier.
-                Stepper(value: $uiScale, in: Prefs.uiScales, step: 0.1) {
-                    Text(verbatim: "Size: \(Int((uiScale * 100).rounded()))%")
+                // A menu rather than a stepper: this setting resizes the window, which would move a
+                // stepper's arrows out from under the pointer after every click.
+                Picker("Text size", selection: $uiFontSize) {
+                    ForEach(Prefs.uiFontSizes, id: \.self) { size in
+                        Text(verbatim: "\(Int(size)) pt").tag(size)
+                    }
                 }
             }
             Section {
@@ -215,9 +247,9 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .scrollDisabled(true)
-        .font(.system(size: 13 * uiScale))
-        .controlSize(uiScale >= 1.3 ? .large : .regular)
-        .frame(width: 460 * uiScale)
+        .font(.system(size: uiFontSize))
+        .controlSize(uiFontSize >= 17 ? .large : .regular)
+        .frame(width: uiFontSize * 26)
         .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -266,7 +298,7 @@ private func symbols(_ flags: NSEvent.ModifierFlags) -> String {
     modifierSymbols.filter { flags.contains($0.0) }.map(\.1).joined()
 }
 
-private func carbonModifiers(_ flags: NSEvent.ModifierFlags) -> Int {
+func carbonModifiers(_ flags: NSEvent.ModifierFlags) -> Int {
     var result = 0
     if flags.contains(.command) { result |= cmdKey }
     if flags.contains(.option) { result |= optionKey }
