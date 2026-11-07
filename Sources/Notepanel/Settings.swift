@@ -81,7 +81,7 @@ final class SettingsWindow {
             let host = NSHostingController(rootView: SettingsView(model: model))
             host.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: host)
-            window.title = "notepanel Settings"
+            window.title = "Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             // Above the note panel, which floats.
