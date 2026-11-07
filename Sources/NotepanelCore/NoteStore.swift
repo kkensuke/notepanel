@@ -176,6 +176,11 @@ public final class NoteStore {
         closeCurrent()
     }
 
+    /// Shows a message in the footer until the next successful save.
+    public func notify(_ message: String) {
+        report(message)
+    }
+
     private func closeCurrent() {
         current = nil
         text = ""
