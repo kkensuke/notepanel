@@ -4,6 +4,8 @@ import AppKit
 final class NotePanel: NSPanel {
     /// Cmd-key commands, by lowercased character. They don't repeat while the key is held.
     var commands: [String: () -> Void] = [:]
+    /// Cmd-plus and Cmd-minus (+1 and -1, repeating while held) and Cmd-0 (0, to reset).
+    var onZoom: (Int) -> Void = { _ in }
 
     override var canBecomeKey: Bool { true }
 
@@ -12,6 +14,13 @@ final class NotePanel: NSPanel {
     // including Cmd-Z and its key repeats, goes on to the editor page.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        // Shift is allowed, since on some keyboards "+" needs it.
+        if modifiers.subtracting(.shift) == .command, let key = event.charactersIgnoringModifiers,
+            let step = Self.zoomSteps[key]
+        {
+            onZoom(step)
+            return true
+        }
         if modifiers == .command, let key = event.charactersIgnoringModifiers?.lowercased() {
             if let command = commands[key] {
                 if !event.isARepeat { command() }
@@ -26,6 +35,8 @@ final class NotePanel: NSPanel {
 
     // A double-click on the title bar would otherwise zoom the panel to fill the screen.
     override func zoom(_ sender: Any?) {}
+
+    private static let zoomSteps: [String: Int] = ["+": 1, "=": 1, "-": -1, "0": 0]
 
     private static let editActions: [String: Selector] = [
         "x": #selector(NSText.cut(_:)),
