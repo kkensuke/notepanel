@@ -1,0 +1,133 @@
+:root {
+  color-scheme: light dark;
+  --font: "SF Mono", ui-monospace, Menlo, monospace;
+  --size: 14px;
+  --bg: Canvas;
+  --fg: CanvasText;
+  --muted: GrayText;
+  --accent: AccentColor;
+  --link: LinkText;
+  --border: color-mix(in srgb, CanvasText 14%, transparent);
+  --panel: color-mix(in srgb, CanvasText 4%, Canvas);
+  --code: color-mix(in srgb, #c2185b 75%, CanvasText);
+  --selection: color-mix(in srgb, AccentColor 28%, transparent);
+  --match: color-mix(in srgb, AccentColor 14%, transparent);
+  --search: color-mix(in srgb, #ffc400 40%, transparent);
+  --search-current: color-mix(in srgb, #ff8a00 55%, transparent);
+  --error: #d32f2f;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#editor {
+  flex: 1;
+  min-height: 0;
+}
+
+footer {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 12px 6px;
+  font-size: 11px;
+  color: var(--muted);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#status {
+  color: var(--error);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#count {
+  flex: none;
+}
+
+#switcher {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}
+
+#switcher[hidden] {
+  display: none;
+}
+
+.box {
+  padding: 4px 8px 8px;
+}
+
+#query,
+.rename {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--fg);
+  font: 14px -apple-system, BlinkMacSystemFont, sans-serif;
+  outline: none;
+}
+
+#query:focus,
+.rename:focus {
+  border-color: var(--accent);
+}
+
+#results {
+  max-height: 420px;
+  margin: 6px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+#results li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: default;
+}
+
+#results li[aria-selected="true"] {
+  background: var(--selection);
+}
+
+.title,
+.snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 11px;
+  align-self: center;
+}
+
+.snippet {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+}
