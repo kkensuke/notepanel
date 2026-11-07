@@ -10,7 +10,8 @@ The design and the agreed feature list are in [docs/design.md](docs/design.md) (
 
 ## Build
 
-Needs macOS 14 or later and Swift 5.10 or later (Xcode or the Command Line Tools).
+Needs macOS 14 or later and Swift 5.10 or later. The Command Line Tools are enough; Xcode isn't
+needed.
 
 ```sh
 scripts/bundle.sh                         # builds build/notepanel.app
@@ -33,10 +34,13 @@ npm run build   # writes ../web/editor.js
 ## Test
 
 ```sh
-swift test                  # NotepanelCore: saving, conflicts, naming, window fitting
+swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, window fitting
 cd editor && npm test       # editor helpers: search ranking, links, line insertion, counts
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
+
+`NotepanelChecks` is a plain executable of assertions rather than an XCTest target, because XCTest
+comes only with Xcode.
 
 The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/Applications`.
 

@@ -40,13 +40,17 @@ enum Prefs {
     }
 }
 
+// The window's own state lives in @Observable models, not @State: in the macOS 27 SDK @State is
+// a macro whose plugin ships only with Xcode, and notepanel builds with the Command Line Tools.
+
 @MainActor
 final class SettingsWindow {
+    private let model = SettingsModel()
     private var window: NSWindow?
 
     func show() {
         if window == nil {
-            let host = NSHostingController(rootView: SettingsView())
+            let host = NSHostingController(rootView: SettingsView(model: model))
             host.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: host)
             window.title = "notepanel Settings"
@@ -57,58 +61,27 @@ final class SettingsWindow {
             window.center()
             self.window = window
         }
+        model.refresh()
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
 }
 
-struct SettingsView: View {
-    @AppStorage("folder") private var folder = Prefs.defaultFolder
-    @AppStorage("fontFamily") private var fontFamily = ""
-    @AppStorage("fontSize") private var fontSize = 14.0
-    @AppStorage("maxHeight") private var maxHeight = 640.0
-    @State private var openAtLogin = SMAppService.mainApp.status == .enabled
-    @State private var loginError: String?
+@MainActor
+@Observable
+final class SettingsModel {
+    private(set) var openAtLogin = false
+    private(set) var loginError: String?
+    let toggleShortcut = ShortcutRecorder(name: "hotkey.toggle")
+    let createShortcut = ShortcutRecorder(name: "hotkey.create")
+    let searchShortcut = ShortcutRecorder(name: "hotkey.search")
 
-    var body: some View {
-        Form {
-            Section("Shortcuts") {
-                ShortcutField(title: "Show or hide notes", name: "hotkey.toggle")
-                ShortcutField(title: "New note", name: "hotkey.create")
-                ShortcutField(title: "Search notes", name: "hotkey.search")
-            }
-            Section("Notes folder") {
-                Text(folder)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                HStack {
-                    Spacer()
-                    Button("Use Default") { folder = Prefs.defaultFolder }
-                        .disabled(folder == Prefs.defaultFolder)
-                    Button("Choose…", action: chooseFolder)
-                }
-            }
-            Section("Editor") {
-                TextField("Font", text: $fontFamily, prompt: Text("SF Mono"))
-                Stepper("Font size: \(Int(fontSize)) pt", value: $fontSize, in: 9...36)
-                Stepper("Maximum height: \(Int(maxHeight)) pt", value: $maxHeight, in: 200...2400, step: 40)
-            }
-            Section {
-                Toggle("Open at login", isOn: $openAtLogin)
-                if let loginError {
-                    Text(loginError).font(.caption).foregroundStyle(.red)
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .scrollDisabled(true)
-        .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: openAtLogin) { _, enabled in setOpenAtLogin(enabled) }
+    /// The login item can be changed in System Settings too, so it's read each time the window shows.
+    func refresh() {
+        openAtLogin = SMAppService.mainApp.status == .enabled
     }
 
-    private func setOpenAtLogin(_ enabled: Bool) {
+    func setOpenAtLogin(_ enabled: Bool) {
         do {
             if enabled {
                 try SMAppService.mainApp.register()
@@ -119,55 +92,47 @@ struct SettingsView: View {
         } catch {
             loginError = error.localizedDescription
         }
-    }
-
-    private func chooseFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.prompt = "Choose"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        folder = (url.path as NSString).abbreviatingWithTildeInPath
+        refresh()
     }
 }
 
 /// Click, then press the shortcut. Esc cancels, and the x button removes the shortcut.
-struct ShortcutField: View {
-    let title: String
+@MainActor
+@Observable
+final class ShortcutRecorder {
     let name: String
-    @State private var shortcut: Shortcut?
-    @State private var recording = false
-    @State private var monitor: Any?
+    private(set) var shortcut: Shortcut?
+    private(set) var recording = false
+    @ObservationIgnored private var monitor: Any?
 
-    var body: some View {
-        LabeledContent(title) {
-            HStack(spacing: 6) {
-                Button(recording ? "Type a shortcut…" : (shortcut?.display ?? "Record Shortcut")) {
-                    if recording { stop() } else { start() }
-                }
-                if shortcut != nil, !recording {
-                    Button {
-                        save(nil)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Remove shortcut")
-                    .accessibilityLabel("Remove shortcut")
-                }
-            }
-        }
-        .onAppear { shortcut = Prefs.shortcut(name) }
-        .onDisappear { stop() }
+    init(name: String) {
+        self.name = name
+        shortcut = Prefs.shortcut(name)
+    }
+
+    func toggle() {
+        if recording { stop() } else { start() }
+    }
+
+    func clear() {
+        save(nil)
+    }
+
+    func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        guard recording else { return }
+        recording = false
+        NotificationCenter.default.post(name: .recordingShortcut, object: false)
     }
 
     private func start() {
         recording = true
         // Otherwise pressing a registered shortcut would trigger it instead of recording it.
         NotificationCenter.default.post(name: .recordingShortcut, object: true)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            record(event)
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            // Local monitors run on the main thread.
+            MainActor.assumeIsolated { self?.record(event) }
             return nil
         }
     }
@@ -187,17 +152,92 @@ struct ShortcutField: View {
         stop()
     }
 
-    private func stop() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
-        guard recording else { return }
-        recording = false
-        NotificationCenter.default.post(name: .recordingShortcut, object: false)
-    }
-
     private func save(_ new: Shortcut?) {
         shortcut = new
         Prefs.setShortcut(new, for: name)
+    }
+}
+
+struct SettingsView: View {
+    let model: SettingsModel
+    @AppStorage("folder") private var folder = Prefs.defaultFolder
+    @AppStorage("fontFamily") private var fontFamily = ""
+    @AppStorage("fontSize") private var fontSize = 14.0
+    @AppStorage("maxHeight") private var maxHeight = 640.0
+
+    var body: some View {
+        Form {
+            Section("Shortcuts") {
+                ShortcutField(title: "Show or hide notes", recorder: model.toggleShortcut)
+                ShortcutField(title: "New note", recorder: model.createShortcut)
+                ShortcutField(title: "Search notes", recorder: model.searchShortcut)
+            }
+            Section("Notes folder") {
+                Text(folder)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                HStack {
+                    Spacer()
+                    Button("Use Default") { folder = Prefs.defaultFolder }
+                        .disabled(folder == Prefs.defaultFolder)
+                    Button("Choose…", action: chooseFolder)
+                }
+            }
+            Section("Editor") {
+                TextField("Font", text: $fontFamily, prompt: Text("SF Mono"))
+                Stepper("Font size: \(Int(fontSize)) pt", value: $fontSize, in: 9...36)
+                Stepper("Maximum height: \(Int(maxHeight)) pt", value: $maxHeight, in: 200...2400, step: 40)
+            }
+            Section {
+                Toggle(
+                    "Open at login",
+                    isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
+                if let loginError = model.loginError {
+                    Text(loginError).font(.caption).foregroundStyle(.red)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .scrollDisabled(true)
+        .frame(width: 460)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        folder = (url.path as NSString).abbreviatingWithTildeInPath
+    }
+}
+
+struct ShortcutField: View {
+    let title: String
+    let recorder: ShortcutRecorder
+
+    var body: some View {
+        LabeledContent(title) {
+            HStack(spacing: 6) {
+                Button(recorder.recording ? "Type a shortcut…" : (recorder.shortcut?.display ?? "Record Shortcut")) {
+                    recorder.toggle()
+                }
+                if recorder.shortcut != nil, !recorder.recording {
+                    Button {
+                        recorder.clear()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Remove shortcut")
+                    .accessibilityLabel("Remove shortcut")
+                }
+            }
+        }
+        .onDisappear { recorder.stop() }
     }
 }
 
