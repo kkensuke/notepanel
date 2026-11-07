@@ -6,9 +6,20 @@ final class NotePanel: NSPanel {
     var commands: [String: () -> Void] = [:]
     /// Cmd-plus and Cmd-minus (+1 and -1, repeating while held) and Cmd-0 (0, to reset).
     var onZoom: (Int) -> Void = { _ in }
-    /// Shortcuts set in Settings that work only while the panel is in front, such as cycling
-    /// through notes. They come before the editor, so one can be any key, and repeat while held.
-    var shortcuts: [(Shortcut, () -> Void)] = []
+    /// Shortcuts set in Settings that work only while the panel is key, such as cycling through
+    /// notes. They repeat while held. They're taken before AppKit routes the key, so one can be any
+    /// key, even Control-Tab, which AppKit would otherwise use to move the focus to the title.
+    var shortcuts: [(Shortcut, () -> Void)] = [] {
+        didSet {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                // Local monitors run on the main thread.
+                let handled = MainActor.assumeIsolated { self?.runShortcut(event) ?? false }
+                return handled ? nil : event
+            }
+        }
+    }
+    private var monitor: Any?
 
     override var canBecomeKey: Bool { true }
 
@@ -36,12 +47,12 @@ final class NotePanel: NSPanel {
         return super.performKeyEquivalent(with: event)
     }
 
-    override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, let action = shortcuts.first(where: { $0.0.matches(event) })?.1 {
-            action()
-            return
+    private func runShortcut(_ event: NSEvent) -> Bool {
+        guard event.window === self, let action = shortcuts.first(where: { $0.0.matches(event) })?.1 else {
+            return false
         }
-        super.sendEvent(event)
+        action()
+        return true
     }
 
     // A double-click on the title bar would otherwise zoom the panel to fill the screen.
