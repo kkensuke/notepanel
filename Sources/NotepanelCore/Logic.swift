@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Fits the window to `height`, keeping its top edge until the bottom would leave the screen.
