@@ -267,7 +267,7 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 
 | ID | リスク | 確認方法 | だめだった場合 |
 |---|---|---|---|
-| R1 | アプリが非アクティブのまま非アクティブ化パネルを key にしたとき、WKWebView にキー入力が届き、キャレットが点滅するか | 他のアプリを使っている最中にホットキーで呼び出して入力する | 表示時に `NSApp.activate()` を呼ぶ方式にする。`defaults write <bundle id> activateOnShow -bool true` で切り替えて試せるようにしておく |
+| R1 | アプリが非アクティブのまま非アクティブ化パネルを key にしたとき、WKWebView にキー入力が届き、キャレットが点滅するか | 他のアプリを使っている最中にホットキーで呼び出して入力する | 表示時に `NSApp.activate()` を呼ぶ方式にする |
 | R2 | 日本語 IME：変換中の Enter で改行しない、確定後の文字がずれない | ひらがなを入力し、変換・確定・Enter を繰り返す | R1 と同じ対処 |
 | R3 | マウスカーソルが I ビームに変わるか。非アクティブ化パネルでは変わらない既知の問題がある | エディタ上にマウスを乗せる | 実害は小さいので許容するか、R1 と同じ対処 |
 | R4 | ⌘Z の長押しで `keydown` が繰り返し届くか | ⌘Z を 2 秒押し続ける | `NotePanel` でリピートを受け、JS の `undo` を直接呼ぶ |
@@ -418,7 +418,7 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 
 - `NotepanelCore`（高さの計算、表示名、命名、名前の検証、保存・衝突・名前変更）は、アサーションで確かめる実行ファイル `NotepanelChecks` で確かめる（`swift run NotepanelChecks`）。XCTest は Xcode にしか含まれず、Command Line Tools だけでは使えないため。
 - エディタの純粋関数（あいまい一致と並べ替え、URL の抽出、上への行挿入、文字数）は Node の `node --test` で確かめる。
-- R1〜R6 と IME は、README の確認項目に沿って実機で確かめる。
+- R1〜R6 と IME は実機で確かめる。実機での利用で問題が出なかったため、v0.4 で README の確認手順と、確認用の切り替え（`activateOnShow`）を外した。
 
 ビルド：Xcode プロジェクトは作らない。SwiftPM と `scripts/bundle.sh`（.app の生成と ad-hoc 署名）を使い、Command Line Tools だけでビルドできるようにする。そのため、Xcode にしか実装（マクロのプラグイン）が含まれない SwiftUI のマクロ（macOS 27 SDK の `@State` など）は使わず、状態は `@Observable` のモデルに持たせる。エディタは `editor/` で `npm run build` を実行し、`web/editor.js` を出力する。`web/editor.js` はリポジトリに含めるので、エディタを変更しない限り Node は不要。
 

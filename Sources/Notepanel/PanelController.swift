@@ -52,8 +52,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
                 bridge.send("open", ["id": name, "text": text, "keep": false])
             }
         }
-        // shortcut: lets risk R1 be tried both ways; remove once M0 settles on one.
-        if UserDefaults.standard.bool(forKey: "activateOnShow") { NSApp.activate() }
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         focusEditor()

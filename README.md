@@ -55,6 +55,9 @@ comes only with Xcode.
 
 The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/Applications`.
 
+To inspect the editor page in the running app, enable Safari's Develop menu; notepanel's page is
+listed there.
+
 ## Keys
 
 | Key | Does |
@@ -75,28 +78,3 @@ The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/
 | In the switcher: ↑↓, Enter, ⌘⌫ | Choose, open, move to the Trash (each row also has Pin and Trash buttons) |
 
 Click the note's name in the title bar to rename it. The panel keeps the size you give it.
-
-## Checking it on a Mac
-
-These depend on how macOS treats a non-activating panel that hosts a web view, and need checking by
-hand (risks R1–R6 in the design):
-
-1. **Typing (R1).** While using another app, press ⌃⌘N and type at once. The caret blinks and text
-   appears.
-2. **Japanese input (R2).** Type with an input method, convert, confirm, and press Return. Return
-   during conversion confirms it and adds no line.
-3. **Pointer (R3).** Over the text, the pointer is an I-beam.
-4. **Held undo (R4).** Hold ⌘Z: it keeps undoing. Hold ⌘⌫ at the start of lines: it deletes
-   across empty lines.
-5. **Full screen (R5).** With Safari, QuickTime or Keynote in full screen, press ⌃⌘N: the panel
-   appears over it.
-6. **Focus (R6).** After showing the panel, typing goes into the note without a click. After Esc,
-   typing goes back to the previous app.
-
-If 1–3 fail, try activating the app when the panel shows, then repeat the checks:
-
-```sh
-defaults write io.github.kkensuke.notepanel activateOnShow -bool true   # back: delete the key
-```
-
-To inspect the editor page, enable Safari's Develop menu; notepanel's page is listed there.
