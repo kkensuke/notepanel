@@ -1,0 +1,400 @@
+# notepanel 設計書
+
+- 版：v0.2（2026-11-07）
+- 状態：機能を確定し、実装中
+- v0.1 からの変更：§8 の任意機能の採否、保存先、既定のホットキー、アプリ名を確定した。設定は専用画面（G2）にし、settings.json の直接編集（G1）はやめた。
+
+## 1. 目的と範囲
+
+tinycast Notes の「呼び出し・ウィンドウ・ファイル運用」と、Heynote の「編集操作」（CodeMirror 6）を組み合わせた、macOS 用のフローティングメモを作る。tinycast とは独立したアプリで、保存先も共有しない。
+
+- 目的：ホットキーで呼び出し、VS Code と同じキー操作で書き、隠すと元のアプリに戻る。
+- 範囲外：Markdown のライブ描画（記号を隠す表示）、同期、複数ウィンドウ、ブロック、計算、AI、画像。
+
+## 2. 既存ツールの確認結果
+
+両者の長所を兼ねるツールは見つからなかった。
+
+表1：近い既存ツールと、要件に合わない点
+
+| ツール | 構成 | 合わない点 |
+|---|---|---|
+| Stik | Tauri＋CodeMirror 6、1 ノート 1 .md、グローバルショートカット | 音声、AI、git 同期など機能が 14 分野あり、最小構成から遠い。全画面アプリ上での表示は記載なし |
+| Jotdown | Swift＋WKWebView＋CodeMirror 6 | 付箋型（ノートごとに枠なしウィンドウ）。保存の本体は JSON で、.md は複製 |
+| Markraft | Rust（GPUI）、1 ノート 1 .md | Typora 風の書式表示で、VS Code 風の編集操作ではない |
+| Heynote | Electron＋CodeMirror 6 | 通常の NSWindow のため全画面アプリ上の表示が不安定。保存は区切り行入りの .txt |
+| tinycast | Swift＋NSTextView | 編集操作（長押し Undo、⌘⌫、⌘←）に不満がある |
+
+Jotdown は、Swift のネイティブ部分と WKWebView 上の CodeMirror 6 を組み合わせる本設計の構成が実際に動くことを示している。
+
+## 3. 方針
+
+ponytail の指示に従い、次の順で手段を選ぶ。
+
+1. 頼まれていない機能は作らない。機能は §8 で採否を決めたものだけ作る。
+2. macOS 標準機能を使う：NSPanel、WKWebView、Carbon の `RegisterEventHotKey`、`NSStatusItem`、`FileManager`、`UserDefaults`、`SMAppService`。
+3. 外部依存は CodeMirror 6（MIT）だけにする。ビルド時に esbuild で 1 ファイルにまとめ、リポジトリに含める。Swift 側の依存はゼロ。
+4. コードは新しく書く。tinycast（AGPL-3.0）は設計だけ参考にし、コードは写さない。
+
+### 3.1 構成を Swift＋WKWebView にする理由
+
+- 非アクティブ化パネル（`.nonactivatingPanel`）と常駐型（accessory）の起動方式が、ネイティブ API でそのまま使える。tinycast のノート画面と同じ条件で、全画面アプリの上に出せる。
+- WKWebView は OS に入っているので、Chromium を同梱しない。
+- 編集部分は Heynote と同じ CodeMirror 6 を使う。CodeMirror 6 の標準キーマップは、Heynote が macOS で使うキー割り当てとほぼ一致する（§6）。
+
+### 3.2 規模の見込み
+
+| 部分 | 見込み行数 |
+|---|---|
+| Swift（ネイティブ部分、設定画面を含む） | 約 900 行 |
+| JavaScript（エディタ・切替画面） | 約 300 行 |
+| HTML・CSS | 約 100 行 |
+
+CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild で minify すると、約 535 KB（gzip 約 183 KB）になる。ローカルから 1 回読むだけなので、呼び出し速度には影響しない見込み。
+
+## 4. 構成
+
+図1：部品の構成とメッセージの流れ
+
+```
+┌──────────────────────────── notepanel.app（LSUIElement） ─────────────────────────────┐
+│                                                                                      │
+│  HotKeys ──toggle/create/search──▶ PanelController ◀──click── StatusItem             │
+│  (RegisterEventHotKey)              │  表示・非表示・フォーカス復帰・高さ調整・名前の編集     │
+│                                     ▼                                                │
+│                              NotePanel（NSPanel, nonactivating）                       │
+│                               │ キー経路の第 1 段（アプリのコマンド、⌘X/C/V）              │
+│                               ▼                                                      │
+│  NoteStore ◀──JSON メッセージ──▶ EditorBridge ──▶ WKWebView                            │
+│  (.md の読み書き、自動保存、衝突検知)                  └─ editor.js（CodeMirror 6、切替画面） │
+│  Prefs / SettingsWindow（UserDefaults、設定画面）                                      │
+└──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+表2：部品の責務
+
+| 部品 | ファイル | 責務 |
+|---|---|---|
+| `AppDelegate` | `App.swift` | 起動、accessory ポリシー、メニューバーアイコン、設定の反映 |
+| `NotePanel` | `NotePanel.swift` | NSPanel のサブクラス。キー入力の第 1 段（§5.6） |
+| `PanelController` | `PanelController.swift` | 表示・非表示・トグル、フォーカス復帰、高さ調整、タイトルバー（名前の編集とボタン）、メッセージの処理 |
+| `HotKeys` | `HotKeys.swift` | `RegisterEventHotKey` の薄い包み。アクセシビリティ権限は不要 |
+| `EditorBridge` | `EditorBridge.swift` | WKWebView の生成と、JSON メッセージの送受信 |
+| `Prefs`、設定画面 | `Settings.swift` | `UserDefaults` の読み書き、SwiftUI の設定画面、ショートカットの録画 |
+| `NoteStore` | `NotepanelCore/NoteStore.swift` | 一覧・読み込み・保存・新規・名前変更・ゴミ箱、自動保存、外部変更と衝突の検知 |
+| 純粋関数 | `NotepanelCore/Logic.swift` | 高さの計算、表示名、`Untitled N` の命名、名前の検証、衝突時の名前 |
+| エディタ | `editor/src/main.js`、`logic.js` | CodeMirror 6 の設定、ノートごとの状態保持、切替画面、文字数、Esc の最終処理 |
+
+`NotepanelCore` は Foundation だけに依存するライブラリにし、XCTest で確かめられるようにする。
+
+## 5. 動作仕様
+
+### 5.1 呼び出し
+
+- ホットキー（既定は ⌃⌘N）で表示・非表示を切り替える。表示中でも前面になければ、前面に出してカーソルを置く。新規ノートと検索のホットキーは、既定では割り当てない。
+- メニューバーアイコンは常に表示する。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「新規ノート」「ノートを検索」「設定…」「終了」を出す。
+- 表示する直前に最前面のアプリを記録する。隠すときに、そのアプリがまだ最前面ならフォーカスを戻す。別のアプリに移っていれば何もしない（tinycast と同じ）。
+- パネルの設定は tinycast に合わせる：`.nonactivatingPanel`、`isFloatingPanel = true`、`hidesOnDeactivate = false`、`collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]`、`level = .floating`。
+
+### 5.2 ウィンドウ
+
+- 高さは内容に合わせて伸び縮みする。上端を固定し、下端が画面の可視領域を出るときだけ上へずらす。最小 120 pt、最大は設定値（既定 640 pt）で、超えたらスクロールする。
+- 幅と位置は `setFrameAutosaveName` で記憶する。
+- タイトルバーは透明にし、ネイティブのビューを重ねる。左にノート名、右に 3 つのボタン（新規・一覧・フォルダを開く）を置く。
+- ノート名はクリックすると編集でき、Enter かフォーカスを外すと名前を変更する。Esc で元に戻す。
+- 色は OS のライト・ダークに追従する（CSS のシステムカラーと `color-scheme`）。
+
+### 5.3 ノートとファイル
+
+- 保存先の既定は `~/Library/Application Support/notepanel/Notes`。設定画面でフォルダを選べる。
+- 1 ノート＝1 つの `.md` ファイル。ファイル名がタイトルになる。メタデータ、データベース、隠しファイルは作らない。
+- 対象は保存先フォルダ直下の `.md` だけ。サブフォルダ、隠しファイル、シンボリックリンクは無視する。
+- 新規ノートは `Untitled.md`、`Untitled 2.md` …と名付ける。名前が `Untitled` または `Untitled N` の間は、本文の最初の空でない行から Markdown 記号を除いたものを表示名にする。
+- 一覧は更新日時の新しい順に並べる。
+- 常に 1 つのノートを開いている状態を保つ。フォルダが空なら `Untitled.md` を作る。
+- 名前に使えないもの：空文字、`.` で始まる名前、`/` と `:` を含む名前、240 バイトを超える名前。大文字・小文字だけの変更はできる。
+- 削除は `FileManager.trashItem` でゴミ箱へ移す。ゴミ箱から戻せるので、確認ダイアログは出さない。
+
+### 5.4 切替画面
+
+- ⌘P でエディタの上に重ねて表示する。HTML で作り、キー操作を WKWebView 内で完結させる。
+- 何も入力していないときは更新順に一覧する。入力すると、タイトルはあいまい一致（文字が順に含まれていればよい）、本文は部分一致で絞り込む。タイトルの一致を本文の一致より上に並べ、本文の一致には該当行を添える。表示は最大 200 件。
+- ↑↓で選び、Enter かクリックで開く。⌘⌫ でゴミ箱へ移す。⌘R で名前を変更する（行が入力欄になり、Enter で確定、Esc で取り消し）。Esc で切替画面を閉じる。
+- 日本語入力の変換中は、Enter・Esc・矢印キーを切替画面の操作に使わない。
+- 本文の検索に使うため、切替画面を開くときに全ノートの本文をまとめて JS に渡す。
+
+  `// shortcut: 全ノートの本文を一括送信する。合計が数十 MB になったら Swift 側の検索に切り替える`
+
+### 5.5 編集
+
+CodeMirror 6 に次の拡張を入れる。
+
+- キーマップ：`defaultKeymap`（`standardKeymap` を含む）、`historyKeymap`、`searchKeymap`、`indentWithTab`。その前に ⌘L（`selectLine`）と ⇧⌘Enter（上に行を挿入）を置く。
+- `history()`、`drawSelection()`、`dropCursor()`、`highlightSpecialChars()`、`EditorState.allowMultipleSelections`
+- `EditorView.clickAddsSelectionRange`：⌥クリックでカーソルを追加する（VS Code と同じ。CodeMirror の既定は ⌘クリック）
+- `rectangularSelection`：⇧⌥ドラッグで矩形選択する（VS Code と同じ。CodeMirror の既定は ⌥ドラッグ）
+- `highlightSelectionMatches()`、`EditorView.lineWrapping`
+- `markdown({ base: markdownLanguage })`：GFM（取り消し線、タスクリスト）を含む色分け、Enter での箇条書きの継続、選択中のテキストへの URL の貼り付けによるリンク化
+- ⌘クリックでリンクを開く。対象は `[text](url)` と、`http://`・`https://`・`mailto:` で始まる URL。Swift 側でもスキームを確かめてから開く。
+- 文字数（改行を除く書記素の数）を右下に表示する。
+- ノートごとに `EditorState` を保持し、アプリ起動中はノートを切り替えても Undo 履歴とカーソル位置が残るようにする。外部の変更で本文が変わったノートは、新しい状態で開き直す。
+
+ソースで次の動作を確認済み。
+
+- ⌘⌫（`deleteLineBoundaryBackward`）は、行頭にいると直前の改行を消す。押し続ければ空行を越えて削除が続く。
+- ⌘←（`cursorLineBoundaryBackward`）はインデントの末尾へ移動し、もう一度押すと行頭へ移動する。
+- `@codemirror/view` には、キーリピート（`event.repeat`）を無視する処理がない。そのため ⌘Z の長押しで Undo が繰り返される見込み。
+- 選択範囲がない状態で ⌘C・⌘X を押すと、行全体をコピー・切り取りする（VS Code と同じ）。
+
+### 5.6 キー入力の経路
+
+非アクティブ化パネルでは、アプリが非アクティブのままなので、メインメニューのキー割り当てに頼れない。tinycast も、この場合に備えてパネル側でキーを処理している（`NotesPanel.performKeyEquivalent`）。本設計では、キー入力を次の順に処理する。
+
+1. `NotePanel.performKeyEquivalent`：アプリのコマンド（⌘N、⌘P、⌘W、⌘O、⌘,、⌘Q）を処理する。リピートは無視する。
+2. 同じ場所で ⌘X・⌘C・⌘V を受け、`NSApp.sendAction` で `cut:`・`copy:`・`paste:` を最初のレスポンダに送る。WKWebView では WebKit が DOM のクリップボードイベントを出し、CodeMirror が処理する。ノート名の編集中は、テキストフィールドが処理する。
+3. それ以外は `super` に渡す。WKWebView が DOM の `keydown` にし、CodeMirror のキーマップが処理する（⌘Z、⇧⌘Z、⌘A、⌘D、⌘F、⌘⌫、⌘← など）。この経路ではリピートを止めない。
+4. Esc は CodeMirror が先に処理する（検索パネルを閉じる、複数カーソルを 1 つに戻す）。何もすることがなければ、優先度が最も低いキーマップが `escape` を送り、ネイティブ側がパネルを隠す。切替画面が開いているときは、切替画面が Esc を受けて閉じる。
+
+Undo・Redo はメニューにも第 1 段にも入れない。メニュー経由にすると WebKit 標準の `undo:` が呼ばれ、CodeMirror の履歴と食い違うおそれがあるためである。
+
+### 5.7 保存
+
+- 入力が止まって 300 ms 後に自動保存する。隠すとき、ノートを切り替えるとき、終了するときは、待たずに保存する。
+- 書き込みは `Data.write(options: .atomic)` で行う。
+- 外部変更の検知：最後に読み書きしたときの更新日時とサイズを覚えておく。
+  - 表示するときに変化があり、未保存の変更がなければ読み直す。
+  - 保存しようとしたときに変化があれば、元ファイルは上書きしない。`<名前> (conflict 2026-11-07 1530).md` という名前で別に保存し、そのノートを開いたままにする。フッターで知らせる。
+  - 元ファイルが消えていれば、同じ名前で作り直す。
+- 保存に失敗したら、未保存の状態を保ったまま、フッターに赤字で知らせる。次の入力か保存の機会に再試行する。
+- 改行は LF で保存する（CodeMirror が CRLF を LF にそろえるため）。
+
+### 5.8 設定
+
+設定は `UserDefaults` に保存し、専用の設定画面（SwiftUI）で編集する。⌘, かメニューバーアイコンの「設定…」で開く。
+
+| 項目 | キー | 既定値 |
+|---|---|---|
+| 表示・非表示のホットキー | `hotkey.toggle` | ⌃⌘N |
+| 新規ノートのホットキー | `hotkey.create` | なし |
+| ノートを検索のホットキー | `hotkey.search` | なし |
+| 保存先フォルダ | `folder` | `~/Library/Application Support/notepanel/Notes` |
+| フォント | `fontFamily` | 空（SF Mono） |
+| 文字サイズ | `fontSize` | 14 |
+| 最大の高さ | `maxHeight` | 640 |
+| ログイン時に起動 | （`SMAppService` の状態） | オフ |
+
+- ホットキーは、ボタンを押してからキーを押して録画する。⌘・⌃・⌥ のどれかを含む組み合わせだけを受け付ける。Esc で取り消し、×ボタンで解除する。録画中はホットキーを一時的に外す。
+- 変更はすぐに反映する（`UserDefaults.didChangeNotification` を受けて、変わった項目だけを適用する）。
+
+### 5.9 ブリッジのメッセージ
+
+表3：Swift と JS の間でやり取りするメッセージ
+
+| 向き | 名前 | 内容 |
+|---|---|---|
+| Swift→JS | `open` | `{id, text, keep}`：ノートを開く。JS 側に同じ本文の状態があれば再利用する。`keep` が真なら切替画面を閉じない |
+| Swift→JS | `renamed` | `{from, to}`：名前の変更や衝突による別名保存を伝える |
+| Swift→JS | `trashed` | ノートの名前：保持している状態を捨てる |
+| Swift→JS | `switcher` | `{notes, force}`：切替画面を開閉する。`force` が真なら必ず開く |
+| Swift→JS | `notes` | 切替画面の一覧を更新する |
+| Swift→JS | `focus` | エディタ（切替画面が開いていれば検索欄）にフォーカスを置く |
+| Swift→JS | `options` | `{fontFamily, fontSize}` |
+| Swift→JS | `status` | フッターに出すメッセージ（空文字で消す） |
+| JS→Swift | `ready` | ページの読み込み完了。これより前に送るメッセージは Swift 側で待たせる |
+| JS→Swift | `changed` | `{id, text}`：入力ごとに送る。保存のタイミングは Swift 側で決める |
+| JS→Swift | `height` | `{height}`：エディタ・検索パネル・フッターの高さの合計。ウィンドウの高さ調整に使う |
+| JS→Swift | `select`、`trash` | `{id}`：切替画面の操作 |
+| JS→Swift | `rename` | `{from, to}`：切替画面での名前の変更 |
+| JS→Swift | `openURL` | `{url}` |
+| JS→Swift | `escape` | Esc の最終処理 |
+
+## 6. ショートカット一覧
+
+表4：アプリのコマンド（`NotePanel` で処理）
+
+| キー | 動作 | 由来 |
+|---|---|---|
+| ⌘N | 新規ノート | tinycast |
+| ⌘P | 切替画面を開く。開いていれば閉じる | tinycast |
+| ⌘W | 隠す | tinycast |
+| ⌘O | 保存先フォルダを Finder で開く | tinycast |
+| ⌘, | 設定画面を開く | 新規 |
+| ⌘Q | 何もしない（誤って終了しないため） | tinycast |
+| Esc | 検索パネル → 複数カーソル → 切替画面 → ウィンドウの順に閉じる | tinycast＋CodeMirror |
+
+表5：編集操作（CodeMirror 6 の標準キーマップ。Heynote の macOS の割り当てとほぼ同じ）
+
+| キー | 動作 | CodeMirror のコマンド |
+|---|---|---|
+| ⌘Z / ⇧⌘Z | Undo / Redo（長押しで連続） | `undo` / `redo` |
+| ⌘⌫ | 行頭まで削除。行頭なら直前の改行を削除 | `deleteLineBoundaryBackward` |
+| ⌘← / ⌘→ | インデント末尾（もう一度で行頭）／行末へ | `cursorLineBoundaryBackward` / `Forward` |
+| ⌥← / ⌥→、⌥⌫ | 単語単位の移動、単語の削除 | `cursorGroupLeft` / `Right`、`deleteGroupBackward` |
+| ⌥↑ / ⌥↓ | 行を移動 | `moveLineUp` / `Down` |
+| ⇧⌥↑ / ⇧⌥↓ | 行を複製 | `copyLineUp` / `Down` |
+| ⇧⌘K | 行を削除 | `deleteLine` |
+| ⌘Enter / ⇧⌘Enter | 下／上に行を挿入 | `insertBlankLine` / 独自（`insertLineAbove`） |
+| ⌘L | 行を選択（続けて押すと次の行まで広げる） | `selectLine` |
+| ⌘D / ⇧⌘L | 次の一致を選択に追加／一致をすべて選択 | `selectNextOccurrence` / `selectSelectionMatches` |
+| ⌘⌥↑ / ⌘⌥↓ | 上下にカーソルを追加 | `addCursorAbove` / `Below` |
+| ⌥クリック、⇧⌥ドラッグ | カーソルの追加、矩形選択 | 設定で VS Code に合わせる（§5.5） |
+| ⌘クリック | リンクを開く | 独自 |
+| Tab / ⇧Tab、⌘] / ⌘[ | インデント／インデント解除 | `indentMore` / `indentLess` |
+| Enter | 箇条書き・番号付きリスト・タスクを継続。空の項目で終了 | `insertNewlineContinueMarkup` |
+| ⌘F、⌘G / ⇧⌘G | 検索・置換パネル、次／前を検索 | `openSearchPanel`、`findNext` / `findPrevious` |
+
+## 7. 技術リスク
+
+表6：実機で確かめる項目（M0）
+
+| ID | リスク | 確認方法 | だめだった場合 |
+|---|---|---|---|
+| R1 | アプリが非アクティブのまま非アクティブ化パネルを key にしたとき、WKWebView にキー入力が届き、キャレットが点滅するか | 他のアプリを使っている最中にホットキーで呼び出して入力する | 表示時に `NSApp.activate()` を呼ぶ方式にする。`defaults write <bundle id> activateOnShow -bool true` で切り替えて試せるようにしておく |
+| R2 | 日本語 IME：変換中の Enter で改行しない、確定後の文字がずれない | ひらがなを入力し、変換・確定・Enter を繰り返す | R1 と同じ対処 |
+| R3 | マウスカーソルが I ビームに変わるか。非アクティブ化パネルでは変わらない既知の問題がある | エディタ上にマウスを乗せる | 実害は小さいので許容するか、R1 と同じ対処 |
+| R4 | ⌘Z の長押しで `keydown` が繰り返し届くか | ⌘Z を 2 秒押し続ける | `NotePanel` でリピートを受け、JS の `undo` を直接呼ぶ |
+| R5 | 全画面アプリの上に表示されるか | Safari、QuickTime、Keynote を全画面にして呼び出す | `level` を上げる（`.statusBar`、`.screenSaver` の順に試す） |
+| R6 | 表示したときにカーソルが置かれるか | 表示直後に入力する | `makeFirstResponder(webView)` の後に JS で `view.focus()` を呼ぶ（実装済み） |
+
+## 8. 機能リスト（確定）
+
+v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
+
+### A. 呼び出し
+
+| ID | 機能 | 区分 | 採否 |
+|---|---|---|---|
+| A1 | グローバルホットキーで表示・非表示を切り替え（既定 ⌃⌘N） | 必須 | 採用 |
+| A2 | グローバルホットキーで新規ノートを作って表示 | 推奨 | 採用 |
+| A3 | グローバルホットキーで切替画面を開いて表示 | 推奨 | 採用 |
+| A4 | メニューバーアイコン | 必須 | 採用 |
+| A5 | 隠したら直前のアプリにフォーカスを戻す | 必須 | 採用 |
+| A6 | すべてのデスクトップと、他アプリの全画面の上に表示 | 必須 | 採用 |
+| A7 | ログイン時に起動 | 任意 | 採用 |
+
+### B. ウィンドウ
+
+| ID | 機能 | 区分 | 採否 |
+|---|---|---|---|
+| B1 | 非アクティブ化フローティングパネル | 必須 | 採用 |
+| B2 | 高さを内容に合わせて伸縮 | 推奨 | 採用 |
+| B3 | 幅と位置を記憶 | 必須 | 採用 |
+| B4 | タイトルバーにノート名を表示 | 必須 | 採用 |
+| B5 | タイトルバーのボタン（新規・一覧・フォルダを開く） | 任意 | 採用 |
+| B6 | タイトルバーのダブルクリックで右上へ移動 | 任意 | 不採用 |
+| B7 | ライト・ダークに追従 | 推奨 | 採用 |
+| B8 | ⌘W・Esc で隠す、⌘Q を無効化 | 必須 | 採用 |
+
+### C. ノート管理
+
+| ID | 機能 | 区分 | 採否 |
+|---|---|---|---|
+| C1 | 1 ノート 1 .md、保存先フォルダ直下のみ | 必須 | 採用 |
+| C2 | 保存先フォルダの指定（設定画面で選ぶ） | 必須 | 採用 |
+| C3 | 前回のノートを開く | 必須 | 採用 |
+| C4 | 新規作成（`Untitled.md`、`Untitled 2.md` …） | 必須 | 採用 |
+| C5 | `Untitled` のうちは 1 行目を表示名にする | 推奨 | 採用 |
+| C6 | 名前の変更（タイトルバーのノート名をクリック、または切替画面で ⌘R） | 任意 | 採用 |
+| C7 | ゴミ箱へ移動（切替画面で ⌘⌫） | 推奨 | 採用 |
+| C8 | ⌘O で保存先フォルダを Finder で開く | 任意 | 採用 |
+
+### D. 切替画面
+
+| ID | 機能 | 区分 | 採否 |
+|---|---|---|---|
+| D1 | ⌘P で更新順の一覧、↑↓・Enter で開く | 必須 | 採用 |
+| D2 | タイトルと本文の検索 | 推奨 | 採用 |
+| D3 | あいまい検索（タイトルに適用。本文は部分一致） | 任意 | 採用 |
+
+### E. 編集
+
+| ID | 機能 | 区分 | 採否 |
+|---|---|---|---|
+| E1 | 標準キーマップ（表5） | 必須 | 採用 |
+| E2 | ⌘Z・⇧⌘Z の長押しで連続実行 | 必須 | 採用 |
+| E3 | マルチカーソル（⌘D、⇧⌘L、⌘⌥↑↓、⌥クリック） | 必須 | 採用 |
+| E4 | 矩形選択（⇧⌥ドラッグ） | 推奨 | 採用 |
+| E5 | 検索・置換パネル（⌘F、⌘G） | 必須 | 採用 |
+| E6 | Tab・⇧Tab でインデント | 推奨 | 採用 |
+| E7 | 折り返し表示 | 必須 | 採用 |
+| E8 | ノートごとに Undo 履歴とカーソル位置を保持（起動中） | 推奨 | 採用 |
+| E9 | フォント・サイズの設定 | 推奨 | 採用 |
+| E10 | 空のノートにプレースホルダーを表示 | 任意 | 不採用 |
+| E11 | Markdown の色分け | 任意 | 採用 |
+| E12 | Enter でリストを継続、空の項目で終了 | 任意 | 採用 |
+| E13 | 選択中のテキストに URL を貼ると `[text](url)` にする | 任意 | 採用 |
+| E14 | 括弧・引用符の自動閉じ | 任意 | 不採用 |
+| E15 | ⌘L で行選択、⇧⌘Enter で上に行を挿入 | 任意 | 採用 |
+| E16 | ⌘クリックでリンクを開く | 任意 | 採用 |
+| E17 | 文字数の表示 | 任意 | 採用 |
+
+### F. 保存
+
+| ID | 機能 | 区分 | 採否 |
+|---|---|---|---|
+| F1 | 300 ms 後の自動保存、隠す・切り替え・終了時の即時保存 | 必須 | 採用 |
+| F2 | atomic な書き込み | 必須 | 採用 |
+| F3 | 外部変更の検知と、衝突時に上書きせず別名で保存 | 必須 | 採用 |
+
+### G. 設定
+
+| ID | 機能 | 区分 | 採否 |
+|---|---|---|---|
+| G1 | settings.json をエディタで開いて編集 | 推奨 | 取りやめ（G2 で置き換え） |
+| G2 | 設定画面とショートカットの録画 | 任意 | 採用 |
+
+### H. 採用しない機能（参考）
+
+| 機能 | 由来 | 理由 |
+|---|---|---|
+| Markdown のライブ描画（記号を隠す表示） | tinycast | 優先しない。⌘← の問題の原因でもある |
+| 書式バー、⌘B・⌘I などの書式コマンド、見出しメニュー | tinycast | Markdown の描画を前提にした機能 |
+| チェックボックスのクリック | tinycast | 同上 |
+| スニペットの展開 | tinycast | tinycast 本体の別機能 |
+| ブロック、計算・通貨、言語の自動判定、整形 | Heynote | メモには不要 |
+| タブ、Emacs キーマップ、コマンドパレット、キーバインドの変更 UI | Heynote | 頼まれていない |
+| 同期、複数ウィンドウ、画像 | — | 範囲外（§1） |
+
+## 9. 非機能要件
+
+- 呼び出しの速さ：WKWebView を起動時に作って保持し、表示・非表示はパネルの `orderFront`・`orderOut` だけで行う。目標は、ホットキーを押してから入力できるまで 100 ms 未満（M0 で計測する）。
+- データ：F2・F3 により、本文を失う経路を作らない。
+- 日本語 IME：R2 を満たすこと。
+- 権限：アクセシビリティやフルディスクアクセスは要求しない。
+- アクセシビリティ：ボタンにラベルを付ける。切替画面には `role="listbox"`・`role="option"`・`aria-selected`・`aria-activedescendant` を付ける。
+- 対応 OS：macOS 14 以降。
+
+## 10. 開発手順
+
+1. **M0 実機確認**：R1〜R6 を確かめる。
+2. **M1 実装**：§8 で採用した機能をすべて実装する。M0 の結果で必要な対処を入れる。
+
+コードは Linux 上で書くため、Swift のビルドとテストは macOS で行う。
+
+テスト：
+
+- `NotepanelCore`（高さの計算、表示名、命名、名前の検証、保存・衝突・名前変更）は XCTest で確かめる（`swift test`）。
+- エディタの純粋関数（あいまい一致と並べ替え、URL の抽出、上への行挿入、文字数）は Node の `node --test` で確かめる。
+- R1〜R6 と IME は、README の確認項目に沿って実機で確かめる。
+
+ビルド：Xcode プロジェクトは作らない。SwiftPM と `scripts/bundle.sh`（.app の生成と ad-hoc 署名）を使う。エディタは `editor/` で `npm run build` を実行し、`web/editor.js` を出力する。`web/editor.js` はリポジトリに含めるので、エディタを変更しない限り Node は不要。
+
+```
+notepanel/
+├── Package.swift
+├── Sources/
+│   ├── Notepanel/          # App.swift, NotePanel.swift, PanelController.swift,
+│   │                       # HotKeys.swift, EditorBridge.swift, Settings.swift
+│   └── NotepanelCore/      # NoteStore.swift, Logic.swift
+├── Tests/NotepanelCoreTests/
+├── web/                    # index.html, style.css, editor.js（生成物）
+├── editor/                 # package.json, src/main.js, src/logic.js, test/
+├── scripts/bundle.sh
+└── docs/design.md
+```
+
+## 11. 決定事項
+
+1. 保存先：tinycast とは共有しない。既定は `~/Library/Application Support/notepanel/Notes` で、設定画面で変更できる。
+2. 既定のホットキー：⌃⌘N（表示・非表示）。
+3. アプリ名：notepanel。
