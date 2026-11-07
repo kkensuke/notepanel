@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsWindow = SettingsWindow()
     private var statusItem: NSStatusItem!
     private var registered: [Shortcut?] = []
+    private var showsIcon = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = PanelController(store: NoteStore(folder: Prefs.folder, backups: Prefs.backups))
@@ -70,8 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize)
         controller.setNoteShortcuts(
             next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"))
+        // Compared with what was applied last, not with isVisible: setting isVisible saves it to
+        // UserDefaults, which runs this again from inside the setter, maybe before isVisible changes.
         let showIcon = defaults.object(forKey: "showMenuBarIcon") as? Bool ?? true
-        if statusItem.isVisible != showIcon { statusItem.isVisible = showIcon }
+        if showIcon != showsIcon {
+            showsIcon = showIcon
+            statusItem.isVisible = showIcon
+        }
     }
 
     private func registerHotKeys(force: Bool = false) {
