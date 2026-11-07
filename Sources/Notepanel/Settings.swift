@@ -214,6 +214,12 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
+            // A click anywhere on it switches to the other tab, as on a toggle.
+            .overlay {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.tab = model.tab == .general ? .shortcuts : .general }
+            }
             .padding(.top, 12)
             Form {
                 switch model.tab {
