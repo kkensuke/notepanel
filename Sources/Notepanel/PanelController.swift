@@ -96,6 +96,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     func setFolder(_ folder: URL) {
         guard folder.standardizedFileURL != store.folder.standardizedFileURL else { return }
+        finishTitle()
         store.setFolder(folder)
         UserDefaults.standard.removeObject(forKey: "lastNote")
         openSomeNote()
@@ -167,6 +168,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     @discardableResult
     private func open(_ name: String, keepSwitcher: Bool = false) -> Bool {
+        finishTitle()
         guard let text = store.open(name) else { return false }
         bridge.send("open", ["id": name, "text": text, "keep": keepSwitcher])
         rememberCurrent()
@@ -188,6 +190,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     private func createNote(keepSwitcher: Bool = false) {
+        finishTitle()
         do {
             let name = try store.create()
             bridge.send("open", ["id": name, "text": "", "keep": keepSwitcher])
@@ -421,6 +424,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func sizeTitle() {
         let width = (titleField.attributedStringValue.size().width + 16).rounded(.up)
         titleWidth.constant = min(max(width, 80), 360)
+    }
+
+    /// Ends typing in the title before another note opens, so the name goes to the note it was
+    /// typed for. Otherwise ending later would try to give that name to the newly opened note.
+    private func finishTitle() {
+        if titleField.currentEditor() != nil { focusEditor() }
     }
 
     private func focusEditor() {
