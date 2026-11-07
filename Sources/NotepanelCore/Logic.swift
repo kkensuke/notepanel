@@ -10,18 +10,38 @@ public func fittedFrame(
     return CGRect(x: frame.minX, y: max(visible.minY, top - height), width: frame.width, height: height)
 }
 
-/// `Untitled` and `Untitled 2` are names nobody chose, so the first line stands in for them.
+/// `Untitled`, `Untitled 2` and so on: the names new notes get.
 public func isUntitled(_ name: String) -> Bool {
-    name.range(of: #"^Untitled( [0-9]+)?$"#, options: .regularExpression) != nil
+    isNumbered(name, base: "Untitled")
 }
 
-public func displayTitle(name: String, text: String) -> String {
-    guard isUntitled(name) else { return name }
+/// `base` itself, or `base 2`, `base 3` and so on.
+public func isNumbered(_ name: String, base: String) -> Bool {
+    guard name.hasPrefix(base) else { return false }
+    let rest = name.dropFirst(base.count)
+    return rest.isEmpty || rest.range(of: #"^ [0-9]+$"#, options: .regularExpression) != nil
+}
+
+/// The name a note's text suggests: its first non-empty line, without Markdown markers or
+/// characters a file name can't hold. Nil if no line gives a usable name.
+public func titleFromText(_ text: String) -> String? {
     for line in text.split(whereSeparator: \.isNewline) {
-        let title = stripMarkdown(String(line))
-        if !title.isEmpty { return String(title.prefix(80)) }
+        var title = stripMarkdown(String(line))
+            .replacingOccurrences(of: #"[/:]"#, with: "-", options: .regularExpression)
+        while title.hasPrefix(".") { title.removeFirst() }
+        title = String(title.prefix(80)).trimmingCharacters(in: .whitespaces)
+        while title.utf8.count > 240 { title.removeLast() }
+        if let name = validNoteName(title) { return name }
     }
-    return name
+    return nil
+}
+
+/// A note's file name follows its first line until the user gives it another name. It still
+/// follows while it's `Untitled` or the title of the text last saved, numbered or not.
+public func followsFirstLine(name: String, savedText: String) -> Bool {
+    if isUntitled(name) { return true }
+    guard let title = titleFromText(savedText) else { return false }
+    return isNumbered(name, base: title)
 }
 
 func stripMarkdown(_ line: String) -> String {
