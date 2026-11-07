@@ -1,0 +1,5 @@
+.build/
+.swiftpm/
+build/
+editor/node_modules/
+.DS_Store

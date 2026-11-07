@@ -35,6 +35,7 @@ ponytail の指示に従い、次の順で手段を選ぶ。
 2. macOS 標準機能を使う：NSPanel、WKWebView、Carbon の `RegisterEventHotKey`、`NSStatusItem`、`FileManager`、`UserDefaults`、`SMAppService`。
 3. 外部依存は CodeMirror 6（MIT）だけにする。ビルド時に esbuild で 1 ファイルにまとめ、リポジトリに含める。Swift 側の依存はゼロ。
 4. コードは新しく書く。tinycast（AGPL-3.0）は設計だけ参考にし、コードは写さない。
+5. アプリの表示とコードの中身（コメント、テストデータを含む）は英語にする。この設計書は日本語のままにする。
 
 ### 3.1 構成を Swift＋WKWebView にする理由
 
@@ -92,7 +93,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 ### 5.1 呼び出し
 
 - ホットキー（既定は ⌃⌘N）で表示・非表示を切り替える。表示中でも前面になければ、前面に出してカーソルを置く。新規ノートと検索のホットキーは、既定では割り当てない。
-- メニューバーアイコンは常に表示する。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「新規ノート」「ノートを検索」「設定…」「終了」を出す。
+- メニューバーアイコンは常に表示する。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「New Note」「Search Notes」「Settings…」「Quit notepanel」を出す。
 - 表示する直前に最前面のアプリを記録する。隠すときに、そのアプリがまだ最前面ならフォーカスを戻す。別のアプリに移っていれば何もしない（tinycast と同じ）。
 - パネルの設定は tinycast に合わせる：`.nonactivatingPanel`、`isFloatingPanel = true`、`hidesOnDeactivate = false`、`collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]`、`level = .floating`。
 
@@ -136,7 +137,7 @@ CodeMirror 6 に次の拡張を入れる。
 - `highlightSelectionMatches()`、`EditorView.lineWrapping`
 - `markdown({ base: markdownLanguage })`：GFM（取り消し線、タスクリスト）を含む色分け、Enter での箇条書きの継続、選択中のテキストへの URL の貼り付けによるリンク化
 - ⌘クリックでリンクを開く。対象は `[text](url)` と、`http://`・`https://`・`mailto:` で始まる URL。Swift 側でもスキームを確かめてから開く。
-- 文字数（改行を除く書記素の数）を右下に表示する。
+- 文字数（改行を除く書記素の数）を右下に「1,234 characters」の形で表示する。
 - ノートごとに `EditorState` を保持し、アプリ起動中はノートを切り替えても Undo 履歴とカーソル位置が残るようにする。外部の変更で本文が変わったノートは、新しい状態で開き直す。
 
 ソースで次の動作を確認済み。
