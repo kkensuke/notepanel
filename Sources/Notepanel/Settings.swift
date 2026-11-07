@@ -197,7 +197,6 @@ struct SettingsView: View {
     let model: SettingsModel
     @AppStorage("folder") private var folder = Prefs.defaultFolder
     @AppStorage("fontFamily") private var fontFamily = ""
-    @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
 
@@ -225,8 +224,8 @@ struct SettingsView: View {
                 }
             }
             Section("Note text") {
+                // No size control: ⌘+, ⌘− and ⌘0 in the panel change it.
                 TextField("Font", text: $fontFamily, prompt: Text("SF Mono"))
-                Stepper("Size: \(Int(fontSize)) pt  (⌘+ / ⌘− / ⌘0)", value: $fontSize, in: Prefs.fontSizes)
             }
             Section("Interface") {
                 // A menu rather than a stepper: this setting resizes the window, which would move a
