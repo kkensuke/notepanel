@@ -7,6 +7,8 @@ using.
 Each note is a plain Markdown file in a folder you choose, so you can also open your notes in any
 other editor, sync them or back them up as you like.
 
+<img src="docs/images/panel.png" width="480" alt="The notepanel panel over Safari in full screen">
+
 ## Features
 
 - **Opens over everything.** The panel floats above other windows, full-screen apps included, on
