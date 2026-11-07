@@ -98,6 +98,7 @@ final class SettingsWindow {
 @MainActor
 @Observable
 final class SettingsModel {
+    var tab = SettingsTab.general
     private(set) var openAtLogin = false
     private(set) var loginError: String?
     let toggleShortcut = ShortcutRecorder(name: "hotkey.toggle")
@@ -193,75 +194,96 @@ final class ShortcutRecorder {
     }
 }
 
+enum SettingsTab {
+    case general, shortcuts
+}
+
 struct SettingsView: View {
     let model: SettingsModel
     @AppStorage("folder") private var folder = Prefs.defaultFolder
     @AppStorage("fontFamily") private var fontFamily = ""
-    @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
 
     var body: some View {
-        Form {
-            Section("Shortcuts from any app") {
-                ShortcutField(title: "Show or hide notes", recorder: model.toggleShortcut)
-                ShortcutField(title: "New note", recorder: model.createShortcut)
-                ShortcutField(title: "Search notes", recorder: model.searchShortcut)
+        VStack(spacing: 0) {
+            Picker("Settings", selection: Binding(get: { model.tab }, set: { model.tab = $0 })) {
+                Text("General").tag(SettingsTab.general)
+                Text("Shortcuts").tag(SettingsTab.shortcuts)
             }
-            Section("Shortcuts in the panel") {
-                ShortcutField(title: "Next note", recorder: model.nextShortcut)
-                ShortcutField(title: "Previous note", recorder: model.previousShortcut)
-            }
-            Section("Notes folder") {
-                Text(folder)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                HStack {
-                    Spacer()
-                    Button("Use Default") { folder = Prefs.defaultFolder }
-                        .disabled(folder == Prefs.defaultFolder)
-                    Button("Choose…", action: chooseFolder)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+            .padding(.top, 12)
+            Form {
+                switch model.tab {
+                case .general: general
+                case .shortcuts: shortcuts
                 }
             }
-            Section("Note text") {
-                TextField("Font", text: $fontFamily, prompt: Text("SF Mono"))
-                Stepper("Size: \(Int(fontSize)) pt  (⌘+ / ⌘− / ⌘0)", value: $fontSize, in: Prefs.fontSizes)
-            }
-            Section("Interface") {
-                // A menu rather than a stepper: this setting resizes the window, which would move a
-                // stepper's arrows out from under the pointer after every click.
-                Picker("Text size", selection: $uiFontSize) {
-                    ForEach(Prefs.uiFontSizes, id: \.self) { size in
-                        Text(verbatim: "\(Int(size)) pt").tag(size)
-                    }
-                }
-                Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
-                if !showMenuBarIcon {
-                    Text("To get back here, press ⌘, in the panel, or open notepanel again.")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Section {
-                Toggle(
-                    "Open at login",
-                    isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
-                if let loginError = model.loginError {
-                    Text(loginError).font(.caption).foregroundStyle(.red)
-                }
-            }
-            // Also here, since the menu bar icon's menu can be hidden.
-            HStack {
-                Spacer()
-                Button("Quit notepanel") { NSApp.terminate(nil) }
-            }
+            .formStyle(.grouped)
+            .scrollDisabled(true)
         }
-        .formStyle(.grouped)
-        .scrollDisabled(true)
         .font(.system(size: uiFontSize))
         .controlSize(uiFontSize >= 17 ? .large : .regular)
         .frame(width: uiFontSize * 26)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder private var shortcuts: some View {
+        Section("Shortcuts from any app") {
+            ShortcutField(title: "Show or hide notes", recorder: model.toggleShortcut)
+            ShortcutField(title: "New note", recorder: model.createShortcut)
+            ShortcutField(title: "Search notes", recorder: model.searchShortcut)
+        }
+        Section("Shortcuts in the panel") {
+            ShortcutField(title: "Next note", recorder: model.nextShortcut)
+            ShortcutField(title: "Previous note", recorder: model.previousShortcut)
+        }
+    }
+
+    @ViewBuilder private var general: some View {
+        Section("Notes folder") {
+            Text(folder)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+            HStack {
+                Spacer()
+                Button("Use Default") { folder = Prefs.defaultFolder }
+                    .disabled(folder == Prefs.defaultFolder)
+                Button("Choose…", action: chooseFolder)
+            }
+        }
+        // The notes' text size has no control here: ⌘+, ⌘− and ⌘0 in the panel change it.
+        Section("Appearance") {
+            TextField("Note font", text: $fontFamily, prompt: Text("SF Mono"))
+            // A menu rather than a stepper: this setting resizes the window, which would move a
+            // stepper's arrows out from under the pointer after every click.
+            Picker("Interface text size", selection: $uiFontSize) {
+                ForEach(Prefs.uiFontSizes, id: \.self) { size in
+                    Text(verbatim: "\(Int(size)) pt").tag(size)
+                }
+            }
+        }
+        Section {
+            Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
+            if !showMenuBarIcon {
+                Text("To get back here, press ⌘, in the panel, or open notepanel again.")
+                    .foregroundStyle(.secondary)
+            }
+            Toggle(
+                "Open at login",
+                isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
+            if let loginError = model.loginError {
+                Text(loginError).font(.caption).foregroundStyle(.red)
+            }
+        }
+        // Also here, since the menu bar icon's menu can be hidden.
+        HStack {
+            Spacer()
+            Button("Quit notepanel") { NSApp.terminate(nil) }
+        }
     }
 
     private func chooseFolder() {

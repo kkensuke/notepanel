@@ -182,7 +182,7 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 
 ### 5.8 設定
 
-設定は `UserDefaults` に保存し、専用の設定画面（SwiftUI）で編集する。⌘, かメニューバーアイコンの「設定…」で開く。
+設定は `UserDefaults` に保存し、専用の設定画面（SwiftUI）で編集する。⌘, かメニューバーアイコンの「設定…」で開く。設定画面は上部の切り替え（segmented control）で「General」と「Shortcuts」に分け、画面の高さは選んだ方に合わせる。
 
 | 項目 | キー | 既定値 |
 |---|---|---|
@@ -191,7 +191,7 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 | ノートを検索のホットキー | `hotkey.search` | なし |
 | 保存先フォルダ | `folder` | `~/Library/Application Support/notepanel/Notes` |
 | ノートのフォント | `fontFamily` | 空（SF Mono） |
-| ノートの文字サイズ（⌘+ / ⌘− / ⌘0 でも変わる） | `fontSize` | 14（9〜36） |
+| ノートの文字サイズ（⌘+ / ⌘− / ⌘0 で変える。設定画面には置かない） | `fontSize` | 14（9〜36） |
 | 表示の文字サイズ（ノート以外：タイトルバー、切替画面、フッター、設定画面） | `uiFontSize` | 15 pt（12〜20 pt からメニューで選ぶ） |
 | 次のノート（パネル内のショートカット） | `shortcut.nextNote` | ⌃Tab |
 | 前のノート（パネル内のショートカット） | `shortcut.previousNote` | ⌃⇧Tab |
