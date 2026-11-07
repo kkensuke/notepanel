@@ -20,8 +20,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
 
     private static let frameName = "Note Panel"
     private static let minHeight: CGFloat = 120
-    /// The window grows with its note up to this share of the screen's height, then scrolls.
-    private static let maxScreenShare: CGFloat = 2.0 / 3.0
 
     private enum Item {
         static let title = NSToolbarItem.Identifier("title")
@@ -382,9 +380,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
         guard contentHeight > 0, let screen = panel.screen ?? NSScreen.main else { return }
         let chrome = panel.frame.height - bridge.webView.frame.height
         let visible = screen.visibleFrame
+        // No limit of its own: the window grows with the note until it fills the screen's height.
         let frame = fittedFrame(
             panel.frame, height: chrome + contentHeight, minHeight: Self.minHeight,
-            maxHeight: visible.height * Self.maxScreenShare, in: visible)
+            maxHeight: visible.height, in: visible)
         if frame != panel.frame { panel.setFrame(frame, display: true) }
     }
 }
