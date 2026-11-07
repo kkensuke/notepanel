@@ -58,13 +58,15 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     /// Returns focus to the app that was in front, unless the user has moved on to another one.
+    /// Saving comes after the panel is gone, so writing the file doesn't hold it on screen.
     func hide() {
+        if panel.isVisible {
+            let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
+            let movedOn = front != NSRunningApplication.current.processIdentifier && front != previousApp?.processIdentifier
+            panel.orderOut(nil)
+            if !movedOn { _ = previousApp?.activate(options: []) }
+        }
         store.flush()
-        guard panel.isVisible else { return }
-        let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
-        let movedOn = front != NSRunningApplication.current.processIdentifier && front != previousApp?.processIdentifier
-        panel.orderOut(nil)
-        if !movedOn { _ = previousApp?.activate(options: []) }
     }
 
     /// Hides the panel if it's in front, and otherwise brings it forward.
@@ -305,6 +307,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.hidesOnDeactivate = false
+        // Appears and disappears at once, with no fade AppKit might add.
+        panel.animationBehavior = .none
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true

@@ -84,6 +84,7 @@ final class SettingsWindow {
             window.title = "Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
+            window.animationBehavior = .none
             // Above the note panel, which floats.
             window.level = .floating
             window.center()

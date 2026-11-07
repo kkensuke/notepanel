@@ -98,6 +98,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 - メニューバーアイコンは既定で表示し、設定で隠せる。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「New Note」「Search Notes」「Settings…」「Quit notepanel」を出す。アイコンを隠しているときは、パネルで ⌘, を押すか、アプリをもう一度開く（Finder や Spotlight から）と設定画面が開く。設定画面にも「Quit notepanel」のボタンを置く。
 - 表示する直前に最前面のアプリを記録する。隠すときに、そのアプリがまだ最前面ならフォーカスを戻す。別のアプリに移っていれば何もしない（tinycast と同じ）。
 - パネルの設定は tinycast に合わせる：`.nonactivatingPanel`、`isFloatingPanel = true`、`hidesOnDeactivate = false`、`collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]`、`level = .floating`。
+- 表示・非表示にアニメーションを付けない（パネルと設定画面の `animationBehavior = .none`）。隠すときは、先にパネルを隠してから保存する。ホットキーはキーを押した時点で働く（離した時点ではない）。
 
 ### 5.2 ウィンドウ
 
