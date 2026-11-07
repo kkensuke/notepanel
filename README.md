@@ -25,7 +25,7 @@ Right-click the icon for New Note, Search Notes, Settings, the backups folder an
 ## Notes and safety
 
 - A note's file name follows its first line (`# Shopping list` → `Shopping list.md`), numbered if
-  the name is taken, until you rename the note yourself.
+  the name is taken, until you rename the note yourself by clicking its name in the title bar.
 - Text is saved 300 ms after you stop typing, and at once when you hide the panel, switch notes or
   quit. If a save fails, the footer says so, the text stays in the app, and quitting asks first.
 - A file changed in another app is never overwritten: your text goes to a `(conflict …)` copy.
@@ -60,7 +60,8 @@ The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/
 | Key | Does |
 |---|---|
 | ⌘N / ⌘P / ⌘O / ⌘, | New note / switch notes / open the notes folder / settings |
-| ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text (the interface size is in Settings) |
+| ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text (the interface text size is in Settings) |
+| ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
 | ⌘⌫ | Delete to the line start; at the start of a line, join it with the line above |
 | ⌘← / ⌘→ | Line start (after the indentation first) / line end |
@@ -71,7 +72,9 @@ The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/
 | ⇧⌥-drag | Rectangular selection |
 | ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
 | ⌘-click | Open a link |
-| In the switcher: ↑↓, Enter, ⌘R, ⌘⌫ | Choose, open, rename, move to the Trash (or use the row's buttons) |
+| In the switcher: ↑↓, Enter, ⌘⌫ | Choose, open, move to the Trash (each row also has Pin and Trash buttons) |
+
+Click the note's name in the title bar to rename it. The panel keeps the size you give it.
 
 ## Checking it on a Mac
 
