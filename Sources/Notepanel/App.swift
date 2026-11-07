@@ -38,6 +38,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Opening the app again while it runs, from Finder or Spotlight, opens Settings: the way back
+    /// when the menu bar icon is hidden.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        settingsWindow.show()
+        return false
+    }
+
     /// Quitting never drops text silently: if the last changes can't be written, it asks.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         controller.store.flush()
