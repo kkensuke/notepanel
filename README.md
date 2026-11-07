@@ -2,7 +2,7 @@
 
 A floating Markdown scratchpad for macOS. A global shortcut brings it up over any app, even one in
 full screen; you write with VS Code's keys; hiding it returns you to the app you were in. Each note
-is a plain `.md` file in a folder you choose.
+is a plain `.md` file in a folder you choose, named after the note's first line.
 
 It combines the invocation and window of [tinycast](https://github.com/abue-ammar/tinycast)'s Notes
 with the editing of [Heynote](https://github.com/heyman/heynote), whose editor is CodeMirror 6.
@@ -20,7 +20,18 @@ open build/notepanel.app
 ```
 
 The app lives in the menu bar. Press <kbd>⌃⌘N</kbd> to show or hide it, or click the menu bar icon.
-Right-click the icon for New Note, Search Notes, Settings and Quit.
+Right-click the icon for New Note, Search Notes, Settings, the backups folder and Quit.
+
+## Notes and safety
+
+- A note's file name follows its first line (`# Shopping list` → `Shopping list.md`), numbered if
+  the name is taken, until you rename the note yourself.
+- Text is saved 300 ms after you stop typing, and at once when you hide the panel, switch notes or
+  quit. If a save fails, the footer says so, the text stays in the app, and quitting asks first.
+- A file changed in another app is never overwritten: your text goes to a `(conflict …)` copy.
+- Before a save overwrites a note, the previous contents are kept in
+  `~/Library/Application Support/notepanel/Backups` (at most every 10 minutes per note, for 30 days).
+- Moving a note to the Trash asks first, and the Trash keeps it.
 
 Node is only needed to change the editor page. `web/editor.js` is built from `editor/` and kept in
 the repository:
@@ -49,6 +60,7 @@ The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/
 | Key | Does |
 |---|---|
 | ⌘N / ⌘P / ⌘O / ⌘, | New note / switch notes / open the notes folder / settings |
+| ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text (the interface size is in Settings) |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
 | ⌘⌫ | Delete to the line start; at the start of a line, join it with the line above |
 | ⌘← / ⌘→ | Line start (after the indentation first) / line end |
@@ -59,9 +71,7 @@ The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/
 | ⇧⌥-drag | Rectangular selection |
 | ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
 | ⌘-click | Open a link |
-| In the switcher: ↑↓, Enter, ⌘R, ⌘⌫ | Choose, open, rename, move to the Trash |
-
-Click the note's name in the title bar to rename it.
+| In the switcher: ↑↓, Enter, ⌘R, ⌘⌫ | Choose, open, rename, move to the Trash (or use the row's buttons) |
 
 ## Checking it on a Mac
 
