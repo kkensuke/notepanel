@@ -285,21 +285,12 @@ struct SettingsView: View {
         }
         Section {
             Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
-            if !showMenuBarIcon {
-                Text("To get back here, press ⌘, in the panel, or open notepanel again.")
-                    .foregroundStyle(.secondary)
-            }
             Toggle(
                 "Open at login",
                 isOn: Binding(get: { model.openAtLogin }, set: { model.setOpenAtLogin($0) }))
             if let loginError = model.loginError {
                 Text(loginError).font(.caption).foregroundStyle(.red)
             }
-        }
-        // Also here, since the menu bar icon's menu can be hidden.
-        HStack {
-            Spacer()
-            Button("Quit notepanel") { NSApp.terminate(nil) }
         }
     }
 

@@ -326,8 +326,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             "w": { [weak self] in self?.hide() },
             "o": { [weak self] in self?.openFolder() },
             ",": { [weak self] in self?.openSettings() },
-            // Quitting is in the menu bar icon's menu, so it can't happen by accident while typing.
-            "q": {},
+            // Quitting saves first, and asks if something couldn't be saved.
+            "q": { NSApp.terminate(nil) },
         ]
 
         // The note's name, centered; clicking it renames the note.

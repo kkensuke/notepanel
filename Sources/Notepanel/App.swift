@@ -93,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Never shown, since the app has no menu bar of its own, but it gives the settings window
-    /// cut, copy, paste and close while the app is active. Undo and Select All stay out: in the
+    /// quit, cut, copy, paste and close while the app is active. Undo and Select All stay out: in the
     /// editor they must reach CodeMirror, not WebKit.
     private func mainMenu() -> NSMenu {
         let edit = NSMenu(title: "Edit")
@@ -102,8 +102,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        let app = NSMenu(title: "notepanel")
+        app.addItem(withTitle: "Quit notepanel", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let menu = NSMenu()
-        for submenu in [NSMenu(title: "notepanel"), edit, window] {
+        for submenu in [app, edit, window] {
             menu.addItem(withTitle: submenu.title, action: nil, keyEquivalent: "").submenu = submenu
         }
         return menu
