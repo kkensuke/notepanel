@@ -18,6 +18,12 @@ extension Notification.Name {
 /// Settings live in UserDefaults. The settings window edits the same keys through @AppStorage.
 enum Prefs {
     static let defaultFolder = "~/Library/Application Support/notepanel/Notes"
+    static let defaultFontSize = 14.0
+    static let fontSizes = 9.0...36.0
+    /// Sizes everything but the note's text: the title bar, the switcher, the footer and the
+    /// settings window.
+    static let defaultUIScale = 1.5
+    static let uiScales = 1.0...2.0
     static let hotKeyNames = ["hotkey.toggle", "hotkey.create", "hotkey.search"]
     static let defaultToggle = Shortcut(keyCode: kVK_ANSI_N, modifiers: controlKey | cmdKey, display: "⌃⌘N")
 
@@ -25,6 +31,10 @@ enum Prefs {
         let path = UserDefaults.standard.string(forKey: "folder") ?? defaultFolder
         return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
     }
+
+    /// Outside the notes folder, so backups never show up as notes.
+    static let backups = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("notepanel/Backups", isDirectory: true)
 
     /// A shortcut that was never set has its default; one stored as an empty string is off.
     static func shortcut(_ name: String) -> Shortcut? {
@@ -162,8 +172,8 @@ struct SettingsView: View {
     let model: SettingsModel
     @AppStorage("folder") private var folder = Prefs.defaultFolder
     @AppStorage("fontFamily") private var fontFamily = ""
-    @AppStorage("fontSize") private var fontSize = 14.0
-    @AppStorage("maxHeight") private var maxHeight = 640.0
+    @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
+    @AppStorage("uiScale") private var uiScale = Prefs.defaultUIScale
 
     var body: some View {
         Form {
@@ -184,10 +194,15 @@ struct SettingsView: View {
                     Button("Choose…", action: chooseFolder)
                 }
             }
-            Section("Editor") {
+            Section("Note text") {
                 TextField("Font", text: $fontFamily, prompt: Text("SF Mono"))
-                Stepper("Font size: \(Int(fontSize)) pt", value: $fontSize, in: 9...36)
-                Stepper("Maximum height: \(Int(maxHeight)) pt", value: $maxHeight, in: 200...2400, step: 40)
+                Stepper("Size: \(Int(fontSize)) pt  (⌘+ / ⌘− / ⌘0)", value: $fontSize, in: Prefs.fontSizes)
+            }
+            Section("Interface") {
+                // Verbatim, so the "%" isn't read as a format specifier.
+                Stepper(value: $uiScale, in: Prefs.uiScales, step: 0.1) {
+                    Text(verbatim: "Size: \(Int((uiScale * 100).rounded()))%")
+                }
             }
             Section {
                 Toggle(
@@ -200,7 +215,9 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .scrollDisabled(true)
-        .frame(width: 460)
+        .font(.system(size: 13 * uiScale))
+        .controlSize(uiScale >= 1.3 ? .large : .regular)
+        .frame(width: 460 * uiScale)
         .fixedSize(horizontal: false, vertical: true)
     }
 

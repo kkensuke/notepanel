@@ -53,7 +53,7 @@ const theme = EditorView.theme({
   ".cm-selectionMatch": {backgroundColor: "var(--match)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
-  ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)"},
+  ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(12px * var(--ui-scale))"},
   ".cm-panels.cm-panels-top": {borderBottom: "1px solid var(--border)"},
   ".cm-panels.cm-panels-bottom": {borderTop: "1px solid var(--border)"},
   ".cm-textfield, .cm-button": {
@@ -132,11 +132,12 @@ function openNote(id, text, keepSwitcher) {
 
 const defaultFont = `"SF Mono", ui-monospace, Menlo, monospace`
 
-function applyOptions({fontFamily, fontSize}) {
+function applyOptions({fontFamily, fontSize, uiScale}) {
   const family = String(fontFamily ?? "").replace(/["\\;{}]/g, "").trim()
   const root = document.documentElement.style
   root.setProperty("--font", family ? `"${family}", ${defaultFont}` : defaultFont)
   root.setProperty("--size", `${Number(fontSize) || 14}px`)
+  root.setProperty("--ui-scale", String(Number(uiScale) || 1.5))
   view.requestMeasure()
   reportHeight()
 }
@@ -222,6 +223,35 @@ function element(tag, className, text) {
   return node
 }
 
+// Feather-style icons, drawn with the text color.
+const icons = {
+  rename: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
+}
+
+function actionButton(name, label, onClick) {
+  const button = document.createElement("button")
+  button.className = `action ${name}`
+  button.title = label
+  button.setAttribute("aria-label", label)
+  button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`
+  // Pressing a button must not take focus from the search field or open the row.
+  button.addEventListener("mousedown", event => {
+    event.preventDefault()
+    event.stopPropagation()
+  })
+  button.addEventListener("click", event => {
+    event.stopPropagation()
+    onClick()
+  })
+  return button
+}
+
+function startRename(id) {
+  renaming = id
+  render()
+}
+
 function row(note, index) {
   const item = document.createElement("li")
   item.id = `note-${index}`
@@ -231,7 +261,12 @@ function row(note, index) {
     item.append(renameField(note))
     return item
   }
-  item.append(element("span", "title", note.title), element("span", "meta", formatModified(note.modified)))
+  const actions = element("span", "actions", "")
+  actions.append(
+    actionButton("rename", "Rename (⌘R)", () => startRename(note.id)),
+    actionButton("trash", "Move to Trash (⌘⌫)", () => post("trash", {id: note.id})),
+  )
+  item.append(element("span", "title", note.title), element("span", "meta", formatModified(note.modified)), actions)
   if (note.snippet) item.append(element("div", "snippet", note.snippet))
   item.addEventListener("mousedown", event => {
     event.preventDefault()
@@ -296,10 +331,7 @@ query.addEventListener("keydown", event => {
   } else if (command && event.key === "Backspace") {
     if (note) post("trash", {id: note.id})
   } else if (command && event.key.toLowerCase() === "r") {
-    if (note) {
-      renaming = note.id
-      render()
-    }
+    if (note) startRename(note.id)
   } else if (command && event.key.toLowerCase() === "a") {
     query.select()
   } else {

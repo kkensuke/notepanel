@@ -50,6 +50,13 @@ func inFolder(line: Int = #line, _ body: (URL) throws -> Void) {
     }
 }
 
+struct Missing: Error {}
+
+func unwrapped<T>(_ value: T?) throws -> T {
+    guard let value else { throw Missing() }
+    return value
+}
+
 func contents(_ store: NoteStore, _ name: String) throws -> String {
     try String(contentsOf: store.url(name), encoding: .utf8)
 }
@@ -74,12 +81,22 @@ equal(fittedFrame(window, height: 900, minHeight: 120, maxHeight: 2000, in: scre
 
 // MARK: - Names
 
-equal(displayTitle(name: "Untitled 2", text: "\n\n# Shopping **list**\n- milk"), "Shopping list")
-equal(displayTitle(name: "Untitled", text: "- [ ] Call Sam"), "Call Sam")
-equal(displayTitle(name: "Untitled", text: "1. First"), "First")
-equal(displayTitle(name: "Untitled", text: "  \n"), "Untitled")
-equal(displayTitle(name: "Untitled ideas", text: "first"), "Untitled ideas")
-equal(displayTitle(name: "Plan", text: "# Other"), "Plan")
+equal(titleFromText("\n\n# Shopping **list**\n- milk"), "Shopping list")
+equal(titleFromText("- [ ] Call Sam"), "Call Sam")
+equal(titleFromText("1. First"), "First")
+equal(titleFromText("Q3/Q4: plans"), "Q3-Q4- plans")
+equal(titleFromText("...dots"), "dots")
+equal(titleFromText("  \n"), nil)
+equal(titleFromText(String(repeating: "a", count: 100))?.count, 80)
+
+check(isUntitled("Untitled"), "Untitled")
+check(isUntitled("Untitled 12"), "Untitled 12")
+check(!isUntitled("Untitled ideas"), "Untitled ideas")
+check(followsFirstLine(name: "Untitled 3", savedText: "anything"), "untitled follows")
+check(followsFirstLine(name: "Shopping", savedText: "# Shopping\nmilk"), "the saved title follows")
+check(followsFirstLine(name: "Shopping 2", savedText: "Shopping"), "a numbered title follows")
+check(!followsFirstLine(name: "Groceries", savedText: "Shopping"), "a name the user gave stays")
+check(!followsFirstLine(name: "Shopping", savedText: ""), "no first line, no following")
 
 let taken: Set = ["Untitled", "Untitled 2"]
 equal(makeUniqueName("Untitled") { taken.contains($0) }, "Untitled 3")
@@ -110,21 +127,48 @@ inFolder { folder in
     equal(Set(store.list().map(\.name)), ["Untitled", "Untitled 2"])
 }
 
+// The file name follows the first line, stays unique, and stops following once renamed.
+inFolder { folder in
+    let store = NoteStore(folder: folder)
+    var renames: [String] = []
+    store.onRenamed = { renames.append("\($0) -> \($1)") }
+    _ = try store.create()
+    store.edit("# Shopping\nmilk")
+    store.flush()
+    equal(store.current, "Shopping")
+    equal(try contents(store, "Shopping"), "# Shopping\nmilk")
+    store.edit("Groceries\nmilk")
+    store.flush()
+    equal(store.current, "Groceries")
+    equal(renames, ["Untitled -> Shopping", "Shopping -> Groceries"])
+
+    _ = try store.create()
+    store.edit("Groceries\neggs")
+    store.flush()
+    equal(store.current, "Groceries 2")
+
+    equal(try store.rename("Groceries 2", to: "Weekly"), "Weekly")
+    store.edit("Something else\neggs")
+    store.flush()
+    equal(store.current, "Weekly")
+    equal(Set(store.list().map(\.name)), ["Groceries", "Weekly"])
+}
+
 // A file changed elsewhere is never overwritten; the text goes to a conflict copy.
 inFolder { folder in
     let store = NoteStore(folder: folder)
-    var conflict: (from: String, to: String)?
-    store.onConflict = { conflict = ($0, $1) }
-    let name = try store.create()
+    var renames: [(from: String, to: String)] = []
+    store.onRenamed = { renames.append(($0, $1)) }
+    _ = try store.create()
     store.edit("mine")
     store.flush()
+    let name = try unwrapped(store.current)
     try Data("theirs!".utf8).write(to: store.url(name))
     store.edit("mine, again")
     store.flush()
     equal(try contents(store, name), "theirs!")
-    guard let conflict else { return fail("no conflict copy", #line) }
-    equal(conflict.from, name)
-    check(conflict.to.hasPrefix("Untitled (conflict "), "conflict copy name: \(conflict.to)")
+    guard let conflict = renames.last, conflict.from == name else { return fail("no conflict copy", #line) }
+    check(conflict.to.hasPrefix("mine (conflict "), "conflict copy name: \(conflict.to)")
     equal(try contents(store, conflict.to), "mine, again")
     equal(store.current, conflict.to)
 }
@@ -136,7 +180,31 @@ inFolder { folder in
     try FileManager.default.removeItem(at: store.url(name))
     store.edit("still here")
     store.flush()
-    equal(try contents(store, name), "still here")
+    equal(try contents(store, try unwrapped(store.current)), "still here")
+}
+
+// The contents a save replaces are kept in the backups folder.
+inFolder { folder in
+    let backups = folder.appendingPathComponent("Backups")
+    let store = NoteStore(folder: folder.appendingPathComponent("Notes"), backups: backups)
+    let backedUp = { () throws -> [String] in
+        try FileManager.default.contentsOfDirectory(at: backups, includingPropertiesForKeys: nil)
+            .map { try String(contentsOf: $0, encoding: .utf8) }.sorted()
+    }
+    _ = try store.create()
+    store.edit("v1")
+    store.flush()  // The file was empty, so there is nothing to keep.
+    check(!FileManager.default.fileExists(atPath: backups.path), "no backup of an empty note")
+    store.edit("v1\nmore")
+    store.flush()
+    equal(try backedUp(), ["v1"])
+    store.edit("v1\nmore still")
+    store.flush()  // Too soon after the last backup.
+    equal(try backedUp(), ["v1"])
+    store.backupInterval = 0
+    store.edit("v1\nmore than ever")
+    store.flush()
+    equal(try backedUp().count, 2)
 }
 
 // Edits made elsewhere are picked up, but never over unsaved text.
@@ -151,6 +219,20 @@ inFolder { folder in
     try Data("outside again".utf8).write(to: store.url(name))
     equal(store.reloadIfChanged(), nil)
     equal(store.text, "unsaved")
+}
+
+// Saving is still possible after a failed write, and the text stays unsaved until then.
+inFolder { folder in
+    let store = NoteStore(folder: folder)
+    _ = try store.create()
+    try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
+    store.edit("kept")
+    store.flush()
+    check(store.hasUnsavedChanges, "unsaved after a failed write")
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
+    store.flush()
+    check(!store.hasUnsavedChanges, "saved once writing works again")
+    equal(try contents(store, try unwrapped(store.current)), "kept")
 }
 
 inFolder { folder in

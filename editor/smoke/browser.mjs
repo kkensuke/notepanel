@@ -152,6 +152,26 @@ assert.deepEqual(await last("rename"), {type: "rename", from: "Ideas", to: "Idea
 await press("Escape")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
 
+// The selected row has Rename and Trash buttons. Trash only asks; Swift confirms before deleting.
+await receive("switcher", {notes, force: true})
+await clear()
+await page.click("#results li[aria-selected='true'] .action.trash")
+assert.equal((await last("trash"))?.id, "Groceries")
+assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false)
+await page.click("#results li[aria-selected='true'] .action.rename")
+await page.waitForFunction(() => document.activeElement.classList.contains("rename"))
+assert.equal(await page.evaluate(() => document.activeElement.value), "Groceries")
+await press("Escape")
+assert.equal(await page.evaluate(() => document.activeElement.id), "query")
+await press("Escape")
+
+// The interface size scales the switcher and footer, but not the note's text.
+await receive("options", {fontSize: 14, uiScale: 2})
+assert.equal(await page.$eval("#query", e => getComputedStyle(e).fontSize), "28px")
+assert.equal(await page.$eval("#count", e => getComputedStyle(e).fontSize), "22px")
+assert.equal(await page.$eval(".cm-content", e => getComputedStyle(e).fontSize), "14px")
+await receive("options", {fontSize: 14, uiScale: 1.5})
+
 // The page reports a height, and the footer counts characters.
 await receive("open", {id: "Count", text: "ab\ncd"})
 await pause(50)

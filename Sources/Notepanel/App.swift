@@ -21,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var registered: [Shortcut?] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        controller = PanelController(store: NoteStore(folder: Prefs.folder))
+        controller = PanelController(store: NoteStore(folder: Prefs.folder, backups: Prefs.backups))
         controller.openSettings = { [weak self] in self?.settingsWindow.show() }
         NSApp.mainMenu = mainMenu()
         setUpStatusItem()
@@ -38,8 +38,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
+    /// Quitting never drops text silently: if the last changes can't be written, it asks.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         controller.store.flush()
+        guard controller.store.hasUnsavedChanges else { return .terminateNow }
+        NSApp.activate()
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "Your latest changes couldn’t be saved"
+        alert.informativeText = "If you quit now, they will be lost. The footer of the note says why saving failed."
+        alert.addButton(withTitle: "Don’t Quit")
+        alert.addButton(withTitle: "Quit Anyway").hasDestructiveAction = true
+        return alert.runModal() == .alertSecondButtonReturn ? .terminateNow : .terminateCancel
     }
 
     // Any change to UserDefaults lands here, so each setting is applied only when it differs.
@@ -49,8 +59,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.setFolder(Prefs.folder)
         controller.setOptions(
             fontFamily: defaults.string(forKey: "fontFamily") ?? "",
-            fontSize: defaults.object(forKey: "fontSize") as? Double ?? 14,
-            maxHeight: defaults.object(forKey: "maxHeight") as? Double ?? 640)
+            fontSize: defaults.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize,
+            uiScale: defaults.object(forKey: "uiScale") as? Double ?? Prefs.defaultUIScale)
     }
 
     private func registerHotKeys(force: Bool = false) {
@@ -106,6 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(menuItem("Search Notes", #selector(searchNotes)))
         menu.addItem(.separator())
         menu.addItem(menuItem("Settings…", #selector(openSettings)))
+        menu.addItem(menuItem("Open Backups Folder", #selector(openBackups)))
         menu.addItem(.separator())
         menu.addItem(menuItem("Quit notepanel", #selector(quit)))
         statusItem.menu = menu
@@ -122,5 +133,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func newNote() { controller.newNote() }
     @objc private func searchNotes() { controller.search() }
     @objc private func openSettings() { settingsWindow.show() }
+    @objc private func openBackups() {
+        try? FileManager.default.createDirectory(at: Prefs.backups, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(Prefs.backups)
+    }
     @objc private func quit() { NSApp.terminate(nil) }
 }
