@@ -1,0 +1,35 @@
+import AppKit
+
+/// A floating panel that takes keys without activating the app, so the app underneath stays active.
+final class NotePanel: NSPanel {
+    /// Cmd-key commands, by lowercased character. They don't repeat while the key is held.
+    var commands: [String: () -> Void] = [:]
+
+    override var canBecomeKey: Bool { true }
+
+    // While the app is inactive the main menu never sees key equivalents, so the panel routes them:
+    // its own commands first, then cut, copy and paste to the first responder. Everything else,
+    // including Cmd-Z and its key repeats, goes on to the editor page.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        if modifiers == .command, let key = event.charactersIgnoringModifiers?.lowercased() {
+            if let command = commands[key] {
+                if !event.isARepeat { command() }
+                return true
+            }
+            if let action = Self.editActions[key] {
+                return NSApp.sendAction(action, to: nil, from: self)
+            }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    // A double-click on the title bar would otherwise zoom the panel to fill the screen.
+    override func zoom(_ sender: Any?) {}
+
+    private static let editActions: [String: Selector] = [
+        "x": #selector(NSText.cut(_:)),
+        "c": #selector(NSText.copy(_:)),
+        "v": #selector(NSText.paste(_:)),
+    ]
+}
