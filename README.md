@@ -21,6 +21,8 @@ open build/notepanel.app
 
 The app lives in the menu bar. Press <kbd>⌃⌘N</kbd> to show or hide it, or click the menu bar icon.
 Right-click the icon for New Note, Search Notes, Settings, the backups folder and Quit.
+You can hide the icon in Settings; then press ⌘, in the panel, or open notepanel again, to get to
+Settings.
 
 ## Notes and safety
 

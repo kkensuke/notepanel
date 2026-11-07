@@ -199,6 +199,7 @@ struct SettingsView: View {
     @AppStorage("fontFamily") private var fontFamily = ""
     @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
+    @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
 
     var body: some View {
         Form {
@@ -235,6 +236,11 @@ struct SettingsView: View {
                         Text(verbatim: "\(Int(size)) pt").tag(size)
                     }
                 }
+                Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
+                if !showMenuBarIcon {
+                    Text("To get back here, press ⌘, in the panel, or open notepanel again.")
+                        .foregroundStyle(.secondary)
+                }
             }
             Section {
                 Toggle(
@@ -243,6 +249,11 @@ struct SettingsView: View {
                 if let loginError = model.loginError {
                     Text(loginError).font(.caption).foregroundStyle(.red)
                 }
+            }
+            // Also here, since the menu bar icon's menu can be hidden.
+            HStack {
+                Spacer()
+                Button("Quit notepanel") { NSApp.terminate(nil) }
             }
         }
         .formStyle(.grouped)
