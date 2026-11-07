@@ -199,6 +199,7 @@ struct SettingsView: View {
     @AppStorage("fontFamily") private var fontFamily = ""
     @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
+    @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
 
     var body: some View {
         Form {
@@ -235,6 +236,7 @@ struct SettingsView: View {
                         Text(verbatim: "\(Int(size)) pt").tag(size)
                     }
                 }
+                Toggle("Show menu bar icon", isOn: $showMenuBarIcon)
             }
             Section {
                 Toggle(

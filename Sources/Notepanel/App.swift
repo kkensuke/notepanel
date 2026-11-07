@@ -63,6 +63,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize)
         controller.setNoteShortcuts(
             next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"))
+        let showIcon = defaults.object(forKey: "showMenuBarIcon") as? Bool ?? true
+        if statusItem.isVisible != showIcon { statusItem.isVisible = showIcon }
     }
 
     private func registerHotKeys(force: Bool = false) {
