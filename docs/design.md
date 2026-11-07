@@ -95,7 +95,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 ### 5.1 呼び出し
 
 - ホットキー（既定は ⌃⌘N）で表示・非表示を切り替える。表示中でも前面になければ、前面に出してカーソルを置く。新規ノートと検索のホットキーは、既定では割り当てない。
-- メニューバーアイコンは常に表示する。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「New Note」「Search Notes」「Settings…」「Quit notepanel」を出す。
+- メニューバーアイコンは既定で表示し、設定で隠せる。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「New Note」「Search Notes」「Settings…」「Quit notepanel」を出す。アイコンを隠しているときは、パネルで ⌘, を押すか、アプリをもう一度開く（Finder や Spotlight から）と設定画面が開く。設定画面にも「Quit notepanel」のボタンを置く。
 - 表示する直前に最前面のアプリを記録する。隠すときに、そのアプリがまだ最前面ならフォーカスを戻す。別のアプリに移っていれば何もしない（tinycast と同じ）。
 - パネルの設定は tinycast に合わせる：`.nonactivatingPanel`、`isFloatingPanel = true`、`hidesOnDeactivate = false`、`collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]`、`level = .floating`。
 
@@ -195,6 +195,7 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 | 表示の文字サイズ（ノート以外：タイトルバー、切替画面、フッター、設定画面） | `uiFontSize` | 15 pt（12〜20 pt からメニューで選ぶ） |
 | 次のノート（パネル内のショートカット） | `shortcut.nextNote` | ⌃Tab |
 | 前のノート（パネル内のショートカット） | `shortcut.previousNote` | ⌃⇧Tab |
+| メニューバーアイコンを表示 | `showMenuBarIcon` | オン |
 | ログイン時に起動 | （`SMAppService` の状態） | オフ |
 
 - ホットキーは、ボタンを押してからキーを押して録画する。どのアプリからでも使うホットキーは ⌘・⌃・⌥ のどれかを含む組み合わせだけ、パネル内のショートカットは ⇧ だけの組み合わせ（⇧Tab など）も受け付ける。Esc で取り消し、×ボタンで解除する。録画中はホットキーを一時的に外す。
