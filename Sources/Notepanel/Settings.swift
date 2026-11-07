@@ -199,8 +199,10 @@ struct SettingsView: View {
                 Stepper("Size: \(Int(fontSize)) pt  (⌘+ / ⌘− / ⌘0)", value: $fontSize, in: Prefs.fontSizes)
             }
             Section("Interface") {
-                Stepper(
-                    "Size: \(Int((uiScale * 100).rounded()))%", value: $uiScale, in: Prefs.uiScales, step: 0.1)
+                // Verbatim, so the "%" isn't read as a format specifier.
+                Stepper(value: $uiScale, in: Prefs.uiScales, step: 0.1) {
+                    Text(verbatim: "Size: \(Int((uiScale * 100).rounded()))%")
+                }
             }
             Section {
                 Toggle(
