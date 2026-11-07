@@ -81,7 +81,7 @@ final class SettingsWindow {
             let host = NSHostingController(rootView: SettingsView(model: model))
             host.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: host)
-            window.title = "notepanel Settings"
+            window.title = "Settings"
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             // Above the note panel, which floats.
@@ -214,20 +214,34 @@ struct SettingsView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            .padding(.top, 12)
-            Form {
-                switch model.tab {
-                case .general: general
-                case .shortcuts: shortcuts
-                }
+            // A click anywhere on it switches to the other tab, as on a toggle.
+            .overlay {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { model.tab = model.tab == .general ? .shortcuts : .general }
             }
-            .formStyle(.grouped)
-            .scrollDisabled(true)
+            .padding(.top, 12)
+            ZStack(alignment: .top) {
+                page(.general) { general }
+                page(.shortcuts) { shortcuts }
+            }
         }
         .font(.system(size: uiFontSize))
         .controlSize(uiFontSize >= 17 ? .large : .regular)
         .frame(width: uiFontSize * 26)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Both tabs are laid out and the other one is hidden, so the window is as tall as the taller
+    /// tab and keeps its height when the tab changes.
+    private func page<Content: View>(_ tab: SettingsTab, @ViewBuilder _ content: () -> Content) -> some View {
+        let shown = model.tab == tab
+        return Form(content: content)
+            .formStyle(.grouped)
+            .scrollDisabled(true)
+            .opacity(shown ? 1 : 0)
+            .disabled(!shown)
+            .accessibilityHidden(!shown)
     }
 
     @ViewBuilder private var shortcuts: some View {
@@ -243,12 +257,14 @@ struct SettingsView: View {
     }
 
     @ViewBuilder private var general: some View {
-        Section("Notes folder") {
+        Section {
             Text(folder)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .textSelection(.enabled)
+        } header: {
             HStack {
+                Text("Notes folder")
                 Spacer()
                 Button("Use Default") { folder = Prefs.defaultFolder }
                     .disabled(folder == Prefs.defaultFolder)
