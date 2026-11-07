@@ -1,43 +1,142 @@
 # notepanel
 
-A floating Markdown scratchpad for macOS. A global shortcut brings it up over any app, even one in
-full screen; you write with VS Code's keys; hiding it returns you to the app you were in. Each note
-is a plain `.md` file in a folder you choose, named after the note's first line.
+A floating notepad for macOS. Press <kbd>⌃⌘N</kbd> in any app, even one in full screen, and a
+note panel appears on top of it. Write, press <kbd>Esc</kbd>, and you're back in the app you were
+using.
 
-It combines the invocation and window of [tinycast](https://github.com/abue-ammar/tinycast)'s Notes
-with the editing of [Heynote](https://github.com/heyman/heynote), whose editor is CodeMirror 6.
-The design and the agreed feature list are in [docs/design.md](docs/design.md) (Japanese).
+Each note is a plain Markdown file in a folder you choose, so you can also open your notes in any
+other editor, sync them or back them up as you like.
 
-## Build
+## Features
 
-Needs macOS 14 or later and Swift 5.10 or later. The Command Line Tools are enough; Xcode isn't
-needed.
+- **Opens over everything.** The panel floats above other windows, full-screen apps included, on
+  every Space. Showing it doesn't switch apps: the app you were in stays active, and gets the focus
+  back when you hide the panel.
+- **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
+  rectangular selection, moving and copying lines, and find and replace. It also highlights
+  Markdown and continues lists when you press Return.
+- **Plain files.** Each note is a `.md` file named after its first line.
+- **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
+  keeps earlier versions as backups.
+- **Quick to switch notes.** <kbd>⌘P</kbd> searches the names and text of your notes, and
+  <kbd>⌃Tab</kbd> goes to the next one. Pinned notes come first.
+- **Input methods work.** You can type with Japanese and other input methods.
+
+## Install
+
+You need macOS 14 Sonoma or later, and Swift 5.10 or later. The Command Line Tools are enough
+(`xcode-select --install`); you don't need Xcode. There are no prebuilt downloads yet, so you build
+the app yourself:
 
 ```sh
+git clone https://github.com/kkensuke/notepanel.git
+cd notepanel
 scripts/bundle.sh                         # builds build/notepanel.app
-cp -R build/notepanel.app /Applications/  # optional
-open build/notepanel.app
+cp -R build/notepanel.app /Applications/
+open /Applications/notepanel.app
 ```
 
-The app lives in the menu bar. Press <kbd>⌃⌘N</kbd> to show or hide it, or click the menu bar icon.
-Right-click the icon for New Note, Search Notes, Settings, the backups folder and Quit. ⌘Q in the
-panel or in Settings also quits.
-You can hide the icon in Settings; then press ⌘, in the panel, or open notepanel again, to get to
-Settings.
+notepanel lives in the menu bar, as a note icon, and has no Dock icon. The shortcut needs no
+Accessibility permission. To start notepanel when you log in, turn on **Open at login** in Settings.
 
-## Notes and safety
+To update, run `git pull` and `scripts/bundle.sh` again, quit notepanel (<kbd>⌘Q</kbd> in the
+panel), copy the new app to `/Applications`, and open it.
 
-- A note's file name follows its first line (`# Shopping list` → `Shopping list.md`), numbered if
-  the name is taken, until you rename the note yourself by clicking its name in the title bar.
-- Text is saved 300 ms after you stop typing, and at once when you hide the panel, switch notes or
-  quit. If a save fails, the footer says so, the text stays in the app, and quitting asks first.
-- A file changed in another app is never overwritten: your text goes to a `(conflict …)` copy.
-- Before a save overwrites a note, the previous contents are kept in
-  `~/Library/Application Support/notepanel/Backups` (at most every 10 minutes per note, for 30 days).
-- Moving a note to the Trash asks first, and the Trash keeps it.
+## Using it
 
-Node is only needed to change the editor page. `web/editor.js` is built from `editor/` and kept in
-the repository:
+- **Show and hide.** Press <kbd>⌃⌘N</kbd>, or click the menu bar icon. <kbd>Esc</kbd> or
+  <kbd>⌘W</kbd> hides the panel.
+- **Notes.** <kbd>⌘N</kbd> starts a new note. <kbd>⌘P</kbd> opens the switcher: type to search,
+  then press <kbd>Return</kbd> to open the note. Each row has a pin button and a trash button.
+- **Names.** A note is named after its first line: `# Shopping list` is saved as
+  `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
+  click the name in the title bar; from then on the name stays as you set it.
+- **Menu.** Right-click the menu bar icon (or Control-click it) for New Note, Search Notes,
+  Settings, the backups folder and Quit.
+- **Size.** The panel keeps the size you give it. <kbd>⌘+</kbd> and <kbd>⌘−</kbd> change the
+  note's text size, and <kbd>⌘0</kbd> resets it.
+
+## Settings
+
+Open Settings with <kbd>⌘,</kbd> in the panel, or from the menu bar icon's menu.
+
+- **General:** the notes folder, the note font, the size of the interface text, whether the menu
+  bar icon shows, and Open at login.
+- **Shortcuts:** the shortcuts that work from any app (show or hide notes, new note, search notes)
+  and the ones that work in the panel (next and previous note). Click a shortcut and press the
+  keys. <kbd>Esc</kbd> cancels, and the × button removes the shortcut.
+
+If you hide the menu bar icon, you can still reach Settings: press <kbd>⌘,</kbd> in the panel, or
+open notepanel again from Finder or Spotlight.
+
+## Your notes and their safety
+
+- **Where they are.** Notes are kept in `~/Library/Application Support/notepanel/Notes` unless
+  you choose another folder in Settings. notepanel lists the `.md` files at the top of that folder,
+  not in subfolders. Choosing another folder doesn't move your notes.
+- **Saving.** Text is saved 0.3 seconds after you stop typing, and at once when you hide the
+  panel, switch notes or quit. If a save fails, the bottom of the panel says why, the text stays in
+  notepanel, and quitting asks before it drops anything.
+- **Changes from other apps.** notepanel reads a note again when you show the panel or open the
+  note. If the file changed on disk while you had unsaved text, your text goes to a separate copy
+  named `… (conflict date time).md`, and the file on disk is left alone.
+- **Backups.** Before a save replaces a note, the earlier text is copied to
+  `~/Library/Application Support/notepanel/Backups`, at most once every 10 minutes per note.
+  Backups older than 30 days are deleted when notepanel starts.
+- **Deleting.** Moving a note to the Trash asks first, and you can restore it from the Trash in
+  Finder.
+- **Other files.** notepanel won't open a file that isn't UTF-8 text, and leaves it unchanged.
+
+## Keys
+
+In the panel:
+
+| Key | Does |
+|---|---|
+| ⌘N / ⌘P / ⌘O / ⌘, | New note / switch notes / open the notes folder / settings |
+| ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
+| ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
+| ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
+| ⌘Q | Quit (it saves first, and asks if something couldn't be saved) |
+| In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
+
+Editing:
+
+| Key | Does |
+|---|---|
+| ⌘⌫ | Delete to the line start; at the start of a line, join it with the line above |
+| ⌘← / ⌘→ | Line start (after the indentation first) / line end |
+| ⌥↑ / ⌥↓, ⇧⌥↑ / ⇧⌥↓ | Move lines, copy lines |
+| ⇧⌘K, ⌘L | Delete line, select line |
+| ⌘Return / ⇧⌘Return | Insert a line below / above |
+| ⌘D, ⇧⌘L, ⌘⌥↑ / ⌘⌥↓, ⌥-click | Multiple cursors |
+| ⇧⌥-drag | Rectangular selection |
+| ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
+| ⌘-click | Open a link |
+
+## Troubleshooting
+
+- **⌃⌘N does nothing.** Another app may already use that shortcut. Choose another one in
+  Settings → Shortcuts.
+- **I need an earlier version of a note.** Right-click the menu bar icon and choose Open Backups
+  Folder. Each backup is named with the date and time, then the note's name.
+- **Uninstalling.** Turn off Open at login, quit notepanel, and delete
+  `/Applications/notepanel.app`. Its settings are
+  removed with `defaults delete io.github.kkensuke.notepanel`. The folder
+  `~/Library/Application Support/notepanel` holds the backups and, unless you chose another
+  folder, your notes: keep it, or move your notes out before deleting it.
+
+## Development
+
+| Path | What it is |
+|---|---|
+| `Sources/Notepanel` | The app (AppKit): the panel, the menu bar icon, Settings |
+| `Sources/NotepanelCore` | Reading and saving notes, with no UI |
+| `editor/` | The editor page (CodeMirror 6), built into `web/editor.js` |
+| `web/` | The page the panel shows in a web view |
+| `docs/design.md` | The design and the feature list (in Japanese) |
+
+Node is needed only to change the editor page. `web/editor.js` is kept in the repository:
 
 ```sh
 cd editor
@@ -45,40 +144,21 @@ npm ci
 npm run build   # writes ../web/editor.js
 ```
 
-## Test
+Tests:
 
 ```sh
-swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, window fitting
+swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, backups
 cd editor && npm test       # editor helpers: search ranking, links, line insertion, counts
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
 
 `NotepanelChecks` is a plain executable of assertions rather than an XCTest target, because XCTest
-comes only with Xcode.
+comes only with Xcode. The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't
+in `/Applications`. To inspect the editor page in the running app, enable Safari's Develop menu;
+notepanel's page is listed there.
 
-The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/Applications`.
+## Credits
 
-To inspect the editor page in the running app, enable Safari's Develop menu; notepanel's page is
-listed there.
-
-## Keys
-
-| Key | Does |
-|---|---|
-| ⌘N / ⌘P / ⌘O / ⌘, | New note / switch notes / open the notes folder / settings |
-| ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text (the interface text size is in Settings) |
-| ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
-| ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
-| ⌘Q | Quit (it saves first, and asks if something couldn't be saved) |
-| ⌘⌫ | Delete to the line start; at the start of a line, join it with the line above |
-| ⌘← / ⌘→ | Line start (after the indentation first) / line end |
-| ⌥↑ / ⌥↓, ⇧⌥↑ / ⇧⌥↓ | Move lines, copy lines |
-| ⇧⌘K, ⌘L | Delete line, select line |
-| ⌘Enter / ⇧⌘Enter | Insert a line below / above |
-| ⌘D, ⇧⌘L, ⌘⌥↑ / ⌘⌥↓, ⌥-click | Multiple cursors |
-| ⇧⌥-drag | Rectangular selection |
-| ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
-| ⌘-click | Open a link |
-| In the switcher: ↑↓, Enter, ⌘⌫ | Choose, open, move to the Trash (each row also has Pin and Trash buttons) |
-
-Click the note's name in the title bar to rename it. The panel keeps the size you give it.
+notepanel takes the way it opens and its panel from the Notes feature of
+[tinycast](https://github.com/abue-ammar/tinycast), and its editing from
+[Heynote](https://github.com/heyman/heynote). The editor is [CodeMirror 6](https://codemirror.net).
