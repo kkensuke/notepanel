@@ -83,14 +83,3 @@ export function countCharacters(text) {
   for (const _ of segmenter.segment(text.replace(/\r?\n/g, ""))) count++
   return count
 }
-
-// "15:30" today, "Nov 7" this year, "Nov 7, 2025" before.
-export function formatModified(ms, now = new Date()) {
-  const date = new Date(ms)
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString("en-US", {hour: "2-digit", minute: "2-digit", hour12: false})
-  }
-  const options = {month: "short", day: "numeric"}
-  if (date.getFullYear() !== now.getFullYear()) options.year = "numeric"
-  return date.toLocaleDateString("en-US", options)
-}

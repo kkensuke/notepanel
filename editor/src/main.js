@@ -14,7 +14,7 @@ import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 import {syntaxHighlighting, HighlightStyle} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
-import {rankNotes, urlAt, insertLineAbove, countCharacters, formatModified} from "./logic.js"
+import {rankNotes, urlAt, insertLineAbove, countCharacters} from "./logic.js"
 
 // Outside the app (in a plain browser) there is no handler, so nothing is sent.
 const post = (type, data = {}) => window.webkit?.messageHandlers?.native?.postMessage({type, ...data})
@@ -25,7 +25,6 @@ const footer = $("footer")
 const statusElement = $("status")
 const countElement = $("count")
 const switcher = $("switcher")
-const switcherBox = switcher.firstElementChild
 const query = $("query")
 const results = $("results")
 
@@ -53,7 +52,7 @@ const theme = EditorView.theme({
   ".cm-selectionMatch": {backgroundColor: "var(--match)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
-  ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(12px * var(--ui-scale))"},
+  ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
   ".cm-panels.cm-panels-top": {borderBottom: "1px solid var(--border)"},
   ".cm-panels.cm-panels-bottom": {borderTop: "1px solid var(--border)"},
   ".cm-textfield, .cm-button": {
@@ -101,7 +100,6 @@ const extensions = [
       post("changed", {id: currentId, text: update.state.doc.toString()})
       scheduleCount()
     }
-    if (update.docChanged || update.geometryChanged) reportHeight()
   }),
   EditorView.domEventHandlers({
     mousedown(event, view) {
@@ -127,19 +125,17 @@ function openNote(id, text, keepSwitcher) {
   currentId = id
   if (!keepSwitcher) closeSwitcher()
   updateCount()
-  reportHeight()
 }
 
 const defaultFont = `"SF Mono", ui-monospace, Menlo, monospace`
 
-function applyOptions({fontFamily, fontSize, uiScale}) {
+function applyOptions({fontFamily, fontSize, uiFontSize}) {
   const family = String(fontFamily ?? "").replace(/["\\;{}]/g, "").trim()
   const root = document.documentElement.style
   root.setProperty("--font", family ? `"${family}", ${defaultFont}` : defaultFont)
   root.setProperty("--size", `${Number(fontSize) || 14}px`)
-  root.setProperty("--ui-scale", String(Number(uiScale) || 1.5))
+  root.setProperty("--ui-size", `${Number(uiFontSize) || 15}px`)
   view.requestMeasure()
-  reportHeight()
 }
 
 // ---- Footer
@@ -155,42 +151,17 @@ function updateCount() {
   countElement.textContent = `${count.toLocaleString("en-US")} ${count === 1 ? "character" : "characters"}`
 }
 
-// ---- Window height
-
-let lastHeight = 0
-let heightQueued = false
-
-// The height the page wants: the note, any search panel and the footer, or the switcher.
-function reportHeight() {
-  if (heightQueued) return
-  heightQueued = true
-  requestAnimationFrame(() => {
-    heightQueued = false
-    let panels = 0
-    for (const panel of view.dom.querySelectorAll(".cm-panels")) panels += panel.offsetHeight
-    let height = view.contentHeight + panels + footer.offsetHeight
-    if (isSwitcherOpen()) height = Math.max(height, switcherBox.offsetHeight)
-    height = Math.ceil(height)
-    if (height !== lastHeight) {
-      lastHeight = height
-      post("height", {height})
-    }
-  })
-}
-
 // ---- Switcher
 
 let notes = []
 let shown = []
 let selected = 0
-let renaming = null
 
 const isSwitcherOpen = () => !switcher.hidden
 
 function openSwitcher(list) {
   notes = list
   selected = 0
-  renaming = null
   query.value = ""
   switcher.hidden = false
   render()
@@ -200,9 +171,7 @@ function openSwitcher(list) {
 function closeSwitcher() {
   if (!isSwitcherOpen()) return
   switcher.hidden = true
-  renaming = null
   view.focus()
-  reportHeight()
 }
 
 function render() {
@@ -213,7 +182,6 @@ function render() {
   if (active) query.setAttribute("aria-activedescendant", active.id)
   else query.removeAttribute("aria-activedescendant")
   active?.scrollIntoView({block: "nearest"})
-  reportHeight()
 }
 
 function element(tag, className, text) {
@@ -223,17 +191,18 @@ function element(tag, className, text) {
   return node
 }
 
-// Feather-style icons, drawn with the text color.
+// Line icons drawn with the text color; a pinned note's pin is filled.
 const icons = {
-  rename: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  pin: '<path d="M9 3h6l-1 6 4 4H6l4-4Z"/><path d="M12 13v8"/>',
   trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
 }
 
-function actionButton(name, label, onClick) {
+function actionButton(name, label, onClick, pressed) {
   const button = document.createElement("button")
   button.className = `action ${name}`
   button.title = label
   button.setAttribute("aria-label", label)
+  if (pressed !== undefined) button.setAttribute("aria-pressed", String(pressed))
   button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`
   // Pressing a button must not take focus from the search field or open the row.
   button.addEventListener("mousedown", event => {
@@ -247,64 +216,24 @@ function actionButton(name, label, onClick) {
   return button
 }
 
-function startRename(id) {
-  renaming = id
-  render()
-}
-
+// Every row shows its buttons all the time, so rows keep one height as the pointer moves.
 function row(note, index) {
   const item = document.createElement("li")
   item.id = `note-${index}`
   item.setAttribute("role", "option")
   item.setAttribute("aria-selected", String(index === selected))
-  if (note.id === renaming) {
-    item.append(renameField(note))
-    return item
-  }
   const actions = element("span", "actions", "")
   actions.append(
-    actionButton("rename", "Rename (⌘R)", () => startRename(note.id)),
+    actionButton("pin", note.pinned ? "Unpin" : "Pin", () => post("pin", {id: note.id}), Boolean(note.pinned)),
     actionButton("trash", "Move to Trash (⌘⌫)", () => post("trash", {id: note.id})),
   )
-  item.append(element("span", "title", note.title), element("span", "meta", formatModified(note.modified)), actions)
+  item.append(element("span", "title", note.title), actions)
   if (note.snippet) item.append(element("div", "snippet", note.snippet))
   item.addEventListener("mousedown", event => {
     event.preventDefault()
     post("select", {id: note.id})
   })
   return item
-}
-
-function renameField(note) {
-  const input = document.createElement("input")
-  input.className = "rename"
-  input.value = note.id
-  input.spellcheck = false
-  input.setAttribute("aria-label", "New name")
-  input.addEventListener("keydown", event => {
-    if (event.isComposing) return
-    if (event.key === "Enter") {
-      event.preventDefault()
-      renaming = null
-      post("rename", {from: note.id, to: input.value})
-      query.focus()
-    } else if (event.key === "Escape") {
-      event.preventDefault()
-      renaming = null
-      render()
-      query.focus()
-    }
-  })
-  input.addEventListener("blur", () => {
-    if (renaming !== note.id) return
-    renaming = null
-    render()
-  })
-  requestAnimationFrame(() => {
-    input.focus()
-    input.select()
-  })
-  return input
 }
 
 query.addEventListener("input", () => {
@@ -330,8 +259,6 @@ query.addEventListener("keydown", event => {
     closeSwitcher()
   } else if (command && event.key === "Backspace") {
     if (note) post("trash", {id: note.id})
-  } else if (command && event.key.toLowerCase() === "r") {
-    if (note) startRename(note.id)
   } else if (command && event.key.toLowerCase() === "a") {
     query.select()
   } else {
@@ -379,7 +306,6 @@ window.receive = ({type, data}) => {
       break
     case "status":
       statusElement.textContent = data
-      reportHeight()
       break
   }
 }

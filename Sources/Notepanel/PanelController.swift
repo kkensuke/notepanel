@@ -3,23 +3,22 @@ import NotepanelCore
 
 /// Shows and hides the note panel, and connects it to the note store and the editor page.
 @MainActor
-final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
+final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTextFieldDelegate {
     let store: NoteStore
     var openSettings: () -> Void = {}
 
     private let panel: NotePanel
     private let bridge = EditorBridge()
-    private let titleLabel = NSTextField(labelWithString: "")
+    private let titleField = NSTextField(string: "")
+    private var titleWidth: NSLayoutConstraint!
     private var buttons: [NSToolbarItem.Identifier: NSButton] = [:]
     private var previousApp: NSRunningApplication?
-    private var contentHeight: CGFloat = 0
-    private var uiScale: CGFloat = 1.5
+    private var uiFontSize: CGFloat = 15
     private var options: NSDictionary = [:]
     /// Old names of renamed notes, so text the page sent under an old name still lands.
     private var renamed: [String: String] = [:]
 
     private static let frameName = "Note Panel"
-    private static let minHeight: CGFloat = 120
 
     private enum Item {
         static let title = NSToolbarItem.Identifier("title")
@@ -31,7 +30,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
     init(store: NoteStore) {
         self.store = store
         panel = NotePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 320),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered, defer: false)
         super.init()
@@ -53,12 +52,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
                 bridge.send("open", ["id": name, "text": text, "keep": false])
             }
         }
-        // shortcut: lets risk R1 be tried both ways; remove once M0 settles on one.
-        if UserDefaults.standard.bool(forKey: "activateOnShow") { NSApp.activate() }
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
-        panel.makeFirstResponder(bridge.webView)
-        bridge.send("focus", "")
+        focusEditor()
     }
 
     /// Returns focus to the app that was in front, unless the user has moved on to another one.
@@ -105,15 +101,22 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
         openSomeNote()
     }
 
-    func setOptions(fontFamily: String, fontSize: Double, uiScale: Double) {
-        let new: NSDictionary = ["fontFamily": fontFamily, "fontSize": fontSize, "uiScale": uiScale]
+    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double) {
+        let new: NSDictionary = ["fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize]
         guard new != options else { return }
         options = new
         bridge.send("options", new)
-        if CGFloat(uiScale) != self.uiScale {
-            self.uiScale = CGFloat(uiScale)
-            applyScale()
+        if CGFloat(uiFontSize) != self.uiFontSize {
+            self.uiFontSize = CGFloat(uiFontSize)
+            applyUIFontSize()
         }
+    }
+
+    func setNoteShortcuts(next: Shortcut?, previous: Shortcut?) {
+        var shortcuts: [(Shortcut, () -> Void)] = []
+        if let next { shortcuts.append((next, { [weak self] in self?.cycle(1) })) }
+        if let previous { shortcuts.append((previous, { [weak self] in self?.cycle(-1) })) }
+        panel.shortcuts = shortcuts
     }
 
     /// Cmd-plus and Cmd-minus step the note's text size; Cmd-0 sets it back to the default.
@@ -141,18 +144,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
                 let text = body["text"] as? String
             else { return }
             store.edit(text)
-        case "height":
-            guard let height = body["height"] as? Double else { return }
-            contentHeight = CGFloat(height)
-            fitHeight()
         case "select":
             if let id = body["id"] as? String { open(id) }
         case "trash":
             if let id = body["id"] as? String { confirmTrash(id) }
-        case "rename":
-            guard let from = body["from"] as? String, let to = body["to"] as? String else { return }
-            rename(from, to: to)
-            bridge.send("notes", notesForSwitcher())
+        case "pin":
+            if let id = body["id"] as? String { togglePin(id) }
         case "openURL":
             // The page is trusted, but a link can say anything, so only web and mail links open.
             guard let string = body["url"] as? String, let url = URL(string: string),
@@ -201,11 +198,23 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
         }
     }
 
+    /// Opens the next or previous note in the switcher's order, wrapping around.
+    private func cycle(_ step: Int) {
+        let names = orderedNotes().map(\.name)
+        guard names.count > 1, let current = store.current, let index = names.firstIndex(of: current) else { return }
+        open(names[(index + step + names.count) % names.count])
+    }
+
     /// Every rename comes through here, from the store: the user's, a file following its
     /// first line, and a conflict copy.
     private func noteRenamed(_ old: String, _ new: String) {
         renamed[old] = new
         for (from, to) in renamed where to == old { renamed[from] = new }
+        var pins = Prefs.pinned(in: store.folder)
+        if let index = pins.firstIndex(of: old) {
+            pins[index] = new
+            Prefs.setPinned(pins, in: store.folder)
+        }
         bridge.send("renamed", ["from": old, "to": new])
         if store.current == new { rememberCurrent() }
         updateTitle()
@@ -246,8 +255,16 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
             store.notify("Couldn’t move “\(name)” to the Trash: \(error.localizedDescription)")
             return
         }
+        Prefs.setPinned(Prefs.pinned(in: store.folder).filter { $0 != trashed }, in: store.folder)
         bridge.send("trashed", trashed)
         if store.current == nil { openSomeNote(keepSwitcher: true) }
+        bridge.send("notes", notesForSwitcher())
+    }
+
+    private func togglePin(_ name: String) {
+        var pins = Prefs.pinned(in: store.folder)
+        if let index = pins.firstIndex(of: name) { pins.remove(at: index) } else { pins.append(name) }
+        Prefs.setPinned(pins, in: store.folder)
         bridge.send("notes", notesForSwitcher())
     }
 
@@ -255,13 +272,21 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
         bridge.send("switcher", ["notes": notesForSwitcher(), "force": false])
     }
 
+    /// Pinned notes first, then the rest, each newest first. The switcher and cycling share it.
+    private func orderedNotes() -> [NoteInfo] {
+        let pins = Set(Prefs.pinned(in: store.folder))
+        let notes = store.list()
+        return notes.filter { pins.contains($0.name) } + notes.filter { !pins.contains($0.name) }
+    }
+
     // shortcut: reads every note on each open of the switcher; fine for hundreds of notes.
     private func notesForSwitcher() -> [[String: Any]] {
-        store.list().map { note in
+        let pins = Set(Prefs.pinned(in: store.folder))
+        return orderedNotes().map { note in
             [
                 "id": note.name,
                 "title": note.name,
-                "modified": note.modified.timeIntervalSince1970 * 1000,
+                "pinned": pins.contains(note.name),
                 "text": note.name == store.current ? store.text : (store.read(note.name) ?? ""),
             ]
         }
@@ -269,12 +294,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
 
     private func rememberCurrent() {
         UserDefaults.standard.set(store.current, forKey: "lastNote")
-    }
-
-    private func updateTitle() {
-        let name = store.current ?? ""
-        titleLabel.stringValue = name
-        panel.title = name
     }
 
     // MARK: - Window
@@ -289,7 +308,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
         panel.titlebarSeparatorStyle = .none
         panel.backgroundColor = .textBackgroundColor
         panel.isReleasedWhenClosed = false
-        panel.minSize = NSSize(width: 320, height: Self.minHeight)
+        panel.minSize = NSSize(width: 320, height: 160)
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.delegate = self
         panel.contentView = bridge.webView
@@ -304,26 +323,38 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
             "q": {},
         ]
 
-        titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        titleLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 360).isActive = true
+        // The note's name, centered; clicking it renames the note.
+        titleField.isBordered = false
+        titleField.drawsBackground = false
+        titleField.isEditable = true
+        titleField.alignment = .center
+        titleField.lineBreakMode = .byTruncatingTail
+        titleField.cell?.usesSingleLineMode = true
+        titleField.focusRingType = .none
+        titleField.delegate = self
+        titleField.toolTip = "Click to rename"
+        titleField.setAccessibilityLabel("Note name")
+        // An editable field has no width of its own, so it's sized to its name.
+        titleWidth = titleField.widthAnchor.constraint(equalToConstant: 120)
+        titleWidth.isActive = true
         buttons = [
             Item.new: toolbarButton("square.and.pencil", "New Note (⌘N)", #selector(newNoteClicked)),
             Item.browse: toolbarButton("list.bullet", "Browse Notes (⌘P)", #selector(browseClicked)),
             Item.folder: toolbarButton("folder", "Open Notes Folder (⌘O)", #selector(openFolderClicked)),
         ]
-        applyScale()
+        applyUIFontSize()
 
-        // A unified toolbar gives the title bar room for the larger title and buttons, and
-        // keeps the traffic lights centered beside them.
+        // A toolbar sizes the title bar to the title and buttons and keeps the traffic lights
+        // centered beside them; the compact style keeps the space above and below small.
         let toolbar = NSToolbar(identifier: "notepanel")
         toolbar.delegate = self
         toolbar.displayMode = .iconOnly
         toolbar.allowsUserCustomization = false
         toolbar.centeredItemIdentifiers = [Item.title]
         panel.toolbar = toolbar
-        panel.toolbarStyle = .unified
+        panel.toolbarStyle = .unifiedCompact
 
+        // The panel keeps the size the user gives it; nothing resizes it to fit a note.
         if !panel.setFrameUsingName(Self.frameName) { panel.center() }
         panel.setFrameAutosaveName(Self.frameName)
     }
@@ -342,7 +373,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
     ) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         if identifier == Item.title {
-            item.view = titleLabel
+            item.view = titleField
         } else if let button = buttons[identifier] {
             item.view = button
             item.label = button.toolTip ?? ""
@@ -361,29 +392,63 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate {
         return button
     }
 
-    /// Sizes the title and the toolbar buttons by the interface size setting.
-    private func applyScale() {
-        titleLabel.font = .systemFont(ofSize: 13 * uiScale, weight: .semibold)
-        let configuration = NSImage.SymbolConfiguration(pointSize: 14 * uiScale, weight: .regular)
+    /// Sizes the title and the toolbar's symbols by the interface text size.
+    private func applyUIFontSize() {
+        titleField.font = .systemFont(ofSize: uiFontSize, weight: .semibold)
+        let configuration = NSImage.SymbolConfiguration(pointSize: uiFontSize + 1, weight: .regular)
         for button in buttons.values {
             guard let symbol = button.identifier?.rawValue else { continue }
             button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: button.toolTip)?
                 .withSymbolConfiguration(configuration)
         }
+        sizeTitle()
     }
 
     @objc private func newNoteClicked() { newNote() }
     @objc private func browseClicked() { toggleSwitcher() }
     @objc private func openFolderClicked() { openFolder() }
 
-    private func fitHeight() {
-        guard contentHeight > 0, let screen = panel.screen ?? NSScreen.main else { return }
-        let chrome = panel.frame.height - bridge.webView.frame.height
-        let visible = screen.visibleFrame
-        // No limit of its own: the window grows with the note until it fills the screen's height.
-        let frame = fittedFrame(
-            panel.frame, height: chrome + contentHeight, minHeight: Self.minHeight,
-            maxHeight: visible.height, in: visible)
-        if frame != panel.frame { panel.setFrame(frame, display: true) }
+    // MARK: - The title
+
+    private func updateTitle() {
+        let name = store.current ?? ""
+        panel.title = name
+        guard titleField.currentEditor() == nil else { return }
+        titleField.stringValue = name
+        sizeTitle()
+    }
+
+    private func sizeTitle() {
+        let width = (titleField.attributedStringValue.size().width + 16).rounded(.up)
+        titleWidth.constant = min(max(width, 80), 360)
+    }
+
+    private func focusEditor() {
+        panel.makeFirstResponder(bridge.webView)
+        bridge.send("focus", "")
+    }
+
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.cancelOperation(_:)) {
+            titleField.abortEditing()
+            updateTitle()
+            focusEditor()
+            return true
+        }
+        if selector == #selector(NSResponder.insertNewline(_:)) {
+            focusEditor()  // Ends editing, which renames the note.
+            return true
+        }
+        return false
+    }
+
+    /// A name typed here is the user's own, so the file stops following the note's first line.
+    func controlTextDidEndEditing(_ notification: Notification) {
+        if let current = store.current, titleField.stringValue != current {
+            rename(current, to: titleField.stringValue)
+        }
+        // Set directly: the field may still count as editing here. A refused name reverts.
+        titleField.stringValue = store.current ?? ""
+        sizeTitle()
     }
 }

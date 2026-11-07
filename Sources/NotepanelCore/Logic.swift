@@ -1,14 +1,4 @@
-import CoreGraphics
 import Foundation
-
-/// Fits the window to `height`, keeping its top edge until the bottom would leave the screen.
-public func fittedFrame(
-    _ frame: CGRect, height: CGFloat, minHeight: CGFloat, maxHeight: CGFloat, in visible: CGRect
-) -> CGRect {
-    let height = min(maxHeight, visible.height, max(minHeight, height.rounded(.up)))
-    let top = min(frame.maxY, visible.maxY)
-    return CGRect(x: frame.minX, y: max(visible.minY, top - height), width: frame.width, height: height)
-}
 
 /// `Untitled`, `Untitled 2` and so on: the names new notes get.
 public func isUntitled(_ name: String) -> Bool {

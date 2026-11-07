@@ -60,7 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.setOptions(
             fontFamily: defaults.string(forKey: "fontFamily") ?? "",
             fontSize: defaults.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize,
-            uiScale: defaults.object(forKey: "uiScale") as? Double ?? Prefs.defaultUIScale)
+            uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize)
+        controller.setNoteShortcuts(
+            next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"))
     }
 
     private func registerHotKeys(force: Bool = false) {

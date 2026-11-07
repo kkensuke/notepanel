@@ -25,7 +25,7 @@ Right-click the icon for New Note, Search Notes, Settings, the backups folder an
 ## Notes and safety
 
 - A note's file name follows its first line (`# Shopping list` → `Shopping list.md`), numbered if
-  the name is taken, until you rename the note yourself.
+  the name is taken, until you rename the note yourself by clicking its name in the title bar.
 - Text is saved 300 ms after you stop typing, and at once when you hide the panel, switch notes or
   quit. If a save fails, the footer says so, the text stays in the app, and quitting asks first.
 - A file changed in another app is never overwritten: your text goes to a `(conflict …)` copy.
@@ -55,12 +55,16 @@ comes only with Xcode.
 
 The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/Applications`.
 
+To inspect the editor page in the running app, enable Safari's Develop menu; notepanel's page is
+listed there.
+
 ## Keys
 
 | Key | Does |
 |---|---|
 | ⌘N / ⌘P / ⌘O / ⌘, | New note / switch notes / open the notes folder / settings |
-| ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text (the interface size is in Settings) |
+| ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text (the interface text size is in Settings) |
+| ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
 | ⌘⌫ | Delete to the line start; at the start of a line, join it with the line above |
 | ⌘← / ⌘→ | Line start (after the indentation first) / line end |
@@ -71,29 +75,6 @@ The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't in `/
 | ⇧⌥-drag | Rectangular selection |
 | ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
 | ⌘-click | Open a link |
-| In the switcher: ↑↓, Enter, ⌘R, ⌘⌫ | Choose, open, rename, move to the Trash (or use the row's buttons) |
+| In the switcher: ↑↓, Enter, ⌘⌫ | Choose, open, move to the Trash (each row also has Pin and Trash buttons) |
 
-## Checking it on a Mac
-
-These depend on how macOS treats a non-activating panel that hosts a web view, and need checking by
-hand (risks R1–R6 in the design):
-
-1. **Typing (R1).** While using another app, press ⌃⌘N and type at once. The caret blinks and text
-   appears.
-2. **Japanese input (R2).** Type with an input method, convert, confirm, and press Return. Return
-   during conversion confirms it and adds no line.
-3. **Pointer (R3).** Over the text, the pointer is an I-beam.
-4. **Held undo (R4).** Hold ⌘Z: it keeps undoing. Hold ⌘⌫ at the start of lines: it deletes
-   across empty lines.
-5. **Full screen (R5).** With Safari, QuickTime or Keynote in full screen, press ⌃⌘N: the panel
-   appears over it.
-6. **Focus (R6).** After showing the panel, typing goes into the note without a click. After Esc,
-   typing goes back to the previous app.
-
-If 1–3 fail, try activating the app when the panel shows, then repeat the checks:
-
-```sh
-defaults write io.github.kkensuke.notepanel activateOnShow -bool true   # back: delete the key
-```
-
-To inspect the editor page, enable Safari's Develop menu; notepanel's page is listed there.
+Click the note's name in the title bar to rename it. The panel keeps the size you give it.

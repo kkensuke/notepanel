@@ -121,11 +121,11 @@ await page.mouse.click(box.x, box.y)
 await page.keyboard.up("Meta")
 assert.equal((await last("openURL"))?.url, "https://example.com/a")
 
-// The switcher: fuzzy title search, keyboard selection, trash and rename.
+// The switcher: fuzzy title search, keyboard selection and trash.
 const notes = [
-  {id: "Groceries", title: "Groceries", modified: Date.now(), text: "milk"},
-  {id: "Untitled", title: "Meeting notes", modified: Date.now() - 1000, text: "agenda"},
-  {id: "Ideas", title: "Ideas", modified: Date.now() - 2000, text: "a milk frother"},
+  {id: "Groceries", title: "Groceries", modified: Date.now(), text: "milk", pinned: true},
+  {id: "Untitled", title: "Meeting notes", modified: Date.now() - 1000, text: "agenda", pinned: false},
+  {id: "Ideas", title: "Ideas", modified: Date.now() - 2000, text: "a milk frother", pinned: false},
 ]
 await receive("switcher", {notes, force: false})
 assert.equal(await page.evaluate(() => document.activeElement.id), "query")
@@ -143,39 +143,41 @@ assert.equal((await last("select"))?.id, "Ideas")
 await press("Backspace", ["Meta"])
 assert.equal((await last("trash"))?.id, "Ideas")
 await press("r", ["Meta"])
-await page.waitForFunction(() => document.activeElement.classList.contains("rename"))
-// The whole name starts selected, as in Finder; move to its end to append.
-await press("ArrowRight")
-await page.keyboard.type(" 2")
-await press("Enter")
-assert.deepEqual(await last("rename"), {type: "rename", from: "Ideas", to: "Ideas 2"})
+assert.equal(await last("rename"), undefined, "renaming moved to the title bar")
 await press("Escape")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
 
-// The selected row has Rename and Trash buttons. Trash only asks; Swift confirms before deleting.
+// Every row shows Pin and Trash, so moving the pointer never changes a row's height.
 await receive("switcher", {notes, force: true})
+const rowHeights = () => page.$$eval("#results li", els => els.map(e => e.getBoundingClientRect().height))
+const before = await rowHeights()
+await page.hover("#results li:nth-child(3)")
+assert.deepEqual(await rowHeights(), before)
+assert.equal(new Set(before).size, 1, "rows without snippets share one height")
+assert.equal(await page.$$eval("#results li .meta", els => els.length), 0, "no dates")
+assert.deepEqual(
+  await page.$$eval("#results li .action.pin", els => els.map(e => e.getAttribute("aria-pressed"))),
+  ["true", "false", "false"])
 await clear()
+await page.click("#results li:nth-child(2) .action.pin")
+assert.equal((await last("pin"))?.id, "Untitled")
+// Trash only asks; Swift confirms before deleting.
 await page.click("#results li[aria-selected='true'] .action.trash")
 assert.equal((await last("trash"))?.id, "Groceries")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false)
-await page.click("#results li[aria-selected='true'] .action.rename")
-await page.waitForFunction(() => document.activeElement.classList.contains("rename"))
-assert.equal(await page.evaluate(() => document.activeElement.value), "Groceries")
-await press("Escape")
-assert.equal(await page.evaluate(() => document.activeElement.id), "query")
 await press("Escape")
 
-// The interface size scales the switcher and footer, but not the note's text.
-await receive("options", {fontSize: 14, uiScale: 2})
-assert.equal(await page.$eval("#query", e => getComputedStyle(e).fontSize), "28px")
-assert.equal(await page.$eval("#count", e => getComputedStyle(e).fontSize), "22px")
+// The interface text size sets the switcher and footer, but not the note's text.
+await receive("options", {fontSize: 14, uiFontSize: 20})
+assert.equal(await page.$eval("#query", e => getComputedStyle(e).fontSize), "20px")
+assert.equal(await page.$eval("#count", e => getComputedStyle(e).fontSize), "16px")
 assert.equal(await page.$eval(".cm-content", e => getComputedStyle(e).fontSize), "14px")
-await receive("options", {fontSize: 14, uiScale: 1.5})
+await receive("options", {fontSize: 14, uiFontSize: 15})
 
-// The page reports a height, and the footer counts characters.
+// The page never asks for a window height: the panel keeps the size the user gave it.
 await receive("open", {id: "Count", text: "ab\ncd"})
 await pause(50)
-assert.ok((await last("height"))?.height > 0)
+assert.equal(await last("height"), undefined)
 assert.equal(await page.$eval("#count", e => e.textContent), "4 characters")
 await receive("status", "Couldn't save")
 assert.equal(await page.$eval("#status", e => e.textContent), "Couldn't save")

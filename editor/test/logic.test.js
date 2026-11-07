@@ -1,7 +1,7 @@
 import {test} from "node:test"
 import assert from "node:assert/strict"
 import {EditorState, EditorSelection} from "@codemirror/state"
-import {fuzzyScore, rankNotes, urlAt, insertLineAbove, countCharacters, formatModified} from "../src/logic.js"
+import {fuzzyScore, rankNotes, urlAt, insertLineAbove, countCharacters} from "../src/logic.js"
 
 test("fuzzyScore matches characters in order and prefers runs", () => {
   assert.equal(fuzzyScore("xyz", "meeting notes"), null)
@@ -53,11 +53,4 @@ test("countCharacters counts graphemes and skips line breaks", () => {
   assert.equal(countCharacters("あいう"), 3)
   assert.equal(countCharacters("\u{1F468}‍\u{1F469}‍\u{1F467}"), 1)
   assert.equal(countCharacters(""), 0)
-})
-
-test("formatModified shows the time today and the date otherwise", () => {
-  const now = new Date(2026, 10, 7, 18, 0)
-  assert.equal(formatModified(new Date(2026, 10, 7, 9, 5).getTime(), now), "09:05")
-  assert.equal(formatModified(new Date(2026, 0, 2).getTime(), now), "Jan 2")
-  assert.equal(formatModified(new Date(2025, 0, 2).getTime(), now), "Jan 2, 2025")
 })
