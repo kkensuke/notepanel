@@ -1,7 +1,7 @@
 # notepanel
 
-A floating notepad for macOS. Press <kbd>⌃⌘N</kbd> in any app, even one in full screen, and a
-note panel appears on top of it. Write, press <kbd>⌃⌘N</kbd> again (or <kbd>⌘W</kbd>, <kbd>Esc</kbd>), and you're back in the app you were
+A floating notepad for macOS. Press `Ctrl+Cmd+N` in any app, even one in full screen, and a
+note panel appears on top of it. Write, press `Ctrl+Cmd+N` again (or `Cmd+W`, `Esc`), and you're back in the app you were
 using.
 
 Each note is a plain Markdown file in a folder you choose, so you can also open your notes in any
@@ -16,12 +16,12 @@ other editor, sync them or back them up as you like.
   back when you hide the panel.
 - **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
   rectangular selection, moving and copying lines, and find and replace. It also highlights
-  Markdown and continues lists when you press Return.
+  Markdown and continues lists when you press `Return`.
 - **Plain files.** Each note is a `.md` file named after its first line.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
   keeps earlier versions as backups.
-- **Quick to switch notes.** <kbd>⌘P</kbd> searches the names and text of your notes, and
-  <kbd>⌃Tab</kbd> goes to the next one. Pinned notes come first.
+- **Quick to switch notes.** `Cmd+P` searches the names and text of your notes, and
+  `Ctrl+Tab` goes to the next one. Pinned notes come first.
 - **Input methods work.** You can type with Japanese and other input methods.
 
 ## Install
@@ -41,36 +41,36 @@ open /Applications/notepanel.app
 notepanel lives in the menu bar, as a note icon, and has no Dock icon. The shortcut needs no
 Accessibility permission. To start notepanel when you log in, turn on **Open at login** in Settings.
 
-To update, run `git pull` and `scripts/bundle.sh` again, quit notepanel (<kbd>⌘Q</kbd> in the
+To update, run `git pull` and `scripts/bundle.sh` again, quit notepanel (`Cmd+Q` in the
 panel), copy the new app to `/Applications`, and open it.
 
 ## Using it
 
-- **Show and hide.** Press <kbd>⌃⌘N</kbd>, or click the menu bar icon. <kbd>Esc</kbd> or
-  <kbd>⌘W</kbd> hides the panel.
-- **Notes.** <kbd>⌘N</kbd> starts a new note. <kbd>⌘P</kbd> opens the switcher: type to search,
-  then press <kbd>Return</kbd> to open the note. Each row has a pin button and a trash button.
+- **Show and hide.** Press `Ctrl+Cmd+N`, or click the menu bar icon. `Esc` or
+  `Cmd+W` hides the panel.
+- **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher: type to search,
+  then press `Return` to open the note. Each row has a pin button and a trash button.
 - **Names.** A note is named after its first line: `# Shopping list` is saved as
   `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
   click the name in the title bar; from then on the name stays as you set it.
 - **Menu.** Right-click the menu bar icon (or Control-click it) for New Note, Search Notes,
   Settings, Keyboard Shortcuts, the backups folder and Quit. Each item shows its key in the panel.
-- **Keys.** <kbd>⇧⌘/</kbd> in the panel lists all the keys. The list is also in Settings →
+- **Keys.** `Shift+Cmd+/` in the panel lists all the keys. The list is also in Settings →
   Shortcuts and in the menu bar icon's menu.
-- **Size.** The panel keeps the size you give it. <kbd>⌘+</kbd> and <kbd>⌘−</kbd> change the
-  note's text size, and <kbd>⌘0</kbd> resets it.
+- **Size.** The panel keeps the size you give it. `Cmd+Plus` and `Cmd+Minus` change the
+  note's text size, and `Cmd+0` resets it.
 
 ## Settings
 
-Open Settings with <kbd>⌘,</kbd> in the panel, or from the menu bar icon's menu.
+Open Settings with `Cmd+,` in the panel, or from the menu bar icon's menu.
 
 - **General:** the notes folder, the note font (one of the monospaced fonts on your Mac), the size
   of the interface text, whether the menu bar icon shows, and Open at login.
 - **Shortcuts:** the shortcuts that work from any app (show or hide notes, new note, search notes)
   and the ones that work in the panel (next and previous note). Click a shortcut and press the
-  keys. <kbd>Esc</kbd> cancels, and the × button removes the shortcut.
+  keys. `Esc` cancels, and the × button removes the shortcut.
 
-If you hide the menu bar icon, you can still reach Settings: press <kbd>⌘,</kbd> in the panel, or
+If you hide the menu bar icon, you can still reach Settings: press `Cmd+,` in the panel, or
 open notepanel again from Finder or Spotlight.
 
 ## Your notes and their safety
@@ -93,7 +93,7 @@ open notepanel again from Finder or Spotlight.
 
 ## Keys
 
-notepanel shows this list too: press <kbd>⇧⌘/</kbd> in the panel.
+notepanel shows this list too: press `Shift+Cmd+/` in the panel.
 
 In the panel, Settings and the list of keys:
 
@@ -128,7 +128,7 @@ Editing:
 
 ## Troubleshooting
 
-- **⌃⌘N does nothing.** Another app may already use that shortcut. Choose another one in
+- **`Ctrl+Cmd+N` does nothing.** Another app may already use that shortcut. Choose another one in
   Settings → Shortcuts.
 - **I need an earlier version of a note.** Right-click the menu bar icon and choose Open Backups
   Folder. Each backup is named with the date and time, then the note's name.
