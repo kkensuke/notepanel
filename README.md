@@ -22,7 +22,6 @@ other editor, sync them or back them up as you like.
   keeps earlier versions as backups.
 - **Quick to switch notes.** `Cmd+P` searches the names and text of your notes, and
   `Ctrl+Tab` goes to the next one. Pinned notes come first.
-- **Input methods work.** You can type with Japanese and other input methods.
 
 ## Install
 
