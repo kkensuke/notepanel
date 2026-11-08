@@ -326,6 +326,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             "w": { [weak self] in self?.hide() },
             "o": { [weak self] in self?.openFolder() },
             ",": { [weak self] in self?.openSettings() },
+            "?": { KeysWindow.show() },
             // Quitting saves first, and asks if something couldn't be saved.
             "q": { NSApp.terminate(nil) },
         ]
