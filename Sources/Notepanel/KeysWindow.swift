@@ -26,6 +26,11 @@ enum KeysWindow {
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
+
+    /// For ⇧⌘/: a second press closes the window.
+    static func toggle() {
+        if window?.isVisible == true { window?.close() } else { show() }
+    }
 }
 
 // Keep these in step with the Keys section of the README.
@@ -34,8 +39,8 @@ private let panelKeys = [
     ("New note", "⌘N"),
     ("Switch notes", "⌘P"),
     ("Open the notes folder", "⌘O"),
-    ("Settings", "⌘,"),
-    ("This list", "⇧⌘/"),
+    ("Open or close Settings", "⌘,"),
+    ("Open or close this list", "⇧⌘/"),
     ("Bigger / smaller note text", "⌘+ / ⌘−"),
     ("Default note text size", "⌘0"),
     ("Hide", "⌘W or Esc"),

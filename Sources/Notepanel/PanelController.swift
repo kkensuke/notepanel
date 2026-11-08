@@ -5,7 +5,7 @@ import NotepanelCore
 @MainActor
 final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTextFieldDelegate {
     let store: NoteStore
-    var openSettings: () -> Void = {}
+    var toggleSettings: () -> Void = {}
 
     private let panel: NotePanel
     private let bridge = EditorBridge()
@@ -325,8 +325,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             "p": { [weak self] in self?.toggleSwitcher() },
             "w": { [weak self] in self?.hide() },
             "o": { [weak self] in self?.openFolder() },
-            ",": { [weak self] in self?.openSettings() },
-            "?": { KeysWindow.show() },
+            ",": { [weak self] in self?.toggleSettings() },
+            "?": { KeysWindow.toggle() },
             // Quitting saves first, and asks if something couldn't be saved.
             "q": { NSApp.terminate(nil) },
         ]

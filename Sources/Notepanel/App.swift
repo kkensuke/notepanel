@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = PanelController(store: NoteStore(folder: Prefs.folder, backups: Prefs.backups))
-        controller.openSettings = { [weak self] in self?.settingsWindow.show() }
+        controller.toggleSettings = { [weak self] in self?.settingsWindow.toggle() }
         NSApp.mainMenu = mainMenu()
         setUpStatusItem()
         applySettings()
@@ -92,8 +92,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeys.set(zip(shortcuts, actions).compactMap { shortcut, action in shortcut.map { ($0, action) } })
     }
 
-    /// Never shown, since the app has no menu bar of its own, but it gives the settings window
-    /// quit, cut, copy, paste and close while the app is active. Undo and Select All stay out: in the
+    /// Never shown, since the app has no menu bar of its own, but it gives the settings window and
+    /// the keys window quit, cut, copy, paste and close while the app is active, and ⌘, and ⇧⌘/,
+    /// which open or close those windows as they do in the panel. Undo and Select All stay out: in the
     /// editor they must reach CodeMirror, not WebKit.
     private func mainMenu() -> NSMenu {
         let edit = NSMenu(title: "Edit")
@@ -103,6 +104,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         let app = NSMenu(title: "notepanel")
+        app.addItem(menuItem("Settings…", #selector(toggleSettings), ","))
+        app.addItem(menuItem("Keyboard Shortcuts", #selector(toggleKeys), "/", [.command, .shift]))
         app.addItem(withTitle: "Quit notepanel", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let menu = NSMenu()
         for submenu in [app, edit, window] {
@@ -158,6 +161,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func searchNotes() { controller.search() }
     @objc private func openSettings() { settingsWindow.show() }
     @objc private func openKeys() { KeysWindow.show() }
+    @objc private func toggleSettings() { settingsWindow.toggle() }
+    @objc private func toggleKeys() { KeysWindow.toggle() }
     @objc private func openBackups() {
         try? FileManager.default.createDirectory(at: Prefs.backups, withIntermediateDirectories: true)
         NSWorkspace.shared.open(Prefs.backups)

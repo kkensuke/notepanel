@@ -94,6 +94,11 @@ final class SettingsWindow {
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }
+
+    /// For ⌘,: a second press closes the window.
+    func toggle() {
+        if window?.isVisible == true { window?.close() } else { show() }
+    }
 }
 
 @MainActor
