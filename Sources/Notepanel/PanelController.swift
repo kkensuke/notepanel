@@ -31,7 +31,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         self.store = store
         panel = NotePanel(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
-            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
+            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered, defer: false)
         super.init()
         configurePanel()
@@ -313,12 +313,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.titlebarSeparatorStyle = .none
-        panel.backgroundColor = .textBackgroundColor
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
         panel.isReleasedWhenClosed = false
         panel.minSize = NSSize(width: 320, height: 160)
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.delegate = self
-        panel.contentView = bridge.webView
+        bridge.webView.setValue(false, forKey: "drawsBackground")
+        panel.contentView = Self.glass(behind: bridge.webView)
         panel.onZoom = { [weak self] step in self?.zoom(step) }
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
@@ -365,6 +367,45 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         // The panel keeps the size the user gives it; nothing resizes it to fit a note.
         if !panel.setFrameUsingName(Self.frameName) { panel.center() }
         panel.setFrameAutosaveName(Self.frameName)
+    }
+
+    /// tinycast's background: glass (a blur before macOS 26) under a scrim, black at 40% in dark
+    /// mode and white at 55% in light mode. It runs under the title bar too, while the page
+    /// starts below the title bar, where it was before.
+    private static func glass(behind page: NSView) -> NSView {
+        let glass: NSView
+        if #available(macOS 26, *) {
+            glass = NSGlassEffectView()
+        } else {
+            let blur = NSVisualEffectView()
+            blur.material = .popover
+            // The app is never active, so the blur would otherwise always look inactive.
+            blur.state = .active
+            glass = blur
+        }
+        let scrim = NSBox()
+        scrim.boxType = .custom
+        scrim.titlePosition = .noTitle
+        scrim.borderWidth = 0
+        scrim.fillColor = NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                ? .black.withAlphaComponent(0.4) : .white.withAlphaComponent(0.55)
+        }
+        let view = NSView()
+        for backdrop in [glass, scrim] {
+            backdrop.frame = view.bounds
+            backdrop.autoresizingMask = [.width, .height]
+            view.addSubview(backdrop)
+        }
+        page.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(page)
+        NSLayoutConstraint.activate([
+            page.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            page.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            page.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            page.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+        ])
+        return view
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {

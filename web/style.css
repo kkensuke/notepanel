@@ -4,19 +4,44 @@
   --size: 14px;
   /* Text size for everything but the note; set from the interface text size setting. */
   --ui-size: 15px;
-  --bg: Canvas;
-  --fg: CanvasText;
-  --muted: GrayText;
+  /* tinycast's colors: the panel's glass shows through, and text is black or white ink at an
+     alpha. These are the light ones; the dark ones follow. */
+  --bg: transparent;
+  --fg: rgb(0 0 0 / 0.85);
+  --muted: rgb(0 0 0 / 0.42);
   --accent: AccentColor;
   --link: LinkText;
-  --border: color-mix(in srgb, CanvasText 14%, transparent);
-  --panel: color-mix(in srgb, CanvasText 4%, Canvas);
+  --border: rgb(0 0 0 / 0.12);
+  --panel: rgb(0 0 0 / 0.04);
   --code: color-mix(in srgb, #c2185b 75%, CanvasText);
-  --selection: color-mix(in srgb, AccentColor 28%, transparent);
-  --match: color-mix(in srgb, AccentColor 14%, transparent);
-  --search: color-mix(in srgb, #ffc400 40%, transparent);
-  --search-current: color-mix(in srgb, #ff8a00 55%, transparent);
+  --selection: rgb(0 0 0 / 0.09);
+  --match: rgb(0 0 0 / 0.045);
+  --search: rgb(255 204 0 / 0.4);
+  --search-current: rgb(255 204 0 / 0.95);
   --error: #d32f2f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: rgb(255 255 255 / 0.9);
+    --muted: rgb(255 255 255 / 0.4);
+    --border: rgb(255 255 255 / 0.1);
+    --panel: rgb(255 255 255 / 0.05);
+    --selection: rgb(255 255 255 / 0.1);
+    --match: rgb(255 255 255 / 0.05);
+    --search: rgb(255 214 10 / 0.32);
+    --search-current: rgb(255 214 10 / 0.9);
+  }
+}
+
+/* The current find match is solid yellow, so its text is black, as in tinycast. */
+.cm-searchMatch-selected {
+  color: #000;
+}
+
+/* The switcher no longer hides the note by covering it, since its background is see-through. */
+body:has(#switcher:not([hidden])) > :not(#switcher) {
+  opacity: 0;
 }
 
 html,
