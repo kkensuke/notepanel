@@ -31,7 +31,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         self.store = store
         panel = NotePanel(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
-            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .fullSizeContentView],
+            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered, defer: false)
         super.init()
         configurePanel()
@@ -313,6 +313,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.titlebarSeparatorStyle = .none
+        // Added after creating the panel, which keeps its frame: with this in the style mask, the
+        // content rect it's created with would cover the title bar too, making it shorter.
+        panel.styleMask.insert(.fullSizeContentView)
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.isReleasedWhenClosed = false
