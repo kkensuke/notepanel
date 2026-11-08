@@ -2,7 +2,8 @@ import AppKit
 
 /// A floating panel that takes keys without activating the app, so the app underneath stays active.
 final class NotePanel: NSPanel {
-    /// Cmd-key commands, by lowercased character. They don't repeat while the key is held.
+    /// Cmd-key commands, by character: lowercased without Shift, and as typed with it ("?" for
+    /// ⇧⌘/). They don't repeat while the key is held.
     var commands: [String: () -> Void] = [:]
     /// Cmd-plus and Cmd-minus (+1 and -1, repeating while held) and Cmd-0 (0, to reset).
     var onZoom: (Int) -> Void = { _ in }
@@ -35,12 +36,14 @@ final class NotePanel: NSPanel {
             onZoom(step)
             return true
         }
-        if modifiers == .command, let key = event.charactersIgnoringModifiers?.lowercased() {
+        // With Shift, a command is looked up by the character typed, such as "?" for ⇧⌘/.
+        if modifiers.subtracting(.shift) == .command, let typed = event.charactersIgnoringModifiers {
+            let key = modifiers.contains(.shift) ? typed : typed.lowercased()
             if let command = commands[key] {
                 if !event.isARepeat { command() }
                 return true
             }
-            if let action = Self.editActions[key] {
+            if modifiers == .command, let action = Self.editActions[key] {
                 return NSApp.sendAction(action, to: nil, from: self)
             }
         }

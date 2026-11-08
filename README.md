@@ -55,7 +55,9 @@ panel), copy the new app to `/Applications`, and open it.
   `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
   click the name in the title bar; from then on the name stays as you set it.
 - **Menu.** Right-click the menu bar icon (or Control-click it) for New Note, Search Notes,
-  Settings, the backups folder and Quit.
+  Settings, Keyboard Shortcuts, the backups folder and Quit. Each item shows its key in the panel.
+- **Keys.** <kbd>⇧⌘/</kbd> in the panel lists all the keys. The list is also in Settings →
+  Shortcuts and in the menu bar icon's menu.
 - **Size.** The panel keeps the size you give it. <kbd>⌘+</kbd> and <kbd>⌘−</kbd> change the
   note's text size, and <kbd>⌘0</kbd> resets it.
 
@@ -92,11 +94,14 @@ open notepanel again from Finder or Spotlight.
 
 ## Keys
 
+notepanel shows this list too: press <kbd>⇧⌘/</kbd> in the panel.
+
 In the panel:
 
 | Key | Does |
 |---|---|
 | ⌘N / ⌘P / ⌘O / ⌘, | New note / switch notes / open the notes folder / settings |
+| ⇧⌘/ | The list of keys |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
@@ -112,7 +117,7 @@ Editing:
 | ⌥↑ / ⌥↓, ⇧⌥↑ / ⇧⌥↓ | Move lines, copy lines |
 | ⇧⌘K, ⌘L | Delete line, select line |
 | ⌘Return / ⇧⌘Return | Insert a line below / above |
-| ⌘D, ⇧⌘L, ⌘⌥↑ / ⌘⌥↓, ⌥-click | Multiple cursors |
+| ⌘D, ⇧⌘L, ⌥⌘↑ / ⌥⌘↓, ⌥-click | Multiple cursors |
 | ⇧⌥-drag | Rectangular selection |
 | ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
 | ⌘-click | Open a link |
