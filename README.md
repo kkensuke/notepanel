@@ -1,7 +1,7 @@
 # notepanel
 
 A floating notepad for macOS. Press `Ctrl+Cmd+N` in any app, even one in full screen, and a
-note panel appears on top of it. Write, press `Ctrl+Cmd+N` again (or `Cmd+W`, `Esc`), and you're back in the app you were
+note panel appears on top of it. Edits (like VS Code), press `Ctrl+Cmd+N` again (or `Cmd+W`, `Esc`), and you're back in the app you were
 using.
 
 Each note is a plain Markdown file in a folder you choose, so you can also open your notes in any
