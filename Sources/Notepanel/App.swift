@@ -105,7 +105,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         let app = NSMenu(title: "notepanel")
         app.addItem(menuItem("Settings…", #selector(toggleSettings), ","))
-        app.addItem(menuItem("Keyboard Shortcuts", #selector(toggleKeys), "/", [.command, .shift]))
+        // "?" rather than "/" with Shift: a menu matches the character typed, and ⇧/ types "?". This is
+        // how Help menus take ⇧⌘/.
+        app.addItem(menuItem("Keyboard Shortcuts", #selector(toggleKeys), "?"))
         app.addItem(withTitle: "Quit notepanel", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let menu = NSMenu()
         for submenu in [app, edit, window] {
@@ -139,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(menuItem("Search Notes", #selector(searchNotes), "p"))
         menu.addItem(.separator())
         menu.addItem(menuItem("Settings…", #selector(openSettings), ","))
+        // Shown as ⇧⌘/, as the docs write it. This menu only shows the key; the panel handles it.
         menu.addItem(menuItem("Keyboard Shortcuts", #selector(openKeys), "/", [.command, .shift]))
         menu.addItem(menuItem("Open Backups Folder", #selector(openBackups)))
         menu.addItem(.separator())
