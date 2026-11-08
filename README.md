@@ -96,16 +96,21 @@ open notepanel again from Finder or Spotlight.
 
 notepanel shows this list too: press <kbd>⇧⌘/</kbd> in the panel.
 
+In the panel, Settings and the list of keys:
+
+| Key | Does |
+|---|---|
+| ⌘, / ⇧⌘/ | Open or close Settings / the list of keys |
+| ⌘Q | Quit (it saves first, and asks if something couldn't be saved) |
+
 In the panel:
 
 | Key | Does |
 |---|---|
-| ⌘N / ⌘P / ⌘O / ⌘, | New note / switch notes / open the notes folder / settings |
-| ⇧⌘/ | The list of keys |
+| ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
-| ⌘Q | Quit (it saves first, and asks if something couldn't be saved) |
 | In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
 
 Editing:
