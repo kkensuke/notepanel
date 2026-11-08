@@ -255,6 +255,10 @@ struct SettingsView: View {
             ShortcutField(title: "Next note", recorder: model.nextShortcut)
             ShortcutField(title: "Previous note", recorder: model.previousShortcut)
         }
+        HStack {
+            Spacer()
+            Button("All Keyboard Shortcuts") { KeysWindow.show() }
+        }
     }
 
     @ViewBuilder private var general: some View {

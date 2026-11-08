@@ -130,21 +130,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if controller.isVisible { controller.hide() } else { controller.show() }
             return
         }
+        // Each item shows the key that does the same in the panel.
         let menu = NSMenu()
-        menu.addItem(menuItem("New Note", #selector(newNote)))
-        menu.addItem(menuItem("Search Notes", #selector(searchNotes)))
+        menu.addItem(menuItem("New Note", #selector(newNote), "n"))
+        menu.addItem(menuItem("Search Notes", #selector(searchNotes), "p"))
         menu.addItem(.separator())
-        menu.addItem(menuItem("Settings…", #selector(openSettings)))
+        menu.addItem(menuItem("Settings…", #selector(openSettings), ","))
+        menu.addItem(menuItem("Keyboard Shortcuts", #selector(openKeys), "/", [.command, .shift]))
         menu.addItem(menuItem("Open Backups Folder", #selector(openBackups)))
         menu.addItem(.separator())
-        menu.addItem(menuItem("Quit notepanel", #selector(quit)))
+        menu.addItem(menuItem("Quit notepanel", #selector(quit), "q"))
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil
     }
 
-    private func menuItem(_ title: String, _ action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+    private func menuItem(
+        _ title: String, _ action: Selector, _ key: String = "", _ modifiers: NSEvent.ModifierFlags = .command
+    ) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = modifiers
         item.target = self
         return item
     }
@@ -152,6 +157,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func newNote() { controller.newNote() }
     @objc private func searchNotes() { controller.search() }
     @objc private func openSettings() { settingsWindow.show() }
+    @objc private func openKeys() { KeysWindow.show() }
     @objc private func openBackups() {
         try? FileManager.default.createDirectory(at: Prefs.backups, withIntermediateDirectories: true)
         NSWorkspace.shared.open(Prefs.backups)
