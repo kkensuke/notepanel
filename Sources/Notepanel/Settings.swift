@@ -112,10 +112,17 @@ final class SettingsModel {
     let searchShortcut = ShortcutRecorder(name: "hotkey.search")
     let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", global: false)
     let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", global: false)
+    /// The fixed-pitch font families on this Mac, for the note font menu.
+    private(set) var monospacedFonts: [String] = []
 
-    /// The login item can be changed in System Settings too, so it's read each time the window shows.
+    /// The login item can be changed in System Settings too, and fonts can be installed, so both
+    /// are read each time the window shows.
     func refresh() {
         openAtLogin = SMAppService.mainApp.status == .enabled
+        let names = NSFontManager.shared.availableFontNames(with: .fixedPitchFontMask) ?? []
+        // Families starting with "." are the system's own, hidden from users.
+        let families = Set(names.compactMap { NSFont(name: $0, size: 0)?.familyName }).filter { !$0.hasPrefix(".") }
+        monospacedFonts = families.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
     func setOpenAtLogin(_ enabled: Bool) {
@@ -283,7 +290,14 @@ struct SettingsView: View {
         }
         // The notes' text size has no control here: ⌘+, ⌘− and ⌘0 in the panel change it.
         Section("Appearance") {
-            TextField("Note font", text: $fontFamily, prompt: Text("SF Mono"))
+            Picker("Note font", selection: $fontFamily) {
+                Text("Default (SF Mono)").tag("")
+                // A font that isn't in the list, such as one typed in before this was a menu, stays.
+                if !fontFamily.isEmpty && !model.monospacedFonts.contains(fontFamily) {
+                    Text(verbatim: fontFamily).tag(fontFamily)
+                }
+                ForEach(model.monospacedFonts, id: \.self) { Text(verbatim: $0).tag($0) }
+            }
             // A menu rather than a stepper: this setting resizes the window, which would move a
             // stepper's arrows out from under the pointer after every click.
             Picker("Interface text size", selection: $uiFontSize) {
