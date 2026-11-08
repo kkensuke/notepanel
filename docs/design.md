@@ -191,7 +191,7 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 | 新規ノートのホットキー | `hotkey.create` | なし |
 | ノートを検索のホットキー | `hotkey.search` | なし |
 | 保存先フォルダ | `folder` | `~/Library/Application Support/notepanel/Notes` |
-| ノートのフォント | `fontFamily` | 空（SF Mono） |
+| ノートのフォント（この Mac の等幅フォントからメニューで選ぶ） | `fontFamily` | 空（SF Mono） |
 | ノートの文字サイズ（⌘+ / ⌘− / ⌘0 で変える。設定画面には置かない） | `fontSize` | 14（9〜36） |
 | 表示の文字サイズ（ノート以外：タイトルバー、切替画面、フッター、設定画面） | `uiFontSize` | 15 pt（12〜20 pt からメニューで選ぶ） |
 | 次のノート（パネル内のショートカット） | `shortcut.nextNote` | ⌃Tab |
