@@ -54,6 +54,10 @@ const theme = EditorView.theme({
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground":
     {backgroundColor: "var(--selection)"},
   ".cm-selectionMatch": {backgroundColor: "var(--match)"},
+  // As in VS Code: a small dot in the middle of each space, in a faint color.
+  ".cm-highlightSpace": {
+    background: "radial-gradient(circle at 50% 55%, var(--whitespace) 0.07em, transparent 0.1em)",
+  },
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
   ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
