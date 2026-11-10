@@ -104,10 +104,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         openSomeNote()
     }
 
-    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, tabSize: Int) {
+    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int) {
         let new: NSDictionary = [
             "fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize,
-            "showWhitespace": showWhitespace, "tabSize": tabSize,
+            "showWhitespace": showWhitespace, "indentSize": indentSize,
         ]
         guard new != options else { return }
         options = new

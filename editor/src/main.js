@@ -16,7 +16,7 @@ import {
 import {defaultKeymap, historyKeymap, history, indentWithTab, selectLine} from "@codemirror/commands"
 import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
-import {syntaxHighlighting, HighlightStyle} from "@codemirror/language"
+import {syntaxHighlighting, HighlightStyle, indentUnit} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
 import {rankNotes, urlAt, insertLineAbove, countCharacters} from "./logic.js"
 
@@ -88,9 +88,10 @@ const ideographicSpaceBoxes = ViewPlugin.define(
 // From Settings. Each note keeps its own state, so these are applied again when a note opens.
 const settings = new Compartment()
 let showWhitespace = false
-let tabWidth = 4
+let indentSize = 4
 const settingsExtensions = () => [
-  EditorState.tabSize.of(tabWidth),
+  // The spaces Tab adds; ⇧Tab takes as many away.
+  indentUnit.of(" ".repeat(indentSize)),
   showWhitespace ? [highlightWhitespace(), ideographicSpaceBoxes] : [],
 ]
 
@@ -159,14 +160,14 @@ function openNote(id, text, keepSwitcher) {
 
 const defaultFont = `"SF Mono", ui-monospace, Menlo, monospace`
 
-function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, tabSize}) {
+function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, indentSize: indent}) {
   const family = String(fontFamily ?? "").replace(/["\\;{}]/g, "").trim()
   const root = document.documentElement.style
   root.setProperty("--font", family ? `"${family}", ${defaultFont}` : defaultFont)
   root.setProperty("--size", `${Number(fontSize) || 14}px`)
   root.setProperty("--ui-size", `${Number(uiFontSize) || 15}px`)
   showWhitespace = show === true
-  tabWidth = tabSize === 2 ? 2 : 4
+  indentSize = indent === 2 ? 2 : 4
   view.dispatch({effects: settings.reconfigure(settingsExtensions())})
   view.requestMeasure()
 }

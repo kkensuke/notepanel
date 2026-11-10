@@ -218,7 +218,7 @@ struct SettingsView: View {
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
     @AppStorage("showWhitespace") private var showWhitespace = false
-    @AppStorage("tabSize") private var tabSize = 4
+    @AppStorage("indentSize") private var indentSize = 4
 
     var body: some View {
         VStack(spacing: 0) {
@@ -308,7 +308,7 @@ struct SettingsView: View {
                 }
             }
             Toggle("Show whitespace", isOn: $showWhitespace)
-            Picker("Tab width", selection: $tabSize) {
+            Picker("Tab key indents by", selection: $indentSize) {
                 Text("2 spaces").tag(2)
                 Text("4 spaces").tag(4)
             }

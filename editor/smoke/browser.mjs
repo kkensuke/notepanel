@@ -174,20 +174,22 @@ assert.equal(await page.$eval("#count", e => getComputedStyle(e).fontSize), "16p
 assert.equal(await page.$eval(".cm-content", e => getComputedStyle(e).fontSize), "14px")
 await receive("options", {fontSize: 14, uiFontSize: 15})
 
-// Show whitespace and the tab width come from Settings, and hold for a note opened later.
+// Show whitespace and the spaces Tab adds come from Settings, and hold for a note opened later.
 const marks = selector => page.$$eval(selector, els => els.length)
-const tabSize = () => page.$eval(".cm-content", e => getComputedStyle(e).tabSize)
-await receive("options", {fontSize: 14, uiFontSize: 15, showWhitespace: true, tabSize: 2})
+await receive("options", {fontSize: 14, uiFontSize: 15, showWhitespace: true, indentSize: 2})
 await receive("open", {id: "Spaces", text: "a b\tc\u3000d"})
 assert.deepEqual(
   [await marks(".cm-highlightSpace"), await marks(".cm-highlightTab"), await marks(".cm-ideographicSpace")],
   [1, 1, 1])
-assert.equal(await tabSize(), "2")
+await page.click(".cm-content")
+await press("Tab")
+assert.equal(await changedText(), "  a b\tc\u3000d")
 await receive("options", {fontSize: 14, uiFontSize: 15})
 assert.deepEqual(
   [await marks(".cm-highlightSpace"), await marks(".cm-highlightTab"), await marks(".cm-ideographicSpace")],
   [0, 0, 0])
-assert.equal(await tabSize(), "4")
+await press("Tab")
+assert.equal(await changedText(), "      a b\tc\u3000d", "4 spaces by default")
 
 // The page never asks for a window height: the panel keeps the size the user gave it.
 await receive("open", {id: "Count", text: "ab\ncd"})
