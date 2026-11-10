@@ -54,7 +54,7 @@ panel), copy the new app to `/Applications`, and open it.
 - **Pinned notes.** Pinned notes come first in the switcher and when you go through notes with
   `Ctrl+Tab`. To change their order, drag the handle at the left of a row, or press `Option+Up`
   and `Option+Down`, while the search field is empty. `Cmd+1` to `Cmd+9` open the first to ninth
-  pinned note.
+  pinned note; the switcher shows each one's key next to its pin.
 - **Names.** A note is named after its first line: `# Shopping list` is saved as
   `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
   click the name in the title bar; from then on the name stays as you set it.

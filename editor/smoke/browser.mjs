@@ -176,6 +176,7 @@ const pinnedNotes = [
 const titles = () => page.$$eval("#results li .title", els => els.map(e => e.textContent))
 await receive("switcher", {notes: pinnedNotes, force: true})
 assert.deepEqual(await page.$$eval("#results li", els => els.map(e => e.classList.contains("movable"))), [true, true, false])
+assert.deepEqual(await page.$$eval("#results li .key", els => els.map(e => e.textContent)), ["⌘1", "⌘2", ""])
 await clear()
 await press("ArrowDown", ["Alt"])
 assert.deepEqual(await titles(), ["B", "A", "C"])
