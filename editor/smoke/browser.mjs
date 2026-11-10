@@ -167,6 +167,36 @@ assert.equal((await last("trash"))?.id, "Groceries")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false)
 await press("Escape")
 
+// Pinned notes move with ⌥↑ and ⌥↓, or by dragging their handle, but only in the full list.
+const pinnedNotes = [
+  {id: "A", title: "A", modified: 3, text: "", pinned: true},
+  {id: "B", title: "B", modified: 2, text: "", pinned: true},
+  {id: "C", title: "C", modified: 1, text: "", pinned: false},
+]
+const titles = () => page.$$eval("#results li .title", els => els.map(e => e.textContent))
+await receive("switcher", {notes: pinnedNotes, force: true})
+assert.deepEqual(await page.$$eval("#results li", els => els.map(e => e.classList.contains("movable"))), [true, true, false])
+await clear()
+await press("ArrowDown", ["Alt"])
+assert.deepEqual(await titles(), ["B", "A", "C"])
+assert.deepEqual((await last("orderPins"))?.ids, ["B", "A"])
+await press("ArrowDown", ["Alt"])
+assert.deepEqual(await titles(), ["B", "A", "C"], "an unpinned note stays below the pinned ones")
+const grip = await (await page.$("#results li:nth-child(2) .grip")).boundingBox()
+const firstRow = await (await page.$("#results li:nth-child(1)")).boundingBox()
+await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+await page.mouse.down()
+await page.mouse.move(grip.x + grip.width / 2, firstRow.y + 2, {steps: 4})
+await page.mouse.up()
+assert.deepEqual(await titles(), ["A", "B", "C"])
+assert.deepEqual((await last("orderPins"))?.ids, ["A", "B"])
+assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false, "dragging opens nothing")
+await page.keyboard.type("b")
+await clear()
+await press("ArrowUp", ["Alt"])
+assert.equal(await last("orderPins"), undefined, "search results keep their order")
+await press("Escape")
+
 // A note opened for a match in its text opens with the match selected.
 await receive("switcher", {notes, force: true})
 await page.keyboard.type("FROTHER")

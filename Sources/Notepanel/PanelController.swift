@@ -163,6 +163,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             if let id = body["id"] as? String { confirmTrash(id) }
         case "pin":
             if let id = body["id"] as? String { togglePin(id) }
+        case "orderPins":
+            if let ids = body["ids"] as? [String] { orderPins(ids) }
         case "openURL":
             // The page is trusted, but a link can say anything, so only web and mail links open.
             guard let string = body["url"] as? String, let url = URL(string: string),
@@ -283,15 +285,33 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         bridge.send("notes", notesForSwitcher())
     }
 
+    /// The page sends the pinned notes it shows, in their new order. Pins whose file is missing
+    /// aren't shown, so they keep their place after the others.
+    private func orderPins(_ ids: [String]) {
+        let pins = Prefs.pinned(in: store.folder)
+        guard Set(ids).count == ids.count, Set(ids).isSubset(of: pins) else { return }
+        Prefs.setPinned(ids + pins.filter { !ids.contains($0) }, in: store.folder)
+        bridge.send("notes", notesForSwitcher())
+    }
+
+    /// Cmd-1 to Cmd-9 open the first to ninth pinned note.
+    private func openPinned(_ number: Int) {
+        let pins = Set(Prefs.pinned(in: store.folder))
+        let pinned = orderedNotes().filter { pins.contains($0.name) }
+        if pinned.indices.contains(number - 1) { open(pinned[number - 1].name) }
+    }
+
     private func toggleSwitcher() {
         bridge.send("switcher", ["notes": notesForSwitcher(), "force": false])
     }
 
-    /// Pinned notes first, then the rest, each newest first. The switcher and cycling share it.
+    /// Pinned notes first, in the order the user gave them, then the rest, newest first. The
+    /// switcher, cycling and Cmd-1 to Cmd-9 share it.
     private func orderedNotes() -> [NoteInfo] {
-        let pins = Set(Prefs.pinned(in: store.folder))
+        let pins = Prefs.pinned(in: store.folder)
         let notes = store.list()
-        return notes.filter { pins.contains($0.name) } + notes.filter { !pins.contains($0.name) }
+        let pinned = pins.compactMap { name in notes.first { $0.name == name } }
+        return pinned + notes.filter { !pins.contains($0.name) }
     }
 
     // shortcut: reads every note on each open of the switcher; fine for hundreds of notes.
@@ -345,6 +365,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             // Quitting saves first, and asks if something couldn't be saved.
             "q": { NSApp.terminate(nil) },
         ]
+        for number in 1...9 {
+            panel.commands[String(number)] = { [weak self] in self?.openPinned(number) }
+        }
 
         // The note's name, centered; clicking it renames the note.
         titleField.isBordered = false

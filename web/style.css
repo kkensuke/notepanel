@@ -138,7 +138,7 @@ footer {
 
 #results li {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   column-gap: 8px;
   padding: 5px 8px;
@@ -158,9 +158,25 @@ footer {
 }
 
 .snippet {
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
   color: var(--muted);
   font-size: calc(var(--ui-size) * 0.85);
+}
+
+.grip {
+  display: grid;
+  color: var(--muted);
+  cursor: grab;
+}
+
+/* Every row keeps the handle's space, so the names line up. */
+#results li:not(.movable) .grip {
+  visibility: hidden;
+}
+
+body.dragging,
+body.dragging * {
+  cursor: grabbing;
 }
 
 .actions {
@@ -196,7 +212,8 @@ footer {
   fill: currentColor;
 }
 
-.action svg {
+.action svg,
+.grip svg {
   width: var(--ui-size);
   height: var(--ui-size);
   fill: none;
