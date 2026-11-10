@@ -18,7 +18,7 @@
   --match: rgb(0 0 0 / 0.045);
   --search: rgb(255 204 0 / 0.4);
   --search-current: rgb(255 204 0 / 0.95);
-  --error: #d32f2f;
+  --error: #ff3b30;
   /* VS Code's color for whitespace, made 10 points more opaque. */
   --whitespace: rgb(51 51 51 / 0.3);
 }
@@ -214,7 +214,7 @@ body.dragging * {
   color: var(--fg);
 }
 
-.action.trash {
+.action.trash:hover {
   color: var(--error);
 }
 
@@ -232,7 +232,7 @@ body.dragging * {
   height: var(--ui-size);
   fill: none;
   stroke: currentColor;
-  stroke-width: 2;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
