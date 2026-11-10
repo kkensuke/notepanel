@@ -84,9 +84,16 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         bridge.send("switcher", ["notes": notesForSwitcher(), "force": true])
     }
 
+    /// Opens the notes folder in Finder with the open note's file selected. With no note open, or
+    /// its file gone, the folder opens with nothing selected.
     func openFolder() {
         try? FileManager.default.createDirectory(at: store.folder, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(store.folder)
+        let note = store.current.map(store.url)
+        if let note, FileManager.default.fileExists(atPath: note.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([note])
+        } else {
+            NSWorkspace.shared.open(store.folder)
+        }
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
