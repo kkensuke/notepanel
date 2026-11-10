@@ -48,7 +48,8 @@ panel), copy the new app to `/Applications`, and open it.
 - **Show and hide.** Press `Ctrl+Cmd+N`, or click the menu bar icon. `Esc` or
   `Cmd+W` hides the panel.
 - **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher: type to search,
-  then press `Return` to open the note. Each row has a pin button and a trash button.
+  then press `Return` to open the note. A note found by its text opens with the match selected.
+  Each row has a pin button and a trash button.
 - **Names.** A note is named after its first line: `# Shopping list` is saved as
   `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
   click the name in the title bar; from then on the name stays as you set it.
