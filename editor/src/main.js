@@ -288,8 +288,8 @@ function element(tag, className, text) {
 // Line icons drawn with the text color; a pinned note's pin is filled.
 const icons = {
   grip: '<path d="M5 7h14M5 12h14M5 17h14"/>',
-  pin: '<path d="M9 3h6l-1 6 4 4H6l4-4Z"/><path d="M12 13v8"/>',
-  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
+  pin: '<path d="M9 3.5h6M10 3.5v5.2l-3.2 3.1c-.4.4-.1 1.2.5 1.2h9.4c.6 0 .9-.8.5-1.2L14 8.7V3.5Z"/><path d="M12 13v8"/>',
+  trash: '<path d="M4.5 6.5h15M9.5 6.5V5.3c0-1 .8-1.8 1.8-1.8h1.4c1 0 1.8.8 1.8 1.8v1.2M6.5 6.5l.9 12.2a2 2 0 0 0 2 1.8h5.2a2 2 0 0 0 2-1.8l.9-12.2M10.2 10v6.5M13.8 10v6.5"/>',
 }
 
 function actionButton(name, label, onClick, pressed) {
