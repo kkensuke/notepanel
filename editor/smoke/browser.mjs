@@ -167,6 +167,15 @@ assert.equal((await last("trash"))?.id, "Groceries")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false)
 await press("Escape")
 
+// A note opened for a match in its text opens with the match selected.
+await receive("switcher", {notes, force: true})
+await page.keyboard.type("FROTHER")
+await press("Enter")
+assert.equal((await last("select"))?.id, "Ideas")
+await receive("open", {id: "Ideas", text: "a milk frother", keep: false})
+await page.keyboard.type("jug")
+assert.equal(await changedText(), "a milk jug")
+
 // The interface text size sets the switcher and footer, but not the note's text.
 await receive("options", {fontSize: 14, uiFontSize: 20})
 assert.equal(await page.$eval("#query", e => getComputedStyle(e).fontSize), "20px")
