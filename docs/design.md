@@ -149,6 +149,9 @@ CodeMirror 6 に次の拡張を入れる。
 - ⌘クリックでリンクを開く。対象は `[text](url)` と、`http://`・`https://`・`mailto:` で始まる URL。Swift 側でもスキームを確かめてから開く。
 - 文字数（改行を除く書記素の数）を右下に「1,234 characters」の形で表示する。
 - ノートごとに `EditorState` を保持し、アプリ起動中はノートを切り替えても Undo 履歴とカーソル位置が残るようにする。外部の変更で本文が変わったノートは、新しい状態で開き直す。
+- 設定で空白の表示をオンにすると、`highlightWhitespace()` で半角空白を点、タブを矢印で示し、全角空白（U+3000）を枠で囲む。
+- Tab キーはタブ文字を入れず、行頭に半角空白を足す（`indentWithTab`）。足す数（`indentUnit`）は設定で 2 か 4 を選ぶ。⇧Tab は同じ数だけ減らす。
+- 空白の表示と Tab キーで足す数は、ノートごとの状態に含まれる。そのため、ノートを開くたびに今の設定を当て直す。
 
 ソースで次の動作を確認済み。
 
@@ -194,6 +197,8 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 | ノートのフォント（この Mac の等幅フォントからメニューで選ぶ） | `fontFamily` | 空（SF Mono） |
 | ノートの文字サイズ（⌘+ / ⌘− / ⌘0 で変える。設定画面には置かない） | `fontSize` | 14（9〜36） |
 | 表示の文字サイズ（ノート以外：タイトルバー、切替画面、フッター、設定画面） | `uiFontSize` | 15 pt（12〜20 pt からメニューで選ぶ） |
+| 空白の表示 | `showWhitespace` | オフ |
+| Tab キーで足す半角空白の数 | `indentSize` | 4（2 か 4） |
 | 次のノート（パネル内のショートカット） | `shortcut.nextNote` | ⌃Tab |
 | 前のノート（パネル内のショートカット） | `shortcut.previousNote` | ⌃⇧Tab |
 | メニューバーアイコンを表示 | `showMenuBarIcon` | オン |
@@ -217,7 +222,7 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 | Swift→JS | `switcher` | `{notes, force}`：切替画面を開閉する。`force` が真なら必ず開く |
 | Swift→JS | `notes` | 切替画面の一覧を更新する |
 | Swift→JS | `focus` | エディタ（切替画面が開いていれば検索欄）にフォーカスを置く |
-| Swift→JS | `options` | `{fontFamily, fontSize, uiFontSize}` |
+| Swift→JS | `options` | `{fontFamily, fontSize, uiFontSize, showWhitespace, indentSize}` |
 | Swift→JS | `status` | フッターに出すメッセージ（空文字で消す） |
 | JS→Swift | `ready` | ページの読み込み完了。これより前に送るメッセージは Swift 側で待たせる |
 | JS→Swift | `changed` | `{id, text}`：入力ごとに送る。保存のタイミングは Swift 側で決める |
