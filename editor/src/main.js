@@ -325,7 +325,10 @@ function row(note, index) {
   grip.innerHTML = `<svg viewBox="0 0 24 24">${icons.grip}</svg>`
   grip.addEventListener("mousedown", event => dragPinned(event, note))
   const actions = element("span", "actions", "")
+  // ⌘1 to ⌘9 open the first nine pinned notes, which Swift lists first.
+  const number = note.pinned ? notes.findIndex(({id}) => id === note.id) + 1 : 0
   actions.append(
+    element("span", "key", number >= 1 && number <= 9 ? `⌘${number}` : ""),
     actionButton("pin", note.pinned ? "Unpin" : "Pin", () => post("pin", {id: note.id}), Boolean(note.pinned)),
     actionButton("trash", "Move to Trash (⌘⌫)", () => post("trash", {id: note.id})),
   )

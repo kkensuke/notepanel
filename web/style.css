@@ -149,6 +149,11 @@ footer {
   cursor: default;
 }
 
+/* The row under the pointer gets about half the selected row's tint. */
+#results li:hover {
+  background: var(--match);
+}
+
 #results li[aria-selected="true"] {
   background: var(--selection);
 }
@@ -184,7 +189,13 @@ body.dragging * {
 
 .actions {
   display: flex;
+  align-items: center;
   gap: calc(var(--ui-size) * 0.25);
+}
+
+.key {
+  color: var(--muted);
+  font-size: calc(var(--ui-size) * 0.8);
 }
 
 .action {
