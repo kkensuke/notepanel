@@ -105,7 +105,7 @@ In the panel:
 
 | Key | Does |
 |---|---|
-| ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder |
+| ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder with this note selected |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
