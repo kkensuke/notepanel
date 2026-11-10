@@ -58,6 +58,11 @@ const theme = EditorView.theme({
   ".cm-highlightSpace": {
     background: "radial-gradient(circle at 50% 55%, var(--whitespace) 0.07em, transparent 0.1em)",
   },
+  // CodeMirror's arrow for a tab, cut out of the same color.
+  ".cm-highlightTab": {
+    background: "var(--whitespace)",
+    mask: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="20"><path stroke="black" fill="none" d="M1 10H196L190 5M190 15L196 10M197 4L197 16"/></svg>') right 90% / auto 100% no-repeat`,
+  },
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
   ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
