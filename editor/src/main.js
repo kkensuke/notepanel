@@ -156,6 +156,8 @@ function updateCount() {
 let notes = []
 let shown = []
 let selected = 0
+// A note chosen for a match in its text, and the text to select once it opens.
+let jump = null
 
 const isSwitcherOpen = () => !switcher.hidden
 // Swift sends the pinned notes first, in the user's order. Searching sorts by match, so pinned
@@ -207,6 +209,20 @@ function closeSwitcher() {
   if (!isSwitcherOpen()) return
   switcher.hidden = true
   view.focus()
+}
+
+function choose(note) {
+  jump = note.snippet ? {id: note.id, text: query.value.trim()} : null
+  post("select", {id: note.id})
+}
+
+function selectMatch(text) {
+  const at = view.state.doc.toString().toLowerCase().indexOf(text.toLowerCase())
+  if (at < 0) return
+  view.dispatch({
+    selection: {anchor: at, head: at + text.length},
+    effects: EditorView.scrollIntoView(at, {y: "center"}),
+  })
 }
 
 function render() {
@@ -274,7 +290,7 @@ function row(note, index) {
   if (note.snippet) item.append(element("div", "snippet", note.snippet))
   item.addEventListener("mousedown", event => {
     event.preventDefault()
-    post("select", {id: note.id})
+    choose(note)
   })
   return item
 }
@@ -299,7 +315,7 @@ query.addEventListener("keydown", event => {
     selected = Math.max(selected - 1, 0)
     render()
   } else if (event.key === "Enter") {
-    if (note) post("select", {id: note.id})
+    if (note) choose(note)
   } else if (event.key === "Escape") {
     closeSwitcher()
   } else if (command && event.key === "Backspace") {
@@ -318,6 +334,8 @@ window.receive = ({type, data}) => {
   switch (type) {
     case "open":
       openNote(data.id, data.text, data.keep)
+      if (jump?.id === data.id) selectMatch(jump.text)
+      jump = null
       break
     case "renamed": {
       const state = states.get(data.from)

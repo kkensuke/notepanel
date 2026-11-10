@@ -49,7 +49,8 @@ panel), copy the new app to `/Applications`, and open it.
 - **Show and hide.** Press `Ctrl+Cmd+N`, or click the menu bar icon. `Esc` or
   `Cmd+W` hides the panel.
 - **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher: type to search,
-  then press `Return` to open the note. Each row has a pin button and a trash button.
+  then press `Return` to open the note. A note found by its text opens with the match selected.
+  Each row has a pin button and a trash button.
 - **Pinned notes.** Pinned notes come first in the switcher and when you go through notes with
   `Ctrl+Tab`. To change their order, drag the handle at the left of a row, or press `Option+Up`
   and `Option+Down`, while the search field is empty. `Cmd+1` to `Cmd+9` open the first to ninth
@@ -110,7 +111,7 @@ In the panel:
 
 | Key | Does |
 |---|---|
-| ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder |
+| ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder with this note selected |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
