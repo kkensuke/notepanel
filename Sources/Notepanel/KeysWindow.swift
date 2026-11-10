@@ -44,6 +44,7 @@ private let windowKeys = [
 private let panelKeys = [
     ("New note", "⌘N"),
     ("Switch notes", "⌘P"),
+    ("Open a pinned note", "⌘1 … ⌘9"),
     ("Open the notes folder", "⌘O"),
     ("Bigger / smaller note text", "⌘+ / ⌘−"),
     ("Default note text size", "⌘0"),

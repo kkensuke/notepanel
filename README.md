@@ -21,7 +21,8 @@ other editor, sync them or back them up as you like.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
   keeps earlier versions as backups.
 - **Quick to switch notes.** `Cmd+P` searches the names and text of your notes, and
-  `Ctrl+Tab` goes to the next one. Pinned notes come first, in the order you give them.
+  `Ctrl+Tab` goes to the next one. Pinned notes come first, in the order you give them, and
+  `Cmd+1` to `Cmd+9` open them.
 
 ## Install
 
@@ -51,7 +52,8 @@ panel), copy the new app to `/Applications`, and open it.
   then press `Return` to open the note. Each row has a pin button and a trash button.
 - **Pinned notes.** Pinned notes come first in the switcher and when you go through notes with
   `Ctrl+Tab`. To change their order, drag the handle at the left of a row, or press `Option+Up`
-  and `Option+Down`, while the search field is empty.
+  and `Option+Down`, while the search field is empty. `Cmd+1` to `Cmd+9` open the first to ninth
+  pinned note.
 - **Names.** A note is named after its first line: `# Shopping list` is saved as
   `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
   click the name in the title bar; from then on the name stays as you set it.
@@ -110,6 +112,7 @@ In the panel:
 |---|---|
 | ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
+| ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
 | In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
