@@ -158,6 +158,41 @@ let shown = []
 let selected = 0
 
 const isSwitcherOpen = () => !switcher.hidden
+// Swift sends the pinned notes first, in the user's order. Searching sorts by match, so pinned
+// notes are moved only in the full list.
+const pinnedCount = () => notes.filter(note => note.pinned).length
+const canMove = note => note.pinned && !query.value.trim()
+const savePinOrder = () => post("orderPins", {ids: notes.filter(note => note.pinned).map(note => note.id)})
+
+function movePinned(from, to, save = true) {
+  if (from < 0 || from === to || to < 0 || to >= pinnedCount()) return
+  notes.splice(to, 0, ...notes.splice(from, 1))
+  selected = to
+  render()
+  if (save) savePinOrder()
+}
+
+// Dragging a pinned note's handle moves it among the pinned notes; the order is saved on release.
+function dragPinned(event, note) {
+  event.preventDefault()
+  event.stopPropagation()
+  if (event.button !== 0) return
+  document.body.classList.add("dragging")
+  const move = ({clientY}) => {
+    const rows = [...results.children].slice(0, pinnedCount())
+    const over = rows.findIndex(row => clientY < row.getBoundingClientRect().bottom)
+    // The rows show copies of the notes, so the note is found by its id.
+    movePinned(notes.findIndex(({id}) => id === note.id), over < 0 ? rows.length - 1 : over, false)
+  }
+  const drop = () => {
+    removeEventListener("mousemove", move)
+    removeEventListener("mouseup", drop)
+    document.body.classList.remove("dragging")
+    savePinOrder()
+  }
+  addEventListener("mousemove", move)
+  addEventListener("mouseup", drop)
+}
 
 function openSwitcher(list) {
   notes = list
@@ -193,6 +228,7 @@ function element(tag, className, text) {
 
 // Line icons drawn with the text color; a pinned note's pin is filled.
 const icons = {
+  grip: '<path d="M5 7h14M5 12h14M5 17h14"/>',
   pin: '<path d="M9 3h6l-1 6 4 4H6l4-4Z"/><path d="M12 13v8"/>',
   trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
 }
@@ -222,12 +258,19 @@ function row(note, index) {
   item.id = `note-${index}`
   item.setAttribute("role", "option")
   item.setAttribute("aria-selected", String(index === selected))
+  item.classList.toggle("movable", canMove(note))
+  // Mouse only: ⌥↑ and ⌥↓ do the same from the keyboard.
+  const grip = element("span", "grip", "")
+  grip.title = "Drag to reorder (⌥↑ ⌥↓)"
+  grip.setAttribute("aria-hidden", "true")
+  grip.innerHTML = `<svg viewBox="0 0 24 24">${icons.grip}</svg>`
+  grip.addEventListener("mousedown", event => dragPinned(event, note))
   const actions = element("span", "actions", "")
   actions.append(
     actionButton("pin", note.pinned ? "Unpin" : "Pin", () => post("pin", {id: note.id}), Boolean(note.pinned)),
     actionButton("trash", "Move to Trash (⌘⌫)", () => post("trash", {id: note.id})),
   )
-  item.append(element("span", "title", note.title), actions)
+  item.append(grip, element("span", "title", note.title), actions)
   if (note.snippet) item.append(element("div", "snippet", note.snippet))
   item.addEventListener("mousedown", event => {
     event.preventDefault()
@@ -247,7 +290,9 @@ query.addEventListener("keydown", event => {
   const note = shown[selected]
   const command = event.metaKey && !event.ctrlKey && !event.altKey
   let handled = true
-  if (event.key === "ArrowDown") {
+  if (event.altKey && !event.metaKey && !event.ctrlKey && /^Arrow(Up|Down)$/.test(event.key)) {
+    if (note && canMove(note)) movePinned(selected, selected + (event.key === "ArrowUp" ? -1 : 1))
+  } else if (event.key === "ArrowDown") {
     selected = Math.min(selected + 1, shown.length - 1)
     render()
   } else if (event.key === "ArrowUp") {

@@ -54,6 +54,7 @@ private let switcherKeys = [
     ("Choose a note", "↑ / ↓"),
     ("Open it", "↩"),
     ("Move it to the Trash", "⌘⌫"),
+    ("Move a pinned note up / down", "⌥↑ / ⌥↓"),
 ]
 
 private let editingKeys = [
