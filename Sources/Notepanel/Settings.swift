@@ -217,6 +217,8 @@ struct SettingsView: View {
     @AppStorage("fontFamily") private var fontFamily = ""
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
+    @AppStorage("showWhitespace") private var showWhitespace = false
+    @AppStorage("tabSize") private var tabSize = 4
 
     var body: some View {
         VStack(spacing: 0) {
@@ -304,6 +306,11 @@ struct SettingsView: View {
                 ForEach(Prefs.uiFontSizes, id: \.self) { size in
                     Text(verbatim: "\(Int(size)) pt").tag(size)
                 }
+            }
+            Toggle("Show whitespace", isOn: $showWhitespace)
+            Picker("Tab width", selection: $tabSize) {
+                Text("2 spaces").tag(2)
+                Text("4 spaces").tag(4)
             }
         }
         Section {

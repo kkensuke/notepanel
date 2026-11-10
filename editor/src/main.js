@@ -1,13 +1,17 @@
 // The editor page: CodeMirror 6 for the note, and the note switcher on top of it.
 // Swift calls `receive(message)`; the page answers with `post(type, data)`.
-import {EditorState} from "@codemirror/state"
+import {EditorState, Compartment} from "@codemirror/state"
 import {
   EditorView,
   keymap,
   drawSelection,
   dropCursor,
   highlightSpecialChars,
+  highlightWhitespace,
   rectangularSelection,
+  Decoration,
+  MatchDecorator,
+  ViewPlugin,
 } from "@codemirror/view"
 import {defaultKeymap, historyKeymap, history, indentWithTab, selectLine} from "@codemirror/commands"
 import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
@@ -66,6 +70,30 @@ const theme = EditorView.theme({
 
 // ---- Editor
 
+// Full-width spaces look like nothing at all, so showing whitespace boxes them too.
+const ideographicSpaces = new MatchDecorator({
+  regexp: /\u3000/g,
+  decoration: Decoration.mark({class: "cm-ideographicSpace"}),
+})
+const ideographicSpaceBoxes = ViewPlugin.define(
+  view => ({
+    decorations: ideographicSpaces.createDeco(view),
+    update(update) {
+      this.decorations = ideographicSpaces.updateDeco(update, this.decorations)
+    },
+  }),
+  {decorations: plugin => plugin.decorations},
+)
+
+// From Settings. Each note keeps its own state, so these are applied again when a note opens.
+const settings = new Compartment()
+let showWhitespace = false
+let tabWidth = 4
+const settingsExtensions = () => [
+  EditorState.tabSize.of(tabWidth),
+  showWhitespace ? [highlightWhitespace(), ideographicSpaceBoxes] : [],
+]
+
 let currentId = null
 // Each note's state, so its undo history and cursor survive switching notes.
 const states = new Map()
@@ -84,6 +112,7 @@ const extensions = [
   markdown({base: markdownLanguage}),
   syntaxHighlighting(highlight),
   theme,
+  settings.of(settingsExtensions()),
   keymap.of([
     {key: "Mod-l", run: selectLine, preventDefault: true},
     {key: "Mod-Shift-Enter", run: view => (view.dispatch(insertLineAbove(view.state)), true)},
@@ -122,6 +151,7 @@ function openNote(id, text, keepSwitcher) {
   if (currentId !== null) states.set(currentId, view.state)
   const saved = states.get(id)
   view.setState(saved && saved.doc.toString() === text ? saved : EditorState.create({doc: text, extensions}))
+  view.dispatch({effects: settings.reconfigure(settingsExtensions())})
   currentId = id
   if (!keepSwitcher) closeSwitcher()
   updateCount()
@@ -129,12 +159,15 @@ function openNote(id, text, keepSwitcher) {
 
 const defaultFont = `"SF Mono", ui-monospace, Menlo, monospace`
 
-function applyOptions({fontFamily, fontSize, uiFontSize}) {
+function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, tabSize}) {
   const family = String(fontFamily ?? "").replace(/["\\;{}]/g, "").trim()
   const root = document.documentElement.style
   root.setProperty("--font", family ? `"${family}", ${defaultFont}` : defaultFont)
   root.setProperty("--size", `${Number(fontSize) || 14}px`)
   root.setProperty("--ui-size", `${Number(uiFontSize) || 15}px`)
+  showWhitespace = show === true
+  tabWidth = tabSize === 2 ? 2 : 4
+  view.dispatch({effects: settings.reconfigure(settingsExtensions())})
   view.requestMeasure()
 }
 

@@ -68,7 +68,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.setOptions(
             fontFamily: defaults.string(forKey: "fontFamily") ?? "",
             fontSize: defaults.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize,
-            uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize)
+            uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize,
+            showWhitespace: defaults.bool(forKey: "showWhitespace"),
+            tabSize: defaults.object(forKey: "tabSize") as? Int ?? 4)
         controller.setNoteShortcuts(
             next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"))
         // Compared with what was applied last, not with isVisible: setting isVisible saves it to

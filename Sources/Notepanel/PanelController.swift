@@ -104,8 +104,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         openSomeNote()
     }
 
-    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double) {
-        let new: NSDictionary = ["fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize]
+    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, tabSize: Int) {
+        let new: NSDictionary = [
+            "fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize,
+            "showWhitespace": showWhitespace, "tabSize": tabSize,
+        ]
         guard new != options else { return }
         options = new
         bridge.send("options", new)
