@@ -146,6 +146,8 @@ CodeMirror 6 に次の拡張を入れる。
 - `EditorView.clickAddsSelectionRange`：⌥クリックでカーソルを追加する（VS Code と同じ。CodeMirror の既定は ⌘クリック）
 - `rectangularSelection`：⇧⌥ドラッグで矩形選択する（VS Code と同じ。CodeMirror の既定は ⌥ドラッグ）
 - `highlightSelectionMatches()`、`EditorView.lineWrapping`
+- 折り返した行の 2 行目以降は、`.cm-line` の `text-indent: -2ch` と左 padding で 2 文字分下げる。改行で始まる行と見分けるためで、`- ` の後の本文の位置にも揃う。
+- URL は空白を含まないので、ブラウザは 1 語として扱う。そのままでは、行の残りに収まらない URL が丸ごと次の行に送られ、`- ` だけが行に残る。これを避けるため、URL（`tags.url`）にだけ `word-break: break-all` を付け、行末まで詰めてから折り返す。本文と `[text](url)` の text は空白で折り返す。
 - `markdown({ base: markdownLanguage })`：GFM（取り消し線、タスクリスト）を含む色分け、Enter での箇条書きの継続、選択中のテキストへの URL の貼り付けによるリンク化
 - ⌘クリックでリンクを開く。対象は `[text](url)` と、`http://`・`https://`・`mailto:` で始まる URL。Swift 側でもスキームを確かめてから開く。
 - 文字数（改行を除く書記素の数）を右下に「1,234 characters」の形で表示する。

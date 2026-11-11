@@ -40,7 +40,9 @@ const highlight = HighlightStyle.define([
   {tag: tags.emphasis, fontStyle: "italic"},
   {tag: tags.strikethrough, textDecoration: "line-through"},
   {tag: tags.monospace, color: "var(--code)"},
-  {tag: [tags.link, tags.url], color: "var(--link)"},
+  {tag: tags.link, color: "var(--link)"},
+  // A URL breaks at the panel's edge, so a list marker isn't left alone on its line.
+  {tag: tags.url, color: "var(--link)", wordBreak: "break-all"},
   {tag: [tags.processingInstruction, tags.quote, tags.contentSeparator], color: "var(--muted)"},
 ])
 
@@ -49,7 +51,9 @@ const theme = EditorView.theme({
   "&.cm-focused": {outline: "none"},
   ".cm-scroller": {fontFamily: "var(--font)", lineHeight: "1.6"},
   ".cm-content": {padding: "6px 0", caretColor: "var(--fg)"},
-  ".cm-line": {padding: "0 12px"},
+  // A wrapped line's later rows start 2ch in, under the text after "- ", so they don't look
+  // like new lines.
+  ".cm-line": {padding: "0 12px 0 calc(12px + 2ch)", textIndent: "-2ch"},
   ".cm-cursor, .cm-dropCursor": {borderLeftColor: "var(--fg)"},
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground":
     {backgroundColor: "var(--selection)"},
