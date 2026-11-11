@@ -1,6 +1,6 @@
 // The editor page: CodeMirror 6 for the note, and the note switcher on top of it.
 // Swift calls `receive(message)`; the page answers with `post(type, data)`.
-import {EditorState, Compartment} from "@codemirror/state"
+import {EditorState, Compartment, RangeSetBuilder} from "@codemirror/state"
 import {
   EditorView,
   keymap,
@@ -19,7 +19,7 @@ import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 import {syntaxHighlighting, HighlightStyle, indentUnit} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
-import {rankNotes, urlAt, linkAt, insertLineAbove, countCharacters} from "./logic.js"
+import {rankNotes, urlAt, linkAt, listIndent, insertLineAbove, countCharacters} from "./logic.js"
 
 // Outside the app (in a plain browser) there is no handler, so nothing is sent.
 const post = (type, data = {}) => window.webkit?.messageHandlers?.native?.postMessage({type, ...data})
@@ -52,9 +52,7 @@ const theme = EditorView.theme({
   "&.cm-focused": {outline: "none"},
   ".cm-scroller": {fontFamily: "var(--font)", lineHeight: "1.6"},
   ".cm-content": {padding: "6px 0", caretColor: "var(--fg)"},
-  // A wrapped line's later rows start 2ch in, under the text after "- ", so they don't look
-  // like new lines.
-  ".cm-line": {padding: "0 12px 0 calc(12px + 2ch)", textIndent: "-2ch"},
+  ".cm-line": {padding: "0 12px"},
   ".cm-cursor, .cm-dropCursor": {borderLeftColor: "var(--fg)"},
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground":
     {backgroundColor: "var(--selection)"},
@@ -104,6 +102,33 @@ const ideographicSpaceBoxes = ViewPlugin.define(
     decorations: ideographicSpaces.createDeco(view),
     update(update) {
       this.decorations = ideographicSpaces.updateDeco(update, this.decorations)
+    },
+  }),
+  {decorations: plugin => plugin.decorations},
+)
+
+// A list item's wrapped rows start under its text, not under its marker. The 12px is the line's
+// own padding.
+function listIndents(view) {
+  const builder = new RangeSetBuilder()
+  for (const {from, to} of view.visibleRanges) {
+    for (let pos = from; pos <= to; ) {
+      const line = view.state.doc.lineAt(pos)
+      const n = listIndent(line.text, view.state.tabSize)
+      if (n) {
+        const style = `padding-left: calc(12px + ${n}ch); text-indent: -${n}ch`
+        builder.add(line.from, line.from, Decoration.line({attributes: {style}}))
+      }
+      pos = line.to + 1
+    }
+  }
+  return builder.finish()
+}
+const hangingIndents = ViewPlugin.define(
+  view => ({
+    decorations: listIndents(view),
+    update(update) {
+      if (update.docChanged || update.viewportChanged) this.decorations = listIndents(update.view)
     },
   }),
   {decorations: plugin => plugin.decorations},
@@ -176,6 +201,7 @@ const extensions = [
   rectangularSelection({eventFilter: event => event.altKey && event.shiftKey && event.button === 0}),
   highlightSelectionMatches(),
   EditorView.lineWrapping,
+  hangingIndents,
   linkPopup,
   markdown({base: markdownLanguage}),
   syntaxHighlighting(highlight),

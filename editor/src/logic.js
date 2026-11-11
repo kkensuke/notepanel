@@ -1,5 +1,5 @@
 // Pure helpers, kept apart from the DOM so they can run under `node --test`.
-import {EditorSelection} from "@codemirror/state"
+import {EditorSelection, countColumn} from "@codemirror/state"
 
 // A case-insensitive subsequence match: every query character must appear in order.
 // Returns a score (higher is better) or null. Runs and word starts score more,
@@ -69,6 +69,12 @@ export function linkAt(line, offset) {
 // The URL under `offset` in a line: a Markdown link's target, or a bare URL.
 export function urlAt(line, offset) {
   return linkAt(line, offset)?.url ?? null
+}
+
+// The columns before a list item's text ("- ", "  1. ", "- [ ] "), or 0 if the line isn't one.
+export function listIndent(line, tabSize) {
+  const marker = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/.exec(line)
+  return marker ? countColumn(marker[0], tabSize) : 0
 }
 
 // VS Code's Shift-Cmd-Enter: a new line above each cursor, with the same indentation.

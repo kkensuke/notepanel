@@ -258,6 +258,30 @@ assert.deepEqual(
 await press("Tab")
 assert.equal(await changedText(), "      a b\tc\u3000d", "4 spaces by default")
 
+// Only a list item's wrapped rows are indented, and they start under the item's text.
+await receive("open", {id: "Wrap", text: `- ${"word ".repeat(30)}\n${"word ".repeat(30)}`})
+await pause(50)
+const rowStarts = await page.$$eval(".cm-line", lines => lines.map(line => {
+  const range = document.createRange()
+  range.selectNodeContents(line)
+  const starts = {}
+  for (const r of range.getClientRects()) if (r.width) starts[Math.round(r.top)] = Math.min(starts[Math.round(r.top)] ?? Infinity, r.left)
+  return Object.values(starts)
+}))
+const itemText = await page.evaluate(() => {
+  const walker = document.createTreeWalker(document.querySelector(".cm-line"), NodeFilter.SHOW_TEXT)
+  let node
+  while ((node = walker.nextNode())) if (node.textContent.includes("word")) break
+  const at = node.textContent.indexOf("word")
+  const range = document.createRange()
+  range.setStart(node, at)
+  range.setEnd(node, at + 1)
+  return range.getBoundingClientRect().left
+})
+assert.ok(rowStarts[0].length > 1 && rowStarts[1].length > 1, "both lines wrap")
+assert.ok(rowStarts[0].slice(1).every(x => Math.abs(x - itemText) < 1), "a list item's rows start under its text")
+assert.ok(rowStarts[1].every(x => Math.abs(x - rowStarts[1][0]) < 1), "a paragraph's rows start at the edge")
+
 // The page never asks for a window height: the panel keeps the size the user gave it.
 await receive("open", {id: "Count", text: "ab\ncd"})
 await pause(50)
