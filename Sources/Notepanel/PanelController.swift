@@ -101,6 +101,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return false
     }
 
+    func windowDidResize(_ notification: Notification) {
+        sizeTitle()
+    }
+
     // MARK: - Settings
 
     func setFolder(_ folder: URL) {
@@ -503,9 +507,15 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         sizeTitle()
     }
 
+    /// Leaves room on both sides for the buttons (wider than the traffic lights), so a long name
+    /// stays centered and ends in "…" instead of pushing the buttons into the overflow menu.
     private func sizeTitle() {
         let width = (titleField.attributedStringValue.size().width + 16).rounded(.up)
-        titleWidth.constant = min(max(width, 80), 360)
+        // shortcut: 16 pt per button and 24 pt at the edge guess the toolbar's spacing; measure
+        // the laid-out buttons if they still overflow or names cut off too early.
+        let buttonsWidth = buttons.values.map { $0.fittingSize.width + 16 }.reduce(24, +)
+        let room = panel.frame.width - 2 * buttonsWidth
+        titleWidth.constant = max(0, min(max(width, 80), 360, room))
     }
 
     /// Ends typing in the title before another note opens, so the name goes to the note it was
