@@ -121,6 +121,33 @@ await page.mouse.click(box.x, box.y)
 await page.keyboard.up("Meta")
 assert.equal((await last("openURL"))?.url, "https://example.com/a")
 
+// Pointing at a link shows Copy and Open on its URL's first characters, in the link's own row.
+await clear()
+await page.mouse.move(box.x, box.y)
+await page.waitForSelector(".cm-linkButtons")
+await pause(50)
+const urlStart = await page.evaluate(() => {
+  const node = [...document.querySelector(".cm-line").querySelectorAll("span")]
+    .map(s => s.firstChild).find(n => n?.textContent.startsWith("https"))
+  const range = document.createRange()
+  range.setStart(node, 0)
+  range.setEnd(node, 1)
+  const r = range.getBoundingClientRect()
+  return {x: r.x, y: r.y + r.height / 2}
+})
+const popup = await page.$eval(".cm-tooltip-hover", e => e.getBoundingClientRect().toJSON())
+assert.ok(Math.abs(popup.x - urlStart.x) < 2, "the popup starts where the URL starts")
+assert.ok(Math.abs(popup.y + popup.height / 2 - urlStart.y) < 3, "the popup sits on the link's row")
+const copyIcon = await page.$eval(".cm-linkButtons .copy", e => e.innerHTML)
+await page.click(".cm-linkButtons .copy")
+assert.equal((await last("copy"))?.text, "https://example.com/a")
+assert.notEqual(await page.$eval(".cm-linkButtons .copy", e => e.innerHTML), copyIcon, "Copy turns into a check")
+await page.click(".cm-linkButtons .open")
+assert.equal((await last("openURL"))?.url, "https://example.com/a")
+await page.mouse.move(box.x, box.y + 200)
+await pause(50)
+assert.equal(await page.$(".cm-linkButtons"), null, "the popup goes when the pointer leaves the link")
+
 // The switcher: fuzzy title search, keyboard selection and trash.
 const notes = [
   {id: "Groceries", title: "Groceries", modified: Date.now(), text: "milk", pinned: true},
