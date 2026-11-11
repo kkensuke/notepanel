@@ -121,7 +121,7 @@ await page.mouse.click(box.x, box.y)
 await page.keyboard.up("Meta")
 assert.equal((await last("openURL"))?.url, "https://example.com/a")
 
-// Pointing at a link shows Copy and Open on its URL's first characters, in the link's own row.
+// Pointing at a link shows Open and Copy on its URL's first characters, in the link's own row.
 await clear()
 await page.mouse.move(box.x, box.y)
 await page.waitForSelector(".cm-linkButtons")

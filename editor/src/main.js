@@ -123,7 +123,7 @@ let currentId = null
 // Each note's state, so its undo history and cursor survive switching notes.
 const states = new Map()
 
-// Pointing at a link shows Copy and Open buttons on the link's first characters ("https:"), in
+// Pointing at a link shows Open and Copy buttons on the link's first characters ("https:"), in
 // its own row: the pointer gets there without leaving the link, and no other line is covered.
 const linkPopup = hoverTooltip(
   (view, pos) => {
@@ -151,7 +151,7 @@ function linkButtons(view, url, urlFrom) {
     clearTimeout(timer)
     timer = setTimeout(() => (copy.innerHTML = iconSVG("copy")), 1500)
   })
-  dom.append(copy, actionButton("open", "Open Link (⌘-click)", () => post("openURL", {url})))
+  dom.append(actionButton("open", "Open Link (⌘-click)", () => post("openURL", {url})), copy)
   return {
     dom,
     // CodeMirror puts the popup's top at this rectangle's bottom; this centers it on the row.
