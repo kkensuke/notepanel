@@ -40,7 +40,9 @@ const highlight = HighlightStyle.define([
   {tag: tags.emphasis, fontStyle: "italic"},
   {tag: tags.strikethrough, textDecoration: "line-through"},
   {tag: tags.monospace, color: "var(--code)"},
-  {tag: [tags.link, tags.url], color: "var(--link)"},
+  {tag: tags.link, color: "var(--link)"},
+  // A URL breaks at the panel's edge, so a list marker isn't left alone on its line.
+  {tag: tags.url, color: "var(--link)", wordBreak: "break-all"},
   {tag: [tags.processingInstruction, tags.quote, tags.contentSeparator], color: "var(--muted)"},
 ])
 
