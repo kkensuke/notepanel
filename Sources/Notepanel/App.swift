@@ -73,6 +73,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             indentSize: defaults.object(forKey: "indentSize") as? Int ?? 4)
         controller.setNoteShortcuts(
             next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"))
+        controller.setBackgroundOpacity(
+            defaults.object(forKey: "backgroundOpacity") as? Double ?? Prefs.defaultBackgroundOpacity)
         // Compared with what was applied last, not with isVisible: setting isVisible saves it to
         // UserDefaults, which runs this again from inside the setter, maybe before isVisible changes.
         let showIcon = defaults.object(forKey: "showMenuBarIcon") as? Bool ?? true

@@ -28,6 +28,9 @@ enum Prefs {
     /// settings window. The toolbar's symbols follow it.
     static let defaultUIFontSize = 15.0
     static let uiFontSizes: [Double] = [12, 13, 14, 15, 16, 17, 18, 20]
+    /// The note panel's background, not its text: 0 is clear, 1 is solid, and the default in
+    /// between is tinycast's glass and scrim.
+    static let defaultBackgroundOpacity = 0.5
     /// Global shortcuts, which work from any app.
     static let hotKeyNames = ["hotkey.toggle", "hotkey.create", "hotkey.search"]
     static let defaultShortcuts: [String: Shortcut] = [

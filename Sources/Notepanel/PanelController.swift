@@ -9,6 +9,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     private let panel: NotePanel
     private let bridge = EditorBridge()
+    /// The background under the page: glass, with a scrim over it.
+    private let glass = PanelController.makeGlass()
+    private let scrim = NSBox()
+    private var backgroundOpacity: Double?
     private let titleField = NSTextField(string: "")
     private var titleWidth: NSLayoutConstraint!
     private var buttons: [NSToolbarItem.Identifier: NSButton] = [:]
@@ -134,6 +138,23 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if let next { shortcuts.append((next, { [weak self] in self?.cycle(1) })) }
         if let previous { shortcuts.append((previous, { [weak self] in self?.cycle(-1) })) }
         panel.shortcuts = shortcuts
+    }
+
+    /// The background's opacity; the text keeps its own. 0 leaves nothing behind the text, the
+    /// default is tinycast's background, and 1 is solid. Up to the default, the glass and the
+    /// scrim fade in together; past it, the scrim gets more opaque.
+    func setBackgroundOpacity(_ opacity: Double) {
+        let opacity = min(1, max(0, opacity))
+        guard opacity != backgroundOpacity else { return }
+        backgroundOpacity = opacity
+        let middle = Prefs.defaultBackgroundOpacity
+        let fade = CGFloat(min(1, opacity / middle))
+        glass.alphaValue = fade
+        scrim.alphaValue = fade
+        scrim.fillColor = Self.scrimColor(solid: max(0, (opacity - middle) / (1 - middle)))
+        // With nothing behind the text, the shadow would outline the letters.
+        panel.hasShadow = fade > 0
+        panel.invalidateShadow()
     }
 
     /// Cmd-plus and Cmd-minus step the note's text size; Cmd-0 sets it back to the default.
@@ -356,8 +377,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.minSize = NSSize(width: 320, height: 160)
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.delegate = self
+        // Set explicitly, so clicks where the background is clear reach the panel, not the app behind.
+        panel.ignoresMouseEvents = false
         bridge.webView.setValue(false, forKey: "drawsBackground")
-        panel.contentView = Self.glass(behind: bridge.webView)
+        panel.contentView = background(behind: bridge.webView)
         panel.onZoom = { [weak self] step in self?.zoom(step) }
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
@@ -409,28 +432,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.setFrameAutosaveName(Self.frameName)
     }
 
-    /// tinycast's background: glass (a blur before macOS 26) under a scrim, black at 40% in dark
-    /// mode and white at 55% in light mode. It runs under the title bar too, while the page
-    /// starts below the title bar, where it was before.
-    private static func glass(behind page: NSView) -> NSView {
-        let glass: NSView
-        if #available(macOS 26, *) {
-            glass = NSGlassEffectView()
-        } else {
-            let blur = NSVisualEffectView()
-            blur.material = .popover
-            // The app is never active, so the blur would otherwise always look inactive.
-            blur.state = .active
-            glass = blur
-        }
-        let scrim = NSBox()
+    /// tinycast's background: glass (a blur before macOS 26) under a scrim. It runs under the
+    /// title bar too, while the page starts below the title bar, where it was before.
+    private func background(behind page: NSView) -> NSView {
         scrim.boxType = .custom
         scrim.titlePosition = .noTitle
         scrim.borderWidth = 0
-        scrim.fillColor = NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-                ? .black.withAlphaComponent(0.4) : .white.withAlphaComponent(0.55)
-        }
+        scrim.fillColor = Self.scrimColor(solid: 0)
         let view = NSView()
         for backdrop in [glass, scrim] {
             backdrop.frame = view.bounds
@@ -446,6 +454,25 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             page.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         return view
+    }
+
+    private static func makeGlass() -> NSView {
+        if #available(macOS 26, *) { return NSGlassEffectView() }
+        let blur = NSVisualEffectView()
+        blur.material = .popover
+        // The app is never active, so the blur would otherwise always look inactive.
+        blur.state = .active
+        return blur
+    }
+
+    /// tinycast's scrim is black at 40% in dark mode and white at 55% in light mode. `solid`,
+    /// from 0 to 1, takes it from there to fully opaque.
+    private static func scrimColor(solid: Double) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let alpha = dark ? 0.4 : 0.55
+            return (dark ? NSColor.black : .white).withAlphaComponent(CGFloat(alpha + (1 - alpha) * solid))
+        }
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
