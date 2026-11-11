@@ -1,7 +1,7 @@
 import {test} from "node:test"
 import assert from "node:assert/strict"
 import {EditorState, EditorSelection} from "@codemirror/state"
-import {fuzzyScore, rankNotes, urlAt, linkAt, insertLineAbove, countCharacters} from "../src/logic.js"
+import {fuzzyScore, rankNotes, urlAt, linkAt, listIndent, insertLineAbove, countCharacters} from "../src/logic.js"
 
 test("fuzzyScore matches characters in order and prefers runs", () => {
   assert.equal(fuzzyScore("xyz", "meeting notes"), null)
@@ -43,6 +43,20 @@ test("linkAt spans the whole link and says where its URL starts", () => {
   assert.deepEqual(linkAt(line, 5), {url: "https://example.com/a", from: 4, to: 33, urlFrom: 11})
   assert.deepEqual(linkAt(line, 45), {url: "https://example.org/b", from: 37, to: 59, urlFrom: 37})
   assert.equal(linkAt(line, 1), null)
+})
+
+test("listIndent measures a list item's marker, and is 0 for other lines", () => {
+  assert.equal(listIndent("- item", 4), 2)
+  assert.equal(listIndent("  * nested", 4), 4)
+  assert.equal(listIndent("\t+ tabbed", 4), 6)
+  assert.equal(listIndent("1. first", 4), 3)
+  assert.equal(listIndent("10) tenth", 4), 4)
+  assert.equal(listIndent("- [ ] task", 4), 6)
+  assert.equal(listIndent("- [x] done", 4), 6)
+  assert.equal(listIndent("Plain text - not a list", 4), 0)
+  assert.equal(listIndent("*emphasis* only", 4), 0)
+  assert.equal(listIndent("-no space", 4), 0)
+  assert.equal(listIndent("", 4), 0)
 })
 
 test("insertLineAbove keeps indentation and moves the cursor up", () => {
