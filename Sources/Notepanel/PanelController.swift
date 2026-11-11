@@ -136,12 +136,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.shortcuts = shortcuts
     }
 
-    /// Clamped, since UserDefaults can hold any value, and one near 0 would hide the panel.
-    func setOpacity(_ opacity: Double) {
-        let range = Prefs.panelOpacities
-        panel.alphaValue = CGFloat(min(range.upperBound, max(range.lowerBound, opacity)))
-    }
-
     /// Cmd-plus and Cmd-minus step the note's text size; Cmd-0 sets it back to the default.
     /// It's the same setting as in the settings window.
     private func zoom(_ step: Int) {
