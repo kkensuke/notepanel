@@ -219,6 +219,7 @@ struct SettingsView: View {
     @AppStorage("folder") private var folder = Prefs.defaultFolder
     @AppStorage("fontFamily") private var fontFamily = ""
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
+    @AppStorage("panelOpacity") private var panelOpacity = Prefs.defaultPanelOpacity
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
     @AppStorage("showWhitespace") private var showWhitespace = false
     @AppStorage("indentSize") private var indentSize = 4
@@ -310,6 +311,12 @@ struct SettingsView: View {
                     Text(verbatim: "\(Int(size)) pt").tag(size)
                 }
             }
+            // A slider suits this one: it doesn't resize the window, and the panel changes as it moves.
+            Slider(value: $panelOpacity, in: Prefs.panelOpacities) {
+                Text("Panel opacity")
+            }
+            // VoiceOver reads the opacity as a percentage, not the slider's raw value.
+            .accessibilityValue(Text(verbatim: "\(Int((panelOpacity * 100).rounded()))%"))
             Toggle("Show whitespace", isOn: $showWhitespace)
             Picker("Tab key indents by", selection: $indentSize) {
                 Text("2 spaces").tag(2)
