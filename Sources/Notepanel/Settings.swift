@@ -312,9 +312,20 @@ struct SettingsView: View {
                 }
             }
             // A slider suits this one: it doesn't resize the window, and the panel changes as it moves.
-            // Steps of 5% let the knob land exactly on the default, in the middle.
-            Slider(value: $backgroundOpacity, in: 0...1, step: 0.05) {
-                Text("Background opacity")
+            // Steps of 5% let the knob land exactly on the default, in the middle. macOS 26 draws a
+            // tick for every step, all alike, so a short mark under the middle one picks it out. The
+            // label sits outside the slider so that the mark centers on the slider alone.
+            LabeledContent("Background opacity") {
+                Slider(value: $backgroundOpacity, in: 0...1, step: 0.05) {
+                    Text("Background opacity")
+                }
+                .labelsHidden()
+                .overlay(alignment: .bottom) {
+                    Capsule()
+                        .fill(.secondary)
+                        .frame(width: 2, height: 4)
+                        .alignmentGuide(.bottom) { $0[.top] - 1 }
+                }
             }
             Toggle("Show whitespace", isOn: $showWhitespace)
             Picker("Tab key indents by", selection: $indentSize) {
