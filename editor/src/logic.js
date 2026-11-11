@@ -50,15 +50,25 @@ function snippetAt(text, at) {
   return (start > lineStart ? "…" : "") + text.slice(start, lineEnd).trim().slice(0, 120)
 }
 
-// The URL under `offset` in a line: a Markdown link's target, or a bare URL.
-export function urlAt(line, offset) {
+// The link under `offset` in a line: a Markdown link, or a bare URL. `from` and `to` span the
+// link as written, and `urlFrom` is where its URL starts.
+export function linkAt(line, offset) {
   for (const m of line.matchAll(/\[[^\]]*\]\(([^)\s]+)[^)]*\)/g)) {
-    if (offset >= m.index && offset <= m.index + m[0].length) return m[1]
+    const to = m.index + m[0].length
+    if (offset >= m.index && offset <= to)
+      return {url: m[1], from: m.index, to, urlFrom: m.index + m[0].indexOf("](") + 2}
   }
   for (const m of line.matchAll(/(?:https?:\/\/|mailto:)[^\s<>()[\]]+/g)) {
-    if (offset >= m.index && offset <= m.index + m[0].length) return m[0].replace(/[.,;:!?]+$/, "")
+    const to = m.index + m[0].length
+    if (offset >= m.index && offset <= to)
+      return {url: m[0].replace(/[.,;:!?]+$/, ""), from: m.index, to, urlFrom: m.index}
   }
   return null
+}
+
+// The URL under `offset` in a line: a Markdown link's target, or a bare URL.
+export function urlAt(line, offset) {
+  return linkAt(line, offset)?.url ?? null
 }
 
 // VS Code's Shift-Cmd-Enter: a new line above each cursor, with the same indentation.
