@@ -196,6 +196,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
                 ["http", "https", "mailto"].contains(url.scheme?.lowercased() ?? "")
             else { return }
             NSWorkspace.shared.open(url)
+        case "copy":
+            // From the link popup's Copy button; plain text, so it pastes anywhere.
+            guard let text = body["text"] as? String else { return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
         case "escape":
             hide()
         default:

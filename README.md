@@ -58,6 +58,8 @@ panel), copy the new app to `/Applications`, and open it.
 - **Names.** A note is named after its first line: `# Shopping list` is saved as
   `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
   click the name in the title bar; from then on the name stays as you set it.
+- **Links.** Cmd-click a link to open it. Pointing at a link shows two buttons on its first
+  characters: one opens it, the other copies the URL.
 - **Menu.** Right-click the menu bar icon (or Control-click it) for New Note, Search Notes,
   Settings, Keyboard Shortcuts, the backups folder and Quit. Each item shows its key in the panel.
 - **Keys.** `Shift+Cmd+/` in the panel lists all the keys. The list is also in Settings →

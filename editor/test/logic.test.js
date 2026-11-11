@@ -1,7 +1,7 @@
 import {test} from "node:test"
 import assert from "node:assert/strict"
 import {EditorState, EditorSelection} from "@codemirror/state"
-import {fuzzyScore, rankNotes, urlAt, insertLineAbove, countCharacters} from "../src/logic.js"
+import {fuzzyScore, rankNotes, urlAt, linkAt, insertLineAbove, countCharacters} from "../src/logic.js"
 
 test("fuzzyScore matches characters in order and prefers runs", () => {
   assert.equal(fuzzyScore("xyz", "meeting notes"), null)
@@ -36,6 +36,13 @@ test("urlAt finds Markdown link targets and bare URLs", () => {
   assert.equal(urlAt(line, 45), "https://example.org/b")
   assert.equal(urlAt(line, 1), null)
   assert.equal(urlAt("mail mailto:me@example.com", 8), "mailto:me@example.com")
+})
+
+test("linkAt spans the whole link and says where its URL starts", () => {
+  const line = "see [docs](https://example.com/a) or https://example.org/b."
+  assert.deepEqual(linkAt(line, 5), {url: "https://example.com/a", from: 4, to: 33, urlFrom: 11})
+  assert.deepEqual(linkAt(line, 45), {url: "https://example.org/b", from: 37, to: 59, urlFrom: 37})
+  assert.equal(linkAt(line, 1), null)
 })
 
 test("insertLineAbove keeps indentation and moves the cursor up", () => {
