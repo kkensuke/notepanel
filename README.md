@@ -70,8 +70,9 @@ panel), copy the new app to `/Applications`, and open it.
 Open Settings with `Cmd+,` in the panel, or from the menu bar icon's menu.
 
 - **General:** the notes folder, the note font (one of the monospaced fonts on your Mac), the size
-  of the interface text, whether to show spaces, tabs and full-width spaces, how many spaces the
-  Tab key indents by (2 or 4), whether the menu bar icon shows, and Open at login.
+  of the interface text, the panel's opacity (20% to 100%, text included), whether to show spaces,
+  tabs and full-width spaces, how many spaces the Tab key indents by (2 or 4), whether the menu bar
+  icon shows, and Open at login.
 - **Shortcuts:** the shortcuts that work from any app (show or hide notes, new note, search notes)
   and the ones that work in the panel (next and previous note). Click a shortcut and press the
   keys. `Esc` cancels, and the × button removes the shortcut.
