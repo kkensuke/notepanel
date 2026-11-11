@@ -21,6 +21,8 @@
   --error: #ff3b30;
   /* VS Code's color for whitespace, made 10 points more opaque. */
   --whitespace: rgb(51 51 51 / 0.3);
+  /* The link popup is opaque, so the text under it doesn't show through. */
+  --tooltip: rgb(250 250 250);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -34,6 +36,7 @@
     --search: rgb(255 214 10 / 0.32);
     --search-current: rgb(255 214 10 / 0.9);
     --whitespace: rgb(227 228 226 / 0.26);
+    --tooltip: rgb(48 48 50);
   }
 }
 

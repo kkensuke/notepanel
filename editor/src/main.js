@@ -12,13 +12,14 @@ import {
   Decoration,
   MatchDecorator,
   ViewPlugin,
+  hoverTooltip,
 } from "@codemirror/view"
 import {defaultKeymap, historyKeymap, history, indentWithTab, selectLine} from "@codemirror/commands"
 import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 import {syntaxHighlighting, HighlightStyle, indentUnit} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
-import {rankNotes, urlAt, insertLineAbove, countCharacters} from "./logic.js"
+import {rankNotes, urlAt, linkAt, insertLineAbove, countCharacters} from "./logic.js"
 
 // Outside the app (in a plain browser) there is no handler, so nothing is sent.
 const post = (type, data = {}) => window.webkit?.messageHandlers?.native?.postMessage({type, ...data})
@@ -67,6 +68,16 @@ const theme = EditorView.theme({
     background: "var(--whitespace)",
     mask: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="20"><path stroke="black" fill="none" d="M1 10H196L190 5M190 15L196 10M197 4L197 16"/></svg>') right 90% / auto 100% no-repeat`,
   },
+  // The link popup: as tall as a row at any note font size, so it covers no other line.
+  ".cm-tooltip.cm-tooltip-hover": {
+    border: "1px solid var(--border)",
+    borderRadius: "7px",
+    backgroundColor: "var(--tooltip)",
+    boxShadow: "0 2px 8px rgb(0 0 0 / 0.2)",
+  },
+  ".cm-linkButtons": {display: "flex", gap: "1px", padding: "0 2px", fontSize: "var(--size)"},
+  ".cm-linkButtons .action": {padding: "2px", fontSize: "inherit"},
+  ".cm-linkButtons .action svg": {width: "1em", height: "1em"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
   ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
@@ -112,6 +123,48 @@ let currentId = null
 // Each note's state, so its undo history and cursor survive switching notes.
 const states = new Map()
 
+// Pointing at a link shows Copy and Open buttons on the link's first characters ("https:"), in
+// its own row: the pointer gets there without leaving the link, and no other line is covered.
+const linkPopup = hoverTooltip(
+  (view, pos) => {
+    const line = view.state.doc.lineAt(pos)
+    const link = linkAt(line.text, pos - line.from)
+    if (!link) return null
+    return {
+      pos: line.from + link.from,
+      end: line.from + link.to,
+      strictSide: true,
+      create: () => linkButtons(view, link.url, line.from + link.urlFrom),
+    }
+  },
+  // At once; 1, since CodeMirror reads 0 as its default of 300 ms.
+  {hoverTime: 1, hideOnChange: true},
+)
+
+function linkButtons(view, url, urlFrom) {
+  const dom = document.createElement("div")
+  dom.className = "cm-linkButtons"
+  let timer = 0
+  const copy = actionButton("copy", "Copy Link", () => {
+    post("copy", {text: url})
+    copy.innerHTML = iconSVG("check")
+    clearTimeout(timer)
+    timer = setTimeout(() => (copy.innerHTML = iconSVG("copy")), 1500)
+  })
+  dom.append(copy, actionButton("open", "Open Link (⌘-click)", () => post("openURL", {url})))
+  return {
+    dom,
+    // CodeMirror puts the popup's top at this rectangle's bottom; this centers it on the row.
+    getCoords() {
+      const row = view.coordsAtPos(urlFrom, 1)
+      if (!row) return null
+      const top = (row.top + row.bottom - dom.parentElement.offsetHeight) / 2
+      return {left: row.left, right: row.left, top, bottom: top}
+    },
+    destroy: () => clearTimeout(timer),
+  }
+}
+
 const extensions = [
   history(),
   drawSelection(),
@@ -123,6 +176,7 @@ const extensions = [
   rectangularSelection({eventFilter: event => event.altKey && event.shiftKey && event.button === 0}),
   highlightSelectionMatches(),
   EditorView.lineWrapping,
+  linkPopup,
   markdown({base: markdownLanguage}),
   syntaxHighlighting(highlight),
   theme,
@@ -293,8 +347,13 @@ function element(tag, className, text) {
 const icons = {
   grip: '<path d="M5 7h14M5 12h14M5 17h14"/>',
   pin: '<path d="M9 3.5h6M10 3.5v5.2l-3.2 3.1c-.4.4-.1 1.2.5 1.2h9.4c.6 0 .9-.8.5-1.2L14 8.7V3.5Z"/><path d="M12 13v8"/>',
+  copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
+  open: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13M17.5 13.5v4a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h4"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   trash: '<path d="M4.5 6.5h15M9.5 6.5V5.3c0-1 .8-1.8 1.8-1.8h1.4c1 0 1.8.8 1.8 1.8v1.2M6.5 6.5l.9 12.2a2 2 0 0 0 2 1.8h5.2a2 2 0 0 0 2-1.8l.9-12.2M10.2 10v6.5M13.8 10v6.5"/>',
 }
+
+const iconSVG = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`
 
 function actionButton(name, label, onClick, pressed) {
   const button = document.createElement("button")
@@ -302,7 +361,7 @@ function actionButton(name, label, onClick, pressed) {
   button.title = label
   button.setAttribute("aria-label", label)
   if (pressed !== undefined) button.setAttribute("aria-pressed", String(pressed))
-  button.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`
+  button.innerHTML = iconSVG(name)
   // Pressing a button must not take focus from the search field or open the row.
   button.addEventListener("mousedown", event => {
     event.preventDefault()
