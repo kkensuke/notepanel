@@ -28,9 +28,9 @@ enum Prefs {
     /// settings window. The toolbar's symbols follow it.
     static let defaultUIFontSize = 15.0
     static let uiFontSizes: [Double] = [12, 13, 14, 15, 16, 17, 18, 20]
-    /// The note panel's opacity, text included. It stops at 20%, so the panel can't get lost.
-    static let defaultPanelOpacity = 1.0
-    static let panelOpacities = 0.2...1.0
+    /// The note panel's background, not its text: 0 is clear, 1 is solid, and the default in
+    /// between is tinycast's glass and scrim.
+    static let defaultBackgroundOpacity = 0.5
     /// Global shortcuts, which work from any app.
     static let hotKeyNames = ["hotkey.toggle", "hotkey.create", "hotkey.search"]
     static let defaultShortcuts: [String: Shortcut] = [
@@ -219,7 +219,7 @@ struct SettingsView: View {
     @AppStorage("folder") private var folder = Prefs.defaultFolder
     @AppStorage("fontFamily") private var fontFamily = ""
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
-    @AppStorage("panelOpacity") private var panelOpacity = Prefs.defaultPanelOpacity
+    @AppStorage("backgroundOpacity") private var backgroundOpacity = Prefs.defaultBackgroundOpacity
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
     @AppStorage("showWhitespace") private var showWhitespace = false
     @AppStorage("indentSize") private var indentSize = 4
@@ -312,11 +312,10 @@ struct SettingsView: View {
                 }
             }
             // A slider suits this one: it doesn't resize the window, and the panel changes as it moves.
-            Slider(value: $panelOpacity, in: Prefs.panelOpacities) {
-                Text("Panel opacity")
+            // Steps of 5% let the knob land exactly on the default, in the middle.
+            Slider(value: $backgroundOpacity, in: 0...1, step: 0.05) {
+                Text("Background opacity")
             }
-            // VoiceOver reads the opacity as a percentage, not the slider's raw value.
-            .accessibilityValue(Text(verbatim: "\(Int((panelOpacity * 100).rounded()))%"))
             Toggle("Show whitespace", isOn: $showWhitespace)
             Picker("Tab key indents by", selection: $indentSize) {
                 Text("2 spaces").tag(2)
