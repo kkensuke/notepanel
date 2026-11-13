@@ -24,7 +24,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var saveIconGap: NSLayoutConstraint!
     private var buttons: [NSButton] = []
     /// The buttons, as one toolbar item.
-    private let buttonsView = NSStackView()
+    private let buttonsView = ButtonRow()
     private var previousApp: NSRunningApplication?
     private var uiFontSize: CGFloat = 15
     private var options: NSDictionary = [:]
@@ -603,8 +603,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     private func toolbarButton(_ symbol: String, _ label: String, _ action: Selector) -> NSButton {
-        let button = NSButton(title: "", target: self, action: action)
+        let button = ToolbarButton(title: "", target: self, action: action)
         button.isBordered = false
+        // Centered in the button's frame, which is wider than the symbol.
+        button.imagePosition = .imageOnly
         button.identifier = NSUserInterfaceItemIdentifier(symbol)
         button.toolTip = label
         button.setAccessibilityLabel(label)
@@ -709,6 +711,23 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 /// The note's name, with an undo history of its own. The panel's shared history may also hold
 /// WebKit's records of typing in the note, which ⌘Z in the name must not undo. The field editor
 /// asks its delegate, the field being edited, for the history to use.
+/// A toolbar button that also takes clicks a little around its symbol. Its frame reaches past the
+/// alignment rect the stack lays out, so the symbol and the row keep their places; 6 pt is half the
+/// spacing between the buttons, so neighbors meet without overlapping.
+private final class ToolbarButton: NSButton {
+    override var alignmentRectInsets: NSEdgeInsets { NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6) }
+    // The symbol's size, as before the insets, whatever AppKit makes of them.
+    override var intrinsicContentSize: NSSize { cell?.cellSize ?? super.intrinsicContentSize }
+}
+
+/// Passes on clicks on the parts of the buttons' frames that reach outside the row.
+private final class ButtonRow: NSStackView {
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        return arrangedSubviews.first { $0.frame.contains(local) } ?? super.hitTest(point)
+    }
+}
+
 private final class NameField: NSTextField {
     private let history = UndoManager()
 
