@@ -48,10 +48,17 @@ enum Prefs {
     static let backups = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("notepanel/Backups", isDirectory: true)
 
-    /// The panel's default frame set in Settings, which ⌥⌘0 goes to; nil for the standard one.
-    static var defaultFrame: NSRect? {
-        guard let stored = UserDefaults.standard.string(forKey: "defaultFrame"), !stored.isEmpty else { return nil }
-        return NSRectFromString(stored)
+    /// The frame ⌥⌘0 gives the panel on a display, set in Settings, by `NSScreen.displayKey`; nil for
+    /// the standard one. It's relative to the display's bottom-left corner, so it moves with the
+    /// display when displays are rearranged.
+    static func defaultFrame(for display: String) -> NSRect? {
+        (UserDefaults.standard.dictionary(forKey: "defaultFrames")?[display] as? String).map(NSRectFromString)
+    }
+
+    static func setDefaultFrame(_ frame: NSRect?, for display: String) {
+        var all = UserDefaults.standard.dictionary(forKey: "defaultFrames") ?? [:]
+        all[display] = frame.map(NSStringFromRect)
+        UserDefaults.standard.set(all, forKey: "defaultFrames")
     }
 
     /// A shortcut that was never set has its default; one stored as an empty string is off.
@@ -121,14 +128,23 @@ final class SettingsModel {
     let searchShortcut = ShortcutRecorder(name: "hotkey.search")
     let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", global: false)
     let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", global: false)
-    /// Makes the panel's frame now its default; set by the app, which has the panel.
+    /// The display the panel is on and its default for ⌥⌘0, and setting that default. The app sets
+    /// these, as it has the panel.
+    var describePlace: () -> DefaultPlace? = { nil }
     var useCurrentFrame: () -> Void = {}
+    var useStandardFrame: () -> Void = {}
+    private(set) var place: DefaultPlace?
     /// The fixed-pitch font families on this Mac, for the note font menu.
     private(set) var monospacedFonts: [String] = []
+
+    func refreshPlace() {
+        place = describePlace()
+    }
 
     /// The login item can be changed in System Settings too, and fonts can be installed, so both
     /// are read each time the window shows.
     func refresh() {
+        refreshPlace()
         openAtLogin = SMAppService.mainApp.status == .enabled
         let names = NSFontManager.shared.availableFontNames(with: .fixedPitchFontMask) ?? []
         // Families starting with "." are the system's own, hidden from users.
@@ -222,6 +238,15 @@ enum SettingsTab {
     case general, shortcuts
 }
 
+/// A display, as the Default place section shows it, and the size ⌥⌘0 gives the panel there.
+struct DefaultPlace {
+    var display: String
+    var builtIn: Bool
+    var size: NSSize
+    /// Set with Use Current, rather than the standard place and size.
+    var custom: Bool
+}
+
 struct SettingsView: View {
     let model: SettingsModel
     @AppStorage("folder") private var folder = Prefs.defaultFolder
@@ -231,7 +256,6 @@ struct SettingsView: View {
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
     @AppStorage("showWhitespace") private var showWhitespace = false
     @AppStorage("indentSize") private var indentSize = 4
-    @AppStorage("defaultFrame") private var defaultFrame = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -303,16 +327,33 @@ struct SettingsView: View {
                 Button("Choose…", action: chooseFolder)
             }
         }
-        // Set by placing the panel and clicking Use Current, rather than by typing numbers.
+        // Each display has its own; this shows the panel's. It's set by placing the panel and
+        // clicking Use Current, rather than by typing numbers.
         Section {
-            Text(defaultFrame.isEmpty ? "Standard: 480 × 360, centered on the screen" : "Your own, set with Use Current")
+            if let place = model.place {
+                HStack(spacing: 10) {
+                    Image(systemName: place.builtIn ? "laptopcomputer" : "display")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: place.display)
+                            .lineLimit(1)
+                        Text(verbatim: placeSummary(place))
+                            .font(.system(size: uiFontSize - 2))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         } header: {
             HStack {
-                Text("Default place (⌥⌘0)")
+                Text("Default place")
+                keysText("⌥⌘0")
+                    .foregroundStyle(.secondary)
                 Spacer()
-                Button("Use Standard") { defaultFrame = "" }
-                    .disabled(defaultFrame.isEmpty)
-                Button("Use Current") { model.useCurrentFrame() }
+                Button("Reset", action: model.useStandardFrame)
+                    .disabled(model.place?.custom != true)
+                    .help("Use the standard place on this display")
+                Button("Use Current", action: model.useCurrentFrame)
+                    .help("Use the panel’s place and size now, on this display")
             }
         }
         // The notes' text size has no control here: ⌘+, ⌘− and ⌘0 in the panel change it.
@@ -363,6 +404,12 @@ struct SettingsView: View {
                 Text(loginError).font(.caption).foregroundStyle(.red)
             }
         }
+    }
+
+    /// "Custom · 620 × 410", or "Standard · 480 × 388, centered".
+    private func placeSummary(_ place: DefaultPlace) -> String {
+        let size = "\(Int(place.size.width)) × \(Int(place.size.height))"
+        return place.custom ? "Custom · \(size)" : "Standard · \(size), centered"
     }
 
     private func chooseFolder() {

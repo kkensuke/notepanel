@@ -6,6 +6,8 @@ import NotepanelCore
 final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTextFieldDelegate {
     let store: NoteStore
     var toggleSettings: () -> Void = {}
+    /// When the panel moves to another display, whose default Settings then shows.
+    var onScreenChange: () -> Void = {}
 
     private let panel: NotePanel
     private let bridge = EditorBridge()
@@ -117,32 +119,63 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return false
     }
 
-    /// ⌥⌘0: the default frame set in Settings, or else the panel's first size, centered on its
-    /// screen. Pressed again before the panel moves or changes size, it goes back to where it was.
+    /// ⌥⌘0: the default frame set in Settings for the display with the pointer, or else the panel's
+    /// first size, centered there. Using the pointer's display brings the panel to the display in
+    /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
     private func toggleDefaultFrame() {
         if let previous = frameBeforeDefault, panel.frame == defaultFrame {
             panel.setFrame(previous, display: true)
             frameBeforeDefault = nil
             return
         }
+        let pointer = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) ?? NSScreen.main
+        else { return }
         frameBeforeDefault = panel.frame
-        // A frame set on a display that's no longer connected falls back to the standard one.
-        if let own = Prefs.defaultFrame, NSScreen.screens.contains(where: { $0.frame.contains(own) }) {
-            panel.setFrame(own, display: true)
-        } else {
-            panel.setFrame(NSRect(origin: panel.frame.origin, size: defaultSize), display: true)
-            panel.center()
-        }
+        let saved = screen.displayKey.flatMap { Prefs.defaultFrame(for: $0) }
+        panel.setFrame(
+            placeOnDisplay(saved: saved, size: defaultSize, display: screen.frame, visible: screen.visibleFrame),
+            display: true)
         defaultFrame = panel.frame
     }
 
-    /// Settings' Use Current: ⌥⌘0 will put the panel where it is now.
+    /// The display the panel is on, as Settings shows it, and its default for ⌥⌘0.
+    func defaultPlace() -> DefaultPlace? {
+        guard let screen = panelScreen, let key = screen.displayKey else { return nil }
+        let saved = Prefs.defaultFrame(for: key)
+        let builtIn = screen.displayID.map { CGDisplayIsBuiltin($0) != 0 } ?? false
+        return DefaultPlace(
+            display: screen.localizedName, builtIn: builtIn, size: saved?.size ?? defaultSize, custom: saved != nil)
+    }
+
+    /// Settings' Use Current: on the panel's display, ⌥⌘0 will put the panel where it is now.
     func useCurrentFrameAsDefault() {
-        UserDefaults.standard.set(NSStringFromRect(panel.frame), forKey: "defaultFrame")
+        guard let screen = panelScreen, let key = screen.displayKey else { return }
+        Prefs.setDefaultFrame(panel.frame.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), for: key)
+    }
+
+    /// Settings' Reset: on the panel's display, ⌥⌘0 will use the first size, centered.
+    func useStandardFrame() {
+        guard let key = panelScreen?.displayKey else { return }
+        Prefs.setDefaultFrame(nil, for: key)
+    }
+
+    /// The display most of the panel is on. Worked out from the frame, as `NSWindow.screen` may be
+    /// nil while the panel is hidden.
+    private var panelScreen: NSScreen? {
+        func overlap(_ screen: NSScreen) -> CGFloat {
+            let shared = screen.frame.intersection(panel.frame)
+            return shared.width * shared.height
+        }
+        return NSScreen.screens.filter { overlap($0) > 0 }.max { overlap($0) < overlap($1) }
     }
 
     func windowDidResize(_ notification: Notification) {
         sizeTitle()
+    }
+
+    func windowDidChangeScreen(_ notification: Notification) {
+        onScreenChange()
     }
 
     // MARK: - Settings
@@ -670,4 +703,20 @@ private final class NameField: NSTextField {
 
     @objc(undoManagerForTextView:)
     func undoManager(for view: NSTextView) -> UndoManager? { history }
+}
+
+extension NSScreen {
+    var displayID: CGDirectDisplayID? {
+        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+    }
+
+    /// The display's UUID, which lasts across restarts and reconnections, unlike its ID. Mirrored
+    /// displays all go by the one they mirror, whichever of them this screen stands for.
+    var displayKey: String? {
+        guard let id = displayID else { return nil }
+        let mirrored = CGDisplayMirrorsDisplay(id)
+        guard let uuid = CGDisplayCreateUUIDFromDisplayID(mirrored == kCGNullDirectDisplay ? id : mirrored)
+        else { return nil }
+        return CFUUIDCreateString(nil, uuid.takeRetainedValue()) as String
+    }
 }
