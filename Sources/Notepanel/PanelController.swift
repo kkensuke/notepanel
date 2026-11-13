@@ -32,9 +32,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var renamed: [String: String] = [:]
 
     private static let frameName = "Note Panel"
-    /// The panel's size before a saved frame replaces it, which ⌥⌘0 goes back to.
+    /// The panel's size before a saved frame replaces it, which ⌃⌘M goes back to.
     private var defaultSize = NSSize.zero
-    /// Where ⌥⌘0 found the panel and where it put it, so a second press, before the panel moves
+    /// Where ⌃⌘M found the panel and where it put it, so a second press, before the panel moves
     /// or changes size, takes it back.
     private var frameBeforeDefault: NSRect?
     private var defaultFrame: NSRect?
@@ -119,7 +119,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return false
     }
 
-    /// ⌥⌘0: the default frame set in Settings for the display with the pointer, or else the panel's
+    /// ⌃⌘M: the default frame set in Settings for the display with the pointer, or else the panel's
     /// first size, centered there. Using the pointer's display brings the panel to the display in
     /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
     private func toggleDefaultFrame() {
@@ -139,7 +139,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         defaultFrame = panel.frame
     }
 
-    /// The display the panel is on, as Settings shows it, and its default for ⌥⌘0.
+    /// The display the panel is on, as Settings shows it, and its default for ⌃⌘M.
     func defaultPlace() -> DefaultPlace? {
         guard let screen = panelScreen, let key = screen.displayKey else { return nil }
         let saved = Prefs.defaultFrame(for: key)
@@ -148,13 +148,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             display: screen.localizedName, builtIn: builtIn, size: saved?.size ?? defaultSize, custom: saved != nil)
     }
 
-    /// Settings' Use Current: on the panel's display, ⌥⌘0 will put the panel where it is now.
+    /// Settings' Use Current: on the panel's display, ⌃⌘M will put the panel where it is now.
     func useCurrentFrameAsDefault() {
         guard let screen = panelScreen, let key = screen.displayKey else { return }
         Prefs.setDefaultFrame(panel.frame.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), for: key)
     }
 
-    /// Settings' Reset: on the panel's display, ⌥⌘0 will use the first size, centered.
+    /// Settings' Reset: on the panel's display, ⌃⌘M will use the first size, centered.
     func useStandardFrame() {
         guard let key = panelScreen?.displayKey else { return }
         Prefs.setDefaultFrame(nil, for: key)

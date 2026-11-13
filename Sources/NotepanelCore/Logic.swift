@@ -60,7 +60,7 @@ public func validNoteName(_ proposed: String) -> String? {
     return name
 }
 
-/// Where ⌥⌘0 puts the panel on a display, given the display's frame and its visible area (without
+/// Where ⌃⌘M puts the panel on a display, given the display's frame and its visible area (without
 /// the menu bar and the Dock). A frame saved for the display, relative to its bottom-left corner,
 /// is moved inside it if the display has become smaller; one bigger than the display, or none,
 /// gives `size`, centered.

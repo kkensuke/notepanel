@@ -39,7 +39,7 @@ final class NotePanel: NSPanel {
             onZoom(step)
             return true
         }
-        if modifiers == [.command, .option], event.charactersIgnoringModifiers == "0" {
+        if modifiers == [.command, .control], event.charactersIgnoringModifiers?.lowercased() == "m" {
             if !event.isARepeat { onDefaultFrame() }
             return true
         }
