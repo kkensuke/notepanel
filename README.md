@@ -30,9 +30,25 @@ other editor, sync them or back them up as you like.
 
 ## Install
 
-You need macOS 14 Sonoma or later, and Swift 5.10 or later. The Command Line Tools are enough
-(`xcode-select --install`); you don't need Xcode. There are no prebuilt downloads yet, so you build
-the app yourself:
+You need macOS 14 Sonoma or later. Install notepanel with [Homebrew](https://brew.sh):
+
+```sh
+brew install kkensuke/tap/notepanel
+open /Applications/notepanel.app
+```
+
+The app is signed ad hoc, not notarized by Apple, so macOS would refuse to open it; Homebrew
+removes its quarantine flag after installing it.
+
+notepanel lives in the menu bar, as a note icon, and has no Dock icon. The shortcut needs no
+Accessibility permission. To start notepanel when you log in, turn on **Open at login** in Settings.
+
+To update, run `brew upgrade notepanel`. It quits notepanel first, so open it again afterwards.
+
+### Building it yourself
+
+You need Swift 5.10 or later. The Command Line Tools are enough (`xcode-select --install`); you
+don't need Xcode.
 
 ```sh
 git clone https://github.com/kkensuke/notepanel.git
@@ -41,9 +57,6 @@ scripts/bundle.sh                         # builds build/notepanel.app
 cp -R build/notepanel.app /Applications/
 open /Applications/notepanel.app
 ```
-
-notepanel lives in the menu bar, as a note icon, and has no Dock icon. The shortcut needs no
-Accessibility permission. To start notepanel when you log in, turn on **Open at login** in Settings.
 
 To update, run `git pull` and `scripts/bundle.sh` again, quit notepanel (`Cmd+Q` in the
 panel), copy the new app to `/Applications`, and open it.
@@ -165,11 +178,12 @@ Editing:
   Settings → Shortcuts.
 - **I need an earlier version of a note.** Right-click the menu bar icon and choose Open Backups
   Folder. Each backup is named with the date and time, then the note's name.
-- **Uninstalling.** Turn off Open at login, quit notepanel, and delete
-  `/Applications/notepanel.app`. Its settings are
-  removed with `defaults delete io.github.kkensuke.notepanel`. The folder
+- **Uninstalling.** Turn off Open at login, then run `brew uninstall notepanel`, which also quits
+  notepanel. If you built the app yourself, quit notepanel and delete `/Applications/notepanel.app`.
+  Its settings are removed with `defaults delete io.github.kkensuke.notepanel`. The folder
   `~/Library/Application Support/notepanel` holds the backups and, unless you chose another
   folder, your notes: keep it, or move your notes out before deleting it.
+  `brew uninstall --zap notepanel` removes the settings and the backups, but not the notes.
 
 ## Development
 
@@ -201,6 +215,22 @@ cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Ma
 comes only with Xcode. The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't
 in `/Applications`. To inspect the editor page in the running app, enable Safari's Develop menu;
 notepanel's page is listed there.
+
+### Releases
+
+A `vX.Y.Z` tag on `main` publishes a release. `.github/workflows/release.yml` builds the app for
+Apple silicon and Intel, attaches `notepanel-X.Y.Z.zip` to a GitHub release, and pushes
+`Casks/notepanel.rb` to [kkensuke/homebrew-tap](https://github.com/kkensuke/homebrew-tap). The tag
+must match `version` in `scripts/bundle.sh`, so set that on `main` first, then:
+
+```sh
+git tag -s vX.Y.Z -m "notepanel X.Y.Z"
+git push origin vX.Y.Z
+```
+
+`ARCHS="arm64 x86_64" scripts/bundle.sh` builds the same universal app locally. The workflow pushes
+to the tap with the secret `HOMEBREW_TAP_TOKEN` of the GitHub environment `release`: a
+fine-grained token with read and write access to the contents of `homebrew-tap` only.
 
 ## Credits
 
