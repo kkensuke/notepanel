@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// `Untitled`, `Untitled 2` and so on: the names new notes get.
