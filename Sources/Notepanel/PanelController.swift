@@ -28,6 +28,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var renamed: [String: String] = [:]
 
     private static let frameName = "Note Panel"
+    /// The panel's size before a saved frame replaces it, which ⌥⌘0 goes back to.
+    private var defaultSize = NSSize.zero
+    /// Where ⌥⌘0 found the panel and where it put it, so a second press, before the panel moves
+    /// or changes size, takes it back.
+    private var frameBeforeDefault: NSRect?
+    private var defaultFrame: NSRect?
 
     private enum Item {
         static let title = NSToolbarItem.Identifier("title")
@@ -109,6 +115,20 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         hide()
         return false
+    }
+
+    /// ⌥⌘0: the panel's first size, centered on its screen. Pressed again before the panel moves or
+    /// changes size, it goes back to where it was.
+    private func toggleDefaultFrame() {
+        if let previous = frameBeforeDefault, panel.frame == defaultFrame {
+            panel.setFrame(previous, display: true)
+            frameBeforeDefault = nil
+        } else {
+            frameBeforeDefault = panel.frame
+            panel.setFrame(NSRect(origin: panel.frame.origin, size: defaultSize), display: true)
+            panel.center()
+            defaultFrame = panel.frame
+        }
     }
 
     func windowDidResize(_ notification: Notification) {
@@ -393,6 +413,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         bridge.webView.setValue(false, forKey: "drawsBackground")
         panel.contentView = background(behind: bridge.webView)
         panel.onZoom = { [weak self] step in self?.zoom(step) }
+        panel.onDefaultFrame = { [weak self] in self?.toggleDefaultFrame() }
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
             "p": { [weak self] in self?.toggleSwitcher() },
@@ -455,6 +476,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.toolbarStyle = .unifiedCompact
 
         // The panel keeps the size the user gives it; nothing resizes it to fit a note.
+        defaultSize = panel.frame.size
         if !panel.setFrameUsingName(Self.frameName) { panel.center() }
         panel.setFrameAutosaveName(Self.frameName)
     }
