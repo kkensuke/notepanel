@@ -19,7 +19,7 @@ import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 import {syntaxHighlighting, HighlightStyle, indentUnit} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
-import {rankNotes, urlAt, linkAt, listIndent, insertLineAbove, countCharacters} from "./logic.js"
+import {rankNotes, urlAt, linkAt, listIndent, insertLineAbove, toggleMark, insertLink, countCharacters} from "./logic.js"
 
 // Outside the app (in a plain browser) there is no handler, so nothing is sent.
 const post = (type, data = {}) => window.webkit?.messageHandlers?.native?.postMessage({type, ...data})
@@ -190,6 +190,10 @@ function linkButtons(view, url, urlFrom) {
   }
 }
 
+// A key's command for an edit from logic.js, which takes the state and returns the transaction.
+const run = edit => view => (view.dispatch(edit(view.state)), true)
+const mark = text => run(state => toggleMark(state, text))
+
 const extensions = [
   history(),
   drawSelection(),
@@ -209,7 +213,13 @@ const extensions = [
   settings.of(settingsExtensions()),
   keymap.of([
     {key: "Mod-l", run: selectLine, preventDefault: true},
-    {key: "Mod-Shift-Enter", run: view => (view.dispatch(insertLineAbove(view.state)), true)},
+    {key: "Mod-Shift-Enter", run: run(insertLineAbove)},
+    {key: "Mod-b", run: mark("**")},
+    // Ahead of the default ⌘I, which selects the enclosing syntax node.
+    {key: "Mod-i", run: mark("*")},
+    {key: "Mod-Shift-x", run: mark("~~")},
+    {key: "Mod-e", run: mark("`")},
+    {key: "Mod-k", run: run(insertLink)},
     ...defaultKeymap,
     ...historyKeymap,
     ...searchKeymap,

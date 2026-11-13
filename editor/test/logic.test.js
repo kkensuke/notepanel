@@ -1,7 +1,30 @@
 import {test} from "node:test"
 import assert from "node:assert/strict"
 import {EditorState, EditorSelection} from "@codemirror/state"
-import {fuzzyScore, rankNotes, urlAt, linkAt, listIndent, insertLineAbove, countCharacters} from "../src/logic.js"
+import {
+  fuzzyScore,
+  rankNotes,
+  urlAt,
+  linkAt,
+  listIndent,
+  insertLineAbove,
+  toggleMark,
+  insertLink,
+  countCharacters,
+} from "../src/logic.js"
+
+// Runs an edit on `doc`, whose selection is written as "|" (a cursor) or a "|" at each end, and
+// returns the result written the same way.
+function edited(edit, doc) {
+  const [from, to = from] = [...doc.matchAll(/\|/g)].map((m, i) => m.index - i)
+  const state = EditorState.create({doc: doc.replaceAll("|", ""), selection: EditorSelection.range(from, to)})
+  const next = edit(state).state
+  const {from: a, to: b} = next.selection.main
+  const text = next.doc.toString()
+  return text.slice(0, a) + "|" + (a === b ? "" : text.slice(a, b) + "|") + text.slice(b)
+}
+const bold = state => toggleMark(state, "**")
+const italic = state => toggleMark(state, "*")
 
 test("fuzzyScore matches characters in order and prefers runs", () => {
   assert.equal(fuzzyScore("xyz", "meeting notes"), null)
@@ -67,6 +90,48 @@ test("insertLineAbove keeps indentation and moves the cursor up", () => {
   const next = insertLineAbove(state).state
   assert.equal(next.doc.toString(), "a\n  \n  b")
   assert.equal(next.selection.main.head, 4)
+})
+
+test("toggleMark wraps a selection, and a second press takes the mark away", () => {
+  assert.equal(edited(bold, "a |b| c"), "a **|b|** c")
+  assert.equal(edited(bold, "a **|b|** c"), "a |b| c")
+  assert.equal(edited(bold, "a |**b**| c"), "a |b| c")
+  assert.equal(edited(state => toggleMark(state, "~~"), "これは|取り消し|です"), "これは~~|取り消し|~~です")
+  assert.equal(edited(state => toggleMark(state, "`"), "`|code|`"), "|code|")
+})
+
+test("toggleMark leaves spaces and line breaks at the selection's ends outside", () => {
+  assert.equal(edited(bold, "a| b |c"), "a **|b|** c")
+  assert.equal(edited(bold, "|line\n|next"), "**|line|**\nnext")
+})
+
+test("toggleMark gives a cursor an empty pair, and takes it away again", () => {
+  assert.equal(edited(bold, "a|"), "a**|**")
+  assert.equal(edited(bold, "a**|**"), "a|")
+  assert.equal(edited(italic, "a*|*"), "a|")
+})
+
+test("toggleMark tells italic from bold", () => {
+  assert.equal(edited(italic, "**|b|**"), "***|b|***")
+  assert.equal(edited(italic, "***|b|***"), "**|b|**")
+  assert.equal(edited(italic, "|**b**|"), "*|**b**|*")
+  assert.equal(edited(bold, "*|b|*"), "***|b|***")
+  assert.equal(edited(bold, "***|b|***"), "*|b|*")
+})
+
+test("toggleMark changes every selection", () => {
+  const state = EditorState.create({
+    doc: "a b",
+    selection: EditorSelection.create([EditorSelection.range(0, 1), EditorSelection.range(2, 3)]),
+    extensions: EditorState.allowMultipleSelections.of(true),
+  })
+  assert.equal(bold(state).state.doc.toString(), "**a** **b**")
+})
+
+test("insertLink puts the cursor where the URL or the text goes", () => {
+  assert.equal(edited(insertLink, "see |docs|"), "see [docs](|)")
+  assert.equal(edited(insertLink, "see |https://example.com/a|"), "see [|](https://example.com/a)")
+  assert.equal(edited(insertLink, "see |"), "see [|]()")
 })
 
 test("countCharacters counts graphemes and skips line breaks", () => {

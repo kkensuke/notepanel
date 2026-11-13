@@ -91,6 +91,27 @@ await press("z", ["Meta"])
 await press("ArrowUp", ["Alt"])
 assert.equal(await changedText(), "  c\na\n  b")
 
+// Cmd-B, Cmd-I (ahead of CodeMirror's own Cmd-I), Shift-Cmd-X and Cmd-E wrap the selection,
+// and press again unwraps it; Cmd-K makes it a link's text.
+await receive("open", {id: "Marks", text: "word"})
+await page.click(".cm-content")
+await press("a", ["Meta"])
+await press("b", ["Meta"])
+assert.equal(await changedText(), "**word**")
+await press("i", ["Meta"])
+assert.equal(await changedText(), "***word***")
+await press("b", ["Meta"])
+await press("i", ["Meta"])
+assert.equal(await changedText(), "word")
+await press("x", ["Meta", "Shift"])
+await press("e", ["Meta"])
+assert.equal(await changedText(), "~~`word`~~")
+await press("z", ["Meta"])
+await press("z", ["Meta"])
+await press("k", ["Meta"])
+await page.keyboard.type("u")
+assert.equal(await changedText(), "[word](u)")
+
 // Switching back to a note keeps its undo history.
 await receive("open", {id: "Untitled", text: "one\n\n\nfour"})
 await page.click(".cm-content")
