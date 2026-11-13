@@ -108,12 +108,23 @@ private struct KeysView: View {
 
     private func rows(_ keys: [(String, String)]) -> some View {
         ForEach(keys.indices, id: \.self) { i in
-            LabeledContent(keys[i].0) { Text(verbatim: keys[i].1) }
+            LabeledContent(keys[i].0) { keysText(keys[i].1) }
         }
     }
 
     /// A shortcut that can be changed in Settings, as it's set now.
     private func setting(_ does: String, _ name: String) -> some View {
-        LabeledContent(does) { Text(verbatim: Prefs.shortcut(name)?.display ?? "Off") }
+        LabeledContent(does) { keysText(Prefs.shortcut(name)?.display ?? "Off") }
     }
+}
+
+/// Keys as text, with a slashed zero so that ⌥⌘0 doesn't read as ⌥⌘O. The zero takes the font's
+/// fixed-width variant: SF Mono slashes its zero, SF Pro doesn't.
+func keysText(_ keys: String) -> Text {
+    let parts = keys.split(separator: "0", omittingEmptySubsequences: false)
+    var text = Text(verbatim: String(parts[0]))
+    for part in parts.dropFirst() {
+        text = Text("\(text)\(Text(verbatim: "0").monospaced())\(Text(verbatim: String(part)))")
+    }
+    return text
 }
