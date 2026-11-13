@@ -305,13 +305,10 @@ struct SettingsView: View {
         }
         // Set by placing the panel and clicking Use Current, rather than by typing numbers.
         Section {
-            Text(
-                defaultFrame.isEmpty
-                    ? "Standard: 480 × 360, in the middle of the screen"
-                    : "Your own: where the panel was when you clicked Use Current")
+            Text(defaultFrame.isEmpty ? "Standard: 480 × 360, centered on the screen" : "Your own, set with Use Current")
         } header: {
             HStack {
-                Text("Default place and size (⌥⌘0)")
+                Text("Default place (⌥⌘0)")
                 Spacer()
                 Button("Use Standard") { defaultFrame = "" }
                     .disabled(defaultFrame.isEmpty)
