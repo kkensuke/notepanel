@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Checks
+        run: swift run NotepanelChecks
+      - name: Universal app
+        run: |
+          ARCHS="arm64 x86_64" scripts/bundle.sh
+          lipo build/notepanel.app/Contents/MacOS/notepanel -verify_arch arm64 x86_64
+          codesign --verify --strict build/notepanel.app
+          du -sh build/notepanel.app

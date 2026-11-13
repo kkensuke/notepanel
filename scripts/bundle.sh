@@ -5,13 +5,17 @@ cd "$(dirname "$0")/.."
 
 version="0.1.0" # The release workflow checks that the tag matches this.
 
-swift build -c release --product Notepanel
-bin="$(swift build -c release --show-bin-path)"
+# ARCHS="arm64 x86_64" builds a universal app, as the release workflow does.
+set --
+for arch in ${ARCHS:-$(uname -m)}; do
+    swift build -c release --product Notepanel --arch "$arch"
+    set -- "$@" "$(swift build -c release --arch "$arch" --show-bin-path)/Notepanel"
+done
 app="build/notepanel.app"
 
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp "$bin/Notepanel" "$app/Contents/MacOS/notepanel"
+lipo -create "$@" -output "$app/Contents/MacOS/notepanel"
 cp -R web "$app/Contents/Resources/web"
 cat > "$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
