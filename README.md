@@ -1,5 +1,7 @@
 # notepanel
 
+English | [日本語](README.ja.md)
+
 A floating notepad for macOS. Press `Ctrl+Cmd+N` in any app, even one in full screen, and a
 note panel appears on top of it. Edits (like VS Code), press `Ctrl+Cmd+N` again (or `Cmd+W`, `Esc`), and you're back in the app you were
 using.

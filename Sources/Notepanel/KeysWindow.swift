@@ -33,7 +33,7 @@ enum KeysWindow {
     }
 }
 
-// Keep these in step with the Keys section of the README.
+// Keep these in step with the Keys sections of README.md and README.ja.md.
 
 private let windowKeys = [
     ("Open or close Settings", "⌘,"),
