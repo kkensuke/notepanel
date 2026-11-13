@@ -90,8 +90,8 @@ open notepanel again from Finder or Spotlight.
   you choose another folder in Settings. notepanel lists the `.md` files at the top of that folder,
   not in subfolders. Choosing another folder doesn't move your notes.
 - **Saving.** Text is saved 0.3 seconds after you stop typing, and at once when you hide the
-  panel, switch notes or quit. The icon left of the note's name shows a pencil while the text isn't
-  saved yet and a check once it is. If a save fails, the icon turns into a red warning, the bottom
+  panel, switch notes or quit. The icon left of the note's name shows a dashed circle while the text
+  isn't saved yet and a checked circle once it is. If a save fails, the icon turns into a red warning, the bottom
   of the panel says why, the text stays in notepanel, and quitting asks before it drops anything.
 - **Changes from other apps.** notepanel reads a note again when you show the panel or open the
   note. If the file changed on disk while you had unsaved text, your text goes to a separate copy
