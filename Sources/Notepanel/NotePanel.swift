@@ -7,6 +7,8 @@ final class NotePanel: NSPanel {
     var commands: [String: () -> Void] = [:]
     /// Cmd-plus and Cmd-minus (+1 and -1, repeating while held) and Cmd-0 (0, to reset).
     var onZoom: (Int) -> Void = { _ in }
+    /// Option-Cmd-0: the panel's default size and place, and back. It doesn't repeat while held.
+    var onDefaultFrame: () -> Void = {}
     /// Shortcuts set in Settings that work only while the panel is key, such as cycling through
     /// notes. They repeat while held. They're taken before AppKit routes the key, so one can be any
     /// key, even Control-Tab, which AppKit would otherwise use to move the focus to the title.
@@ -35,6 +37,10 @@ final class NotePanel: NSPanel {
             let step = Self.zoomSteps[key]
         {
             onZoom(step)
+            return true
+        }
+        if modifiers == [.command, .option], event.charactersIgnoringModifiers == "0" {
+            if !event.isARepeat { onDefaultFrame() }
             return true
         }
         // With Shift, a command is looked up by the character typed, such as "?" for ⇧⌘/.
