@@ -77,6 +77,7 @@ private let editingKeys = [
     ("Strikethrough / code", "⇧⌘X / ⌘E"),
     ("Make a link", "⌘K"),
     ("Open a link", "⌘-click"),
+    ("Tick or clear a task", "Click [ ] or [x]"),
 ]
 
 private struct KeysView: View {
