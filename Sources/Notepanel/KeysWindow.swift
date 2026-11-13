@@ -48,6 +48,7 @@ private let panelKeys = [
     ("Open the notes folder", "⌘O"),
     ("Bigger / smaller note text", "⌘+ / ⌘−"),
     ("Default note text size", "⌘0"),
+    ("Default place and size, and back", "⌥⌘0"),
     ("Hide", "⌘W or Esc"),
 ]
 
