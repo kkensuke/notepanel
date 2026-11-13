@@ -11,6 +11,15 @@ public enum NoteStoreError: Error, Equatable {
     case exists
 }
 
+/// Whether the open note's text is on disk, for the icon beside the title.
+public enum SaveState {
+    case saved
+    /// Typed but not written yet; a save is on its way.
+    case editing
+    /// The last write failed; the next edit or flush tries again.
+    case failed
+}
+
 /// Notes are the `.md` files directly inside `folder`, and a file's name is its note's name.
 ///
 /// Losing text is the worst failure, so text only ever moves forward:
@@ -34,13 +43,17 @@ public final class NoteStore {
     /// A note has a new name: the user renamed it, it followed its first line, or its text was
     /// saved to a conflict copy, which is the open note from then on.
     public var onRenamed: (_ from: String, _ to: String) -> Void = { _, _ in }
+    public var onSaveState: (SaveState) -> Void = { _ in }
+    public private(set) var saveState = SaveState.saved {
+        didSet { if saveState != oldValue { onSaveState(saveState) } }
+    }
 
     private struct Stamp: Equatable {
         let date: Date
         let size: Int
     }
 
-    private var dirty = false
+    private var dirty: Bool { saveState != .saved }
     private var stamp: Stamp?
     /// The open note's text as last read from or written to its file.
     private var savedText = ""
@@ -96,7 +109,7 @@ public final class NoteStore {
         current = name
         text = content
         savedText = content
-        dirty = false
+        saveState = .saved
         stamp = fileStamp(name)
         return content
     }
@@ -104,7 +117,7 @@ public final class NoteStore {
     public func edit(_ newText: String) {
         guard current != nil, newText != text else { return }
         text = newText
-        dirty = true
+        saveState = .editing
         pending?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.flush() }
         pending = work
@@ -127,11 +140,12 @@ public final class NoteStore {
             try Data(text.utf8).write(to: url(target), options: .atomic)
         } catch {
             // Still dirty, so the next edit or flush tries again.
+            saveState = .failed
             report("Couldn’t save: \(error.localizedDescription)")
             return
         }
         let follows = followsFirstLine(name: name, savedText: savedText)
-        dirty = false
+        saveState = .saved
         savedText = text
         stamp = fileStamp(target)
         if target != name {
@@ -169,7 +183,7 @@ public final class NoteStore {
         current = name
         text = ""
         savedText = ""
-        dirty = false
+        saveState = .saved
         stamp = fileStamp(name)
         return name
     }
@@ -278,7 +292,7 @@ public final class NoteStore {
         current = nil
         text = ""
         savedText = ""
-        dirty = false
+        saveState = .saved
         stamp = nil
     }
 

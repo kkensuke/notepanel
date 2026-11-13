@@ -15,6 +15,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var backgroundOpacity: Double?
     private let titleField = NSTextField(string: "")
     private var titleWidth: NSLayoutConstraint!
+    /// The save icon and the name, as one toolbar item.
+    private let titleView = NSView()
+    private let saveIcon = NSImageView()
+    private var saveIconWidth: NSLayoutConstraint!
+    private var saveIconGap: NSLayoutConstraint!
     private var buttons: [NSToolbarItem.Identifier: NSButton] = [:]
     private var previousApp: NSRunningApplication?
     private var uiFontSize: CGFloat = 15
@@ -41,6 +46,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         configurePanel()
         store.onStatus = { [weak self] message in self?.bridge.send("status", message ?? "") }
         store.onRenamed = { [weak self] from, to in self?.noteRenamed(from, to) }
+        store.onSaveState = { [weak self] state in self?.showSaveState(state) }
         bridge.onMessage = { [weak self] type, body in self?.handle(type, body) }
     }
 
@@ -414,7 +420,23 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         titleField.setAccessibilityLabel("Note name")
         // An editable field has no width of its own, so it's sized to its name.
         titleWidth = titleField.widthAnchor.constraint(equalToConstant: 120)
-        titleWidth.isActive = true
+        // Left of the name, whether its text is saved. The icon keeps one width for every
+        // symbol, so the name doesn't move when the symbol changes.
+        saveIcon.imageScaling = .scaleNone
+        for view in [saveIcon, titleField] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            titleView.addSubview(view)
+        }
+        saveIconWidth = saveIcon.widthAnchor.constraint(equalToConstant: uiFontSize)
+        saveIconGap = titleField.leadingAnchor.constraint(equalTo: saveIcon.trailingAnchor)
+        NSLayoutConstraint.activate([
+            titleWidth, saveIconWidth, saveIconGap,
+            saveIcon.leadingAnchor.constraint(equalTo: titleView.leadingAnchor),
+            saveIcon.centerYAnchor.constraint(equalTo: titleField.centerYAnchor),
+            titleField.trailingAnchor.constraint(equalTo: titleView.trailingAnchor),
+            titleField.topAnchor.constraint(equalTo: titleView.topAnchor),
+            titleField.bottomAnchor.constraint(equalTo: titleView.bottomAnchor),
+        ])
         buttons = [
             Item.new: toolbarButton("square.and.pencil", "New Note (⌘N)", #selector(newNoteClicked)),
             Item.browse: toolbarButton("list.bullet", "Browse Notes (⌘P)", #selector(browseClicked)),
@@ -494,7 +516,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     ) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         if identifier == Item.title {
-            item.view = titleField
+            item.view = titleView
         } else if let button = buttons[identifier] {
             item.view = button
             item.label = button.toolTip ?? ""
@@ -522,7 +544,24 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: button.toolTip)?
                 .withSymbolConfiguration(configuration)
         }
+        saveIconWidth.constant = uiFontSize
+        showSaveState(store.saveState)
         sizeTitle()
+    }
+
+    /// A pencil while the text isn't saved yet, a check once it is, and a red warning if saving
+    /// failed (the footer says why).
+    private func showSaveState(_ state: SaveState) {
+        let (symbol, label): (String, String) =
+            switch state {
+            case .saved: ("checkmark", "Saved")
+            case .editing: ("pencil", "Not saved yet")
+            case .failed: ("exclamationmark.triangle", "Couldn’t save")
+            }
+        saveIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: uiFontSize, weight: .regular, scale: .small))
+        saveIcon.contentTintColor = state == .failed ? .systemRed : .secondaryLabelColor
+        saveIcon.toolTip = label
     }
 
     @objc private func newNoteClicked() { newNote() }
@@ -542,12 +581,17 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// Leaves room on both sides for the buttons (wider than the traffic lights), so a long name
     /// stays centered and ends in "…" instead of pushing the buttons into the overflow menu.
     private func sizeTitle() {
-        let width = (titleField.attributedStringValue.size().width + 16).rounded(.up)
+        let text = titleField.attributedStringValue.size().width
+        let width = (text + 16).rounded(.up)
+        let gap: CGFloat = 5
         // shortcut: spacing taken from one screenshot (about 12 pt per button, plus 8 pt to keep a
         // gap before the title); measure the laid-out buttons if another macOS spaces them wider.
         let buttonsWidth = buttons.values.map { $0.fittingSize.width + 12 }.reduce(8, +)
-        let room = panel.frame.width - 2 * buttonsWidth
+        let room = panel.frame.width - 2 * buttonsWidth - saveIconWidth.constant - gap
         titleWidth.constant = max(0, min(max(width, 80), 360, room))
+        // The name is centered in its field, so the icon moves in over the space left of it and
+        // stays `gap` from the text, also when a short name leaves the field wider than the text.
+        saveIconGap.constant = gap - max(0, titleWidth.constant - text) / 2
     }
 
     /// Ends typing in the title before another note opens, so the name goes to the note it was
