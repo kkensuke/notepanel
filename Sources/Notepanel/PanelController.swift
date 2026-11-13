@@ -582,6 +582,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         let item = NSToolbarItem(itemIdentifier: identifier)
         if identifier == Item.title {
             item.view = titleView
+            // From macOS 26 every toolbar item sits on glass, which makes the name look like a button.
+            item.isBordered = false
         } else if let button = buttons[identifier] {
             item.view = button
             item.label = button.toolTip ?? ""
