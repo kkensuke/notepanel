@@ -95,6 +95,27 @@ equal(validNoteName(String(repeating: "\u{3042}", count: 81)), nil)
 let date = DateComponents(calendar: Calendar(identifier: .gregorian), year: 2026, month: 11, day: 7, hour: 15, minute: 30)
 equal(conflictName("Plan", date: date.date!), "Plan (conflict 2026-11-07 1530)")
 
+// MARK: - Default place
+
+// A display to the right of the main one, with the Dock along its bottom.
+let display = CGRect(x: 1440, y: 0, width: 1920, height: 1080)
+let visible = CGRect(x: 1440, y: 70, width: 1920, height: 985)
+let firstSize = CGSize(width: 480, height: 388)
+let centered = CGRect(x: 2160, y: 369, width: 480, height: 388)
+// A saved frame moves with its display.
+equal(
+    placeOnDisplay(saved: CGRect(x: 100, y: 200, width: 600, height: 400), size: firstSize, display: display, visible: visible),
+    CGRect(x: 1540, y: 200, width: 600, height: 400))
+// One that no longer fits, after the display got smaller, is moved inside.
+equal(
+    placeOnDisplay(saved: CGRect(x: 1500, y: 800, width: 600, height: 400), size: firstSize, display: display, visible: visible),
+    CGRect(x: 2760, y: 680, width: 600, height: 400))
+// One bigger than the display, or none, gives the first size, centered.
+equal(
+    placeOnDisplay(saved: CGRect(x: 0, y: 0, width: 2000, height: 400), size: firstSize, display: display, visible: visible),
+    centered)
+equal(placeOnDisplay(saved: nil, size: firstSize, display: display, visible: visible), centered)
+
 // MARK: - NoteStore
 
 inFolder { folder in
