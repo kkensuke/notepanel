@@ -92,6 +92,70 @@ export function insertLineAbove(state) {
   )
 }
 
+// A selection without the spaces and line breaks at its ends (⌘L selects the line break too),
+// since Markdown doesn't read `** b **` as bold.
+function trimmed(state, range) {
+  const text = state.sliceDoc(range.from, range.to)
+  const from = range.to - text.trimStart().length
+  return {from, to: Math.max(from, range.from + text.trimEnd().length)}
+}
+
+// ⌘B and the like: wraps each selection in `mark` ("**", "*", "~~" or "`"), or takes the mark
+// away where it's already just outside the selection or at its ends. A cursor gets an empty pair
+// to type in, or loses the empty pair it's in.
+// shortcut: a selection over several lines gets one pair, which Markdown ignores across a blank
+// line or list items; wrap each line if that comes up.
+export function toggleMark(state, mark) {
+  const size = mark.length
+  const leading = new RegExp(`^\\${mark[0]}*`)
+  const trailing = new RegExp(`\\${mark[0]}*$`)
+  // One * is italic and two are bold, so *** is both and ** isn't italic.
+  const has = run => (mark === "*" ? run % 2 === 1 : run >= size)
+  return state.update(
+    state.changeByRange(range => {
+      const {from, to} = trimmed(state, range)
+      const before = trailing.exec(state.sliceDoc(Math.max(0, from - 3), from))[0].length
+      const after = leading.exec(state.sliceDoc(to, Math.min(state.doc.length, to + 3)))[0].length
+      if (has(Math.min(before, after)))
+        return {
+          changes: [{from: from - size, to: from}, {from: to, to: to + size}],
+          range: EditorSelection.range(from - size, to - size),
+        }
+      const text = state.sliceDoc(from, to)
+      const start = leading.exec(text)[0].length
+      const end = trailing.exec(text)[0].length
+      if (start + end < text.length && has(Math.min(start, end)))
+        return {
+          changes: [{from, to: from + size}, {from: to - size, to}],
+          range: EditorSelection.range(from, to - 2 * size),
+        }
+      return {
+        changes: [{from, insert: mark}, {from: to, insert: mark}],
+        range: EditorSelection.range(from + size, to + size),
+      }
+    }),
+    {scrollIntoView: true, userEvent: "input"},
+  )
+}
+
+// ⌘K: makes each selection a link's text, with the cursor where the URL goes. A selected URL
+// becomes the link's target instead, and a cursor an empty link; then the cursor goes where the
+// text goes.
+export function insertLink(state) {
+  return state.update(
+    state.changeByRange(range => {
+      const {from, to} = trimmed(state, range)
+      const text = state.sliceDoc(from, to)
+      const isURL = /^(?:https?:\/\/|mailto:)\S+$/.test(text)
+      return {
+        changes: {from, to, insert: isURL ? `[](${text})` : `[${text}]()`},
+        range: EditorSelection.cursor(from + (isURL || !text ? 1 : text.length + 3)),
+      }
+    }),
+    {scrollIntoView: true, userEvent: "input"},
+  )
+}
+
 // Characters as people count them (grapheme clusters), without line breaks.
 const segmenter = new Intl.Segmenter()
 export function countCharacters(text) {
