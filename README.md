@@ -14,6 +14,7 @@ other editor, sync them or back them up as you like.
 - **Opens over everything.** The panel floats above other windows, full-screen apps included, on
   every Space. Showing it doesn't switch apps: the app you were in stays active, and gets the focus
   back when you hide the panel.
+- **Small and light.** The app is about 1.4 MB.
 - **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
   rectangular selection, moving and copying lines, and find and replace. It also highlights
   Markdown, continues lists when you press `Return`, and adds or removes bold, italic and other
@@ -63,6 +64,9 @@ panel), copy the new app to `/Applications`, and open it.
   characters: one opens it, the other copies the URL.
 - **Tasks.** Click the box of a task (`- [ ]` or `- [x]`) to tick or clear it. The box stays as
   text; `Cmd+Z` undoes the click.
+- **Dropping files.** Drop a text file, such as a Markdown file, on the note to insert its text
+  where you drop it. The file itself isn't opened or changed. Several files go in on separate
+  lines, and files that aren't text are skipped. `Cmd+Z` undoes it.
 - **Menu.** Right-click the menu bar icon (or Control-click it) for New Note, Search Notes,
   Settings, Keyboard Shortcuts, the backups folder and Quit. Each item shows its key in the panel.
 - **Keys.** `Shift+Cmd+/` in the panel lists all the keys. The list is also in Settings →
