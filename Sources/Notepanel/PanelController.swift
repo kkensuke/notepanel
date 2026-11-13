@@ -170,6 +170,15 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return NSScreen.screens.filter { overlap($0) > 0 }.max { overlap($0) < overlap($1) }
     }
 
+    /// Narrows the name before the toolbar lays out the new width: narrowed only afterwards, a long
+    /// name leaves the buttons no room for a moment when the panel shrinks fast, and they start to
+    /// move into the overflow menu. AppKit calls this as the user drags, but not for
+    /// setFrame(_:display:), which windowDidResize covers.
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        sizeTitle(panelWidth: frameSize.width)
+        return frameSize
+    }
+
     func windowDidResize(_ notification: Notification) {
         sizeTitle()
     }
@@ -647,14 +656,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     /// Leaves room on both sides for the buttons (wider than the traffic lights), so a long name
     /// stays centered and ends in "…" instead of pushing the buttons into the overflow menu.
-    private func sizeTitle() {
+    private func sizeTitle(panelWidth: CGFloat? = nil) {
         let text = titleField.attributedStringValue.size().width
         let width = (text + 16).rounded(.up)
         let gap: CGFloat = 5
         // shortcut: margins taken from one screenshot (about 20 pt for the toolbar's edge and a gap
         // before the title); measure the laid-out buttons if another macOS sets them wider.
         let buttonsWidth = buttonsView.fittingSize.width + 20
-        let room = panel.frame.width - 2 * buttonsWidth - saveIconWidth.constant - gap
+        let room = (panelWidth ?? panel.frame.width) - 2 * buttonsWidth - saveIconWidth.constant - gap
         titleWidth.constant = max(0, min(max(width, 80), 360, room))
         // The name is centered in its field, so the icon moves in over the space left of it and
         // stays `gap` from the text, also when a short name leaves the field wider than the text.
