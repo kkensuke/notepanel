@@ -59,6 +59,21 @@ public func validNoteName(_ proposed: String) -> String? {
     return name
 }
 
+/// Where ⌥⌘0 puts the panel on a display, given the display's frame and its visible area (without
+/// the menu bar and the Dock). A frame saved for the display, relative to its bottom-left corner,
+/// is moved inside it if the display has become smaller; one bigger than the display, or none,
+/// gives `size`, centered.
+public func placeOnDisplay(saved: CGRect?, size: CGSize, display: CGRect, visible: CGRect) -> CGRect {
+    if let saved, saved.width <= display.width, saved.height <= display.height {
+        let x = min(max(display.minX + saved.minX, display.minX), display.maxX - saved.width)
+        let y = min(max(display.minY + saved.minY, display.minY), display.maxY - saved.height)
+        return CGRect(x: x, y: y, width: saved.width, height: saved.height)
+    }
+    return CGRect(
+        x: (visible.midX - size.width / 2).rounded(), y: (visible.midY - size.height / 2).rounded(),
+        width: size.width, height: size.height)
+}
+
 public func conflictName(_ name: String, date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")

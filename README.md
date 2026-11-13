@@ -73,16 +73,18 @@ panel), copy the new app to `/Applications`, and open it.
   Shortcuts and in the menu bar icon's menu.
 - **Size.** The panel keeps the size you give it. `Cmd+Plus` and `Cmd+Minus` change the
   note's text size, and `Cmd+0` resets it.
-- **Default place.** `Option+Cmd+0` moves the panel to its default place and size, which brings
-  it back if it ended up off the screen. Pressed again before you move the panel, it goes back to
-  where it was. The default is 480 × 360, centered on the screen; to choose your own, put the panel
-  where you want it and click **Use Current** in Settings.
+- **Default place.** `Option+Cmd+0` moves the panel to its default place and size on the display
+  with the pointer, which also brings it back if it ended up off the screen. Pressed again before
+  you move the panel, it goes back to where it was. Each display has its own default. The standard
+  one is the panel's first size, centered; to choose your own, put the panel where you want it on
+  that display and click **Use Current** in Settings.
 
 ## Settings
 
 Open Settings with `Cmd+,` in the panel, or from the menu bar icon's menu.
 
-- **General:** the notes folder, the panel's default place and size (for `Option+Cmd+0`), the
+- **General:** the notes folder, the panel's default place and size on the display it's on (for
+  `Option+Cmd+0`; **Reset** goes back to the standard one), the
   note font (one of the monospaced fonts on your Mac), the size of the interface text, the opacity
   of the panel's background, whether to show spaces, tabs and full-width spaces, how many spaces
   the Tab key indents by (2 or 4), whether the menu bar icon shows, and Open at login. The background opacity slider starts in the middle, at the default
@@ -133,7 +135,7 @@ In the panel:
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
-| ⌥⌘0 | Panel to its default place and size; again, back to where it was |
+| ⌥⌘0 | Panel to its default place and size on the pointer's display; again, back to where it was |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
 | In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
 | In the switcher: ⌥↑ / ⌥↓ | Move a pinned note up / down (with the search field empty) |

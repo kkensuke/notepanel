@@ -24,7 +24,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = PanelController(store: NoteStore(folder: Prefs.folder, backups: Prefs.backups))
         controller.toggleSettings = { [weak self] in self?.settingsWindow.toggle() }
-        settingsWindow.model.useCurrentFrame = { [weak self] in self?.controller.useCurrentFrameAsDefault() }
+        controller.onScreenChange = { [weak self] in self?.settingsWindow.model.refreshPlace() }
+        let model = settingsWindow.model
+        model.describePlace = { [weak self] in self?.controller.defaultPlace() }
+        model.useCurrentFrame = { [weak self] in self?.controller.useCurrentFrameAsDefault() }
+        model.useStandardFrame = { [weak self] in self?.controller.useStandardFrame() }
         NSApp.mainMenu = mainMenu()
         setUpStatusItem()
         applySettings()
@@ -76,6 +80,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"))
         controller.setBackgroundOpacity(
             defaults.object(forKey: "backgroundOpacity") as? Double ?? Prefs.defaultBackgroundOpacity)
+        // Use Current and Reset change the defaults for ⌥⌘0, which Settings shows.
+        settingsWindow.model.refreshPlace()
         // Compared with what was applied last, not with isVisible: setting isVisible saves it to
         // UserDefaults, which runs this again from inside the setter, maybe before isVisible changes.
         let showIcon = defaults.object(forKey: "showMenuBarIcon") as? Bool ?? true
