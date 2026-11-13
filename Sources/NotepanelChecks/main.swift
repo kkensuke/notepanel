@@ -205,6 +205,8 @@ inFolder { folder in
 // Saving is still possible after a failed write, and the text stays unsaved until then.
 inFolder { folder in
     let store = NoteStore(folder: folder)
+    var states: [SaveState] = []
+    store.onSaveState = { states.append($0) }
     _ = try store.create()
     try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
     store.edit("kept")
@@ -214,6 +216,7 @@ inFolder { folder in
     store.flush()
     check(!store.hasUnsavedChanges, "saved once writing works again")
     equal(try contents(store, try unwrapped(store.current)), "kept")
+    equal(states, [.editing, .failed, .saved])
 }
 
 inFolder { folder in
