@@ -19,7 +19,17 @@ import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 import {syntaxHighlighting, HighlightStyle, indentUnit} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
-import {rankNotes, urlAt, linkAt, listIndent, insertLineAbove, toggleMark, insertLink, countCharacters} from "./logic.js"
+import {
+  rankNotes,
+  urlAt,
+  linkAt,
+  listIndent,
+  insertLineAbove,
+  toggleMark,
+  insertLink,
+  toggleTask,
+  countCharacters,
+} from "./logic.js"
 
 // Outside the app (in a plain browser) there is no handler, so nothing is sent.
 const post = (type, data = {}) => window.webkit?.messageHandlers?.native?.postMessage({type, ...data})
@@ -45,6 +55,8 @@ const highlight = HighlightStyle.define([
   // A URL breaks at the panel's edge, so a list marker isn't left alone on its line.
   {tag: tags.url, color: "var(--link)", wordBreak: "break-all"},
   {tag: [tags.processingInstruction, tags.quote, tags.contentSeparator], color: "var(--muted)"},
+  // A task's box: "[ ]" or "[x]", the only atom in Markdown. A click ticks or clears it.
+  {tag: tags.atom, class: "cm-taskBox"},
 ])
 
 const theme = EditorView.theme({
@@ -76,6 +88,8 @@ const theme = EditorView.theme({
   ".cm-linkButtons": {display: "flex", gap: "1px", padding: "0 2px", fontSize: "var(--size)"},
   ".cm-linkButtons .action": {padding: "2px", fontSize: "inherit"},
   ".cm-linkButtons .action svg": {width: "1em", height: "1em"},
+  ".cm-taskBox": {cursor: "pointer", borderRadius: "3px"},
+  ".cm-taskBox:hover": {backgroundColor: "var(--selection)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
   ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
@@ -236,7 +250,17 @@ const extensions = [
   }),
   EditorView.domEventHandlers({
     mousedown(event, view) {
-      if (!event.metaKey || event.altKey || event.shiftKey || event.button !== 0) return false
+      if (event.button !== 0) return false
+      const box = event.target.closest(".cm-taskBox")
+      if (box && !event.metaKey && !event.altKey && !event.shiftKey && !event.ctrlKey) {
+        const change = toggleTask(view.state, view.posAtDOM(box))
+        if (!change) return false
+        // The cursor stays where it was.
+        event.preventDefault()
+        view.dispatch(change)
+        return true
+      }
+      if (!event.metaKey || event.altKey || event.shiftKey) return false
       const pos = view.posAtCoords({x: event.clientX, y: event.clientY})
       if (pos === null) return false
       const line = view.state.doc.lineAt(pos)

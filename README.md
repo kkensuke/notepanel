@@ -61,6 +61,8 @@ panel), copy the new app to `/Applications`, and open it.
   click the name in the title bar; from then on the name stays as you set it.
 - **Links.** Cmd-click a link to open it. Pointing at a link shows two buttons on its first
   characters: one opens it, the other copies the URL.
+- **Tasks.** Click the box of a task (`- [ ]` or `- [x]`) to tick or clear it. The box stays as
+  text; `Cmd+Z` undoes the click.
 - **Menu.** Right-click the menu bar icon (or Control-click it) for New Note, Search Notes,
   Settings, Keyboard Shortcuts, the backups folder and Quit. Each item shows its key in the panel.
 - **Keys.** `Shift+Cmd+/` in the panel lists all the keys. The list is also in Settings →
@@ -142,6 +144,7 @@ Editing:
 | ⌘B / ⌘I / ⇧⌘X / ⌘E | Bold / italic / strikethrough / code: puts `**`, `*`, `~~` or `` ` `` around the selection, or takes them away |
 | ⌘K | Make the selection a link's text (a selected URL becomes its target) |
 | ⌘-click | Open a link |
+| Click `[ ]` / `[x]` | Tick / clear a task |
 
 ## Troubleshooting
 
@@ -177,7 +180,7 @@ Tests:
 
 ```sh
 swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, backups
-cd editor && npm test       # editor helpers: search ranking, links, line insertion, formatting, counts
+cd editor && npm test       # editor helpers: search ranking, links, line insertion, formatting, tasks, counts
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
 
