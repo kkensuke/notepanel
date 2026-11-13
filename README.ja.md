@@ -11,7 +11,7 @@ macOS 用の、ほかのウインドウの上に浮かぶメモ帳。どのア�
 ## 特徴
 
 - **何の上にでも出る。** パネルはほかのウインドウの上に浮かび、フルスクリーンのアプリの上にも、どのスペースにも出る。パネルを出してもアプリは切り替わらない。使っていたアプリはアクティブのままで、パネルを隠すとフォーカスが戻る。
-- **小さくて軽い。** アプリはおよそ 1.4 MB。
+- **小さくて軽い。** アプリはおよそ 2 MB。
 - **VS Code のように編集できる。** エディタは CodeMirror 6 で、キー操作は VS Code に合わせている。複数カーソル、矩形選択、行の移動とコピー、検索と置換が使える。Markdown の色分け、`Return` でのリストの継続、`Cmd+B` や `Cmd+I` などによる太字や斜体の付け外しもできる。
 - **普通のファイル。** ノートは 1 つずつ `.md` ファイルになり、ファイル名は 1 行目から付く。
 - **文章を失いにくい。** 入力しながら保存し、ほかのアプリが変えたファイルは上書きせず、以前の内容をバックアップとして残す。
@@ -19,7 +19,22 @@ macOS 用の、ほかのウインドウの上に浮かぶメモ帳。どのア�
 
 ## インストール
 
-macOS 14 Sonoma 以降と、Swift 5.10 以降が必要。Xcode は要らず、Command Line Tools（`xcode-select --install`）で足りる。ビルド済みの配布はまだないので、自分でビルドする。
+macOS 14 Sonoma 以降が必要。[Homebrew](https://brew.sh) でインストールする。
+
+```sh
+brew install kkensuke/tap/notepanel
+open /Applications/notepanel.app
+```
+
+アプリは ad hoc 署名で、Apple の公証を受けていないため、そのままでは macOS が開くのを拒む。Homebrew がインストール後に quarantine 属性を外す。
+
+notepanel はメニューバーにノートのアイコンとして常駐し、Dock にはアイコンを出さない。ショートカットにアクセシビリティの許可は要らない。ログイン時に起動するには、設定画面で **Open at login** をオンにする。
+
+更新するには、`brew upgrade notepanel` を実行する。先に notepanel を終了するので、更新後にもう一度開く。
+
+### 自分でビルドする
+
+Swift 5.10 以降が必要。Xcode は要らず、Command Line Tools（`xcode-select --install`）で足りる。
 
 ```sh
 git clone https://github.com/kkensuke/notepanel.git
@@ -28,8 +43,6 @@ scripts/bundle.sh                         # build/notepanel.app を作る
 cp -R build/notepanel.app /Applications/
 open /Applications/notepanel.app
 ```
-
-notepanel はメニューバーにノートのアイコンとして常駐し、Dock にはアイコンを出さない。ショートカットにアクセシビリティの許可は要らない。ログイン時に起動するには、設定画面で **Open at login** をオンにする。
 
 更新するには、`git pull` と `scripts/bundle.sh` をもう一度実行し、notepanel を終了して（パネルで `Cmd+Q`）、新しいアプリを `/Applications` にコピーしてから開く。
 
@@ -110,7 +123,7 @@ notepanel はメニューバーにノートのアイコンとして常駐し、D
 
 - **`Ctrl+Cmd+N` で何も起きない。** ほかのアプリが、同じショートカットを使っているかもしれない。設定画面の Shortcuts で、別のショートカットを選ぶ。
 - **ノートの以前の版が欲しい。** メニューバーのアイコンを右クリックし、Open Backups Folder を選ぶ。バックアップの名前は、日付と時刻のあとにノートの名前が続く。
-- **アンインストール。** Open at login をオフにし、notepanel を終了してから、`/Applications/notepanel.app` を削除する。設定は `defaults delete io.github.kkensuke.notepanel` で消える。`~/Library/Application Support/notepanel` フォルダには、バックアップと、別のフォルダを選んでいなければノートも入っている。このフォルダは残しておくか、ノートを移してから削除する。
+- **アンインストール。** Open at login をオフにしてから、`brew uninstall notepanel` を実行する。notepanel も終了する。自分でビルドした場合は、notepanel を終了してから、`/Applications/notepanel.app` を削除する。設定は `defaults delete io.github.kkensuke.notepanel` で消える。`~/Library/Application Support/notepanel` フォルダには、バックアップと、別のフォルダを選んでいなければノートも入っている。このフォルダは残しておくか、ノートを移してから削除する。`brew uninstall --zap notepanel` は設定とバックアップを消すが、ノートは消さない。
 
 ## 開発
 
@@ -139,6 +152,17 @@ cd editor && npm run smoke  # エディタのページを、Mac に見せかけ�
 ```
 
 `NotepanelChecks` は、XCTest のターゲットではなく、アサーションを並べた普通の実行ファイルにしている。XCTest は Xcode にしか含まれないため。スモークテストには Google Chrome が必要で、`/Applications` にないときは、環境変数 `CHROME` にその実行ファイルのパスを指定する。動いているアプリでエディタのページを調べるには、Safari の「開発」メニューを有効にする。notepanel のページがそこに出る。
+
+### リリース
+
+`main` 上のコミットに `vX.Y.Z` のタグを付けると、リリースを公開する。`.github/workflows/release.yml` が、Apple シリコンと Intel の両方で動くアプリをビルドし、`notepanel-X.Y.Z.zip` を GitHub のリリースに添付し、`Casks/notepanel.rb` を [kkensuke/homebrew-tap](https://github.com/kkensuke/homebrew-tap) に push する。タグは `scripts/bundle.sh` の `version` と一致していなければならない。先に `main` でこの値を変えてから、次を実行する。
+
+```sh
+git tag -s vX.Y.Z -m "notepanel X.Y.Z"
+git push origin vX.Y.Z
+```
+
+`ARCHS="arm64 x86_64" scripts/bundle.sh` で、同じユニバーサルアプリを手元でもビルドできる。ワークフローは、GitHub の environment `release` にある secret `HOMEBREW_TAP_TOKEN` を使って tap に push する。この secret には、`homebrew-tap` の contents だけを読み書きできる fine-grained token を入れる。
 
 ## クレジット
 

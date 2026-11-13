@@ -125,9 +125,10 @@ inFolder { folder in
     equal(name, "Untitled")
     store.edit("hello")
     store.flush()
-    equal(try contents(store, name), "hello")
+    equal(try contents(store, "hello"), "hello") // Saving named the file after its first line.
+    equal(try store.create(), "Untitled")
     equal(try store.create(), "Untitled 2")
-    equal(Set(store.list().map(\.name)), ["Untitled", "Untitled 2"])
+    equal(Set(store.list().map(\.name)), ["hello", "Untitled", "Untitled 2"])
 }
 
 // The file name follows the first line, stays unique, and stops following once renamed.
