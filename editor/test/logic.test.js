@@ -10,8 +10,10 @@ import {
   insertLineAbove,
   toggleMark,
   insertLink,
+  toggleTask,
   countCharacters,
 } from "../src/logic.js"
+import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 
 // Runs an edit on `doc`, whose selection is written as "|" (a cursor) or a "|" at each end, and
 // returns the result written the same way.
@@ -132,6 +134,17 @@ test("insertLink puts the cursor where the URL or the text goes", () => {
   assert.equal(edited(insertLink, "see |docs|"), "see [docs](|)")
   assert.equal(edited(insertLink, "see |https://example.com/a|"), "see [|](https://example.com/a)")
   assert.equal(edited(insertLink, "see |"), "see [|]()")
+})
+
+test("toggleTask ticks and clears a task's box, and only a task's", () => {
+  const doc = "- [ ] a\n  1. [x] b\n> - [ ] c\n\n```\n- [ ] code\n```\n[ ] text"
+  const state = EditorState.create({doc, extensions: markdown({base: markdownLanguage})})
+  const at = text => doc.indexOf(text)
+  assert.equal(toggleTask(state, at("[ ] a")).state.doc.line(1).text, "- [x] a")
+  assert.equal(toggleTask(state, at("[x] b") + 2).state.doc.line(2).text, "  1. [ ] b")
+  assert.equal(toggleTask(state, at("[ ] c")).state.doc.line(3).text, "> - [x] c")
+  assert.equal(toggleTask(state, at("[ ] code")), null)
+  assert.equal(toggleTask(state, at("[ ] text")), null)
 })
 
 test("countCharacters counts graphemes and skips line breaks", () => {

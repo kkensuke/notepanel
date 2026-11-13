@@ -112,6 +112,19 @@ await press("k", ["Meta"])
 await page.keyboard.type("u")
 assert.equal(await changedText(), "[word](u)")
 
+// A click on a task's box ticks it and leaves the cursor alone; another click clears it.
+await receive("open", {id: "Tasks", text: "- [ ] milk\n- [x] eggs"})
+await page.click(".cm-content")
+await press("ArrowDown", ["Meta"])
+const boxes = await page.$$(".cm-taskBox")
+assert.equal(boxes.length, 2)
+await boxes[0].click()
+assert.equal(await changedText(), "- [x] milk\n- [x] eggs")
+await page.keyboard.type("!")
+assert.equal(await changedText(), "- [x] milk\n- [x] eggs!", "the cursor stayed at the end")
+await (await page.$$(".cm-taskBox"))[1].click()
+assert.equal(await changedText(), "- [x] milk\n- [ ] eggs!")
+
 // Switching back to a note keeps its undo history.
 await receive("open", {id: "Untitled", text: "one\n\n\nfour"})
 await page.click(".cm-content")

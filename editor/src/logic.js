@@ -1,5 +1,6 @@
 // Pure helpers, kept apart from the DOM so they can run under `node --test`.
 import {EditorSelection, countColumn} from "@codemirror/state"
+import {syntaxTree} from "@codemirror/language"
 
 // A case-insensitive subsequence match: every query character must appear in order.
 // Returns a score (higher is better) or null. Runs and word starts score more,
@@ -154,6 +155,18 @@ export function insertLink(state) {
     }),
     {scrollIntoView: true, userEvent: "input"},
   )
+}
+
+// Ticks the task box ("[ ]" or "[x]") at `pos`, or clears it; null if there is no box there. The
+// Markdown parser finds the boxes, so "- [ ]" in a code block isn't one.
+export function toggleTask(state, pos) {
+  const box = syntaxTree(state).resolveInner(pos, 1)
+  if (box.name !== "TaskMarker") return null
+  const ticked = state.sliceDoc(box.from + 1, box.from + 2) !== " "
+  return state.update({
+    changes: {from: box.from + 1, to: box.from + 2, insert: ticked ? " " : "x"},
+    userEvent: "input",
+  })
 }
 
 // Characters as people count them (grapheme clusters), without line breaks.
