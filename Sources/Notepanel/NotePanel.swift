@@ -25,8 +25,9 @@ final class NotePanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     // While the app is inactive the main menu never sees key equivalents, so the panel routes them:
-    // its own commands first, then cut, copy and paste to the first responder. Everything else,
-    // including Cmd-Z and its key repeats, goes on to the editor page.
+    // its own commands first, then cut, copy and paste to the first responder, and Select All, Undo
+    // and Redo to a text field. Everything else, including Cmd-Z in the editor and its key repeats,
+    // goes on to the editor page.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
         // Shift is allowed, since on some keyboards "+" needs it.
@@ -46,10 +47,19 @@ final class NotePanel: NSPanel {
             if modifiers == .command, let action = Self.editActions[key] {
                 return NSApp.sendAction(action, to: nil, from: self)
             }
-            // Select All, in a text field such as the note's name. In the editor it must reach
-            // CodeMirror, so it goes on to the page.
-            if modifiers == .command, key == "a", let text = firstResponder as? NSText {
-                text.selectAll(nil)
+            // Select All, Undo and Redo, in a text field such as the note's name. In the editor
+            // they must reach CodeMirror, so they go on to the page.
+            if let text = firstResponder as? NSText {
+                switch key.lowercased() {
+                case "a" where modifiers == .command:
+                    text.selectAll(nil)
+                case "z" where modifiers == .command:
+                    if let history = text.undoManager, history.canUndo { history.undo() }
+                case "z":  // With Shift
+                    if let history = text.undoManager, history.canRedo { history.redo() }
+                default:
+                    return super.performKeyEquivalent(with: event)
+                }
                 return true
             }
         }

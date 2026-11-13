@@ -13,7 +13,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private let glass = PanelController.makeGlass()
     private let scrim = NSBox()
     private var backgroundOpacity: Double?
-    private let titleField = NSTextField(string: "")
+    private let titleField: NSTextField = NameField(string: "")
     private var titleWidth: NSLayoutConstraint!
     /// The save icon and the name, as one toolbar item.
     private let titleView = NSView()
@@ -628,4 +628,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         titleField.stringValue = store.current ?? ""
         sizeTitle()
     }
+}
+
+/// The note's name, with an undo history of its own. The panel's shared history may also hold
+/// WebKit's records of typing in the note, which ⌘Z in the name must not undo. The field editor
+/// asks its delegate, the field being edited, for the history to use.
+private final class NameField: NSTextField {
+    private let history = UndoManager()
+
+    @objc(undoManagerForTextView:)
+    func undoManager(for view: NSTextView) -> UndoManager? { history }
 }
