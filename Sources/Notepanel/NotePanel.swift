@@ -46,6 +46,12 @@ final class NotePanel: NSPanel {
             if modifiers == .command, let action = Self.editActions[key] {
                 return NSApp.sendAction(action, to: nil, from: self)
             }
+            // Select All, in a text field such as the note's name. In the editor it must reach
+            // CodeMirror, so it goes on to the page.
+            if modifiers == .command, key == "a", let text = firstResponder as? NSText {
+                text.selectAll(nil)
+                return true
+            }
         }
         return super.performKeyEquivalent(with: event)
     }
