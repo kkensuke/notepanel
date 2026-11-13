@@ -16,7 +16,7 @@ other editor, sync them or back them up as you like.
 - **Opens over everything.** The panel floats above other windows, full-screen apps included, on
   every Space. Showing it doesn't switch apps: the app you were in stays active, and gets the focus
   back when you hide the panel.
-- **Small and light.** The app is about 1.4 MB.
+- **Small and light.** The app is about 2 MB.
 - **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
   rectangular selection, moving and copying lines, and find and replace. It also highlights
   Markdown, continues lists when you press `Return`, and adds or removes bold, italic and other
