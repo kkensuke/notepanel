@@ -549,13 +549,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         sizeTitle()
     }
 
-    /// A pencil while the text isn't saved yet, a check once it is, and a red warning if saving
-    /// failed (the footer says why).
+    /// A dashed circle while the text isn't saved yet, a checked circle once it is, and a red
+    /// warning if saving failed (the footer says why).
     private func showSaveState(_ state: SaveState) {
         let (symbol, label): (String, String) =
             switch state {
-            case .saved: ("checkmark", "Saved")
-            case .editing: ("pencil", "Not saved yet")
+            case .saved: ("checkmark.circle", "Saved")
+            case .editing: ("circle.dashed", "Not saved yet")
             case .failed: ("exclamationmark.triangle", "Couldn’t save")
             }
         saveIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
