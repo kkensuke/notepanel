@@ -16,7 +16,8 @@ other editor, sync them or back them up as you like.
   back when you hide the panel.
 - **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
   rectangular selection, moving and copying lines, and find and replace. It also highlights
-  Markdown and continues lists when you press `Return`.
+  Markdown, continues lists when you press `Return`, and adds or removes bold, italic and other
+  marks with `Cmd+B`, `Cmd+I` and the like.
 - **Plain files.** Each note is a `.md` file named after its first line.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
   keeps earlier versions as backups.
@@ -138,6 +139,8 @@ Editing:
 | ⌘D, ⇧⌘L, ⌥⌘↑ / ⌥⌘↓, ⌥-click | Multiple cursors |
 | ⇧⌥-drag | Rectangular selection |
 | ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
+| ⌘B / ⌘I / ⇧⌘X / ⌘E | Bold / italic / strikethrough / code: puts `**`, `*`, `~~` or `` ` `` around the selection, or takes them away |
+| ⌘K | Make the selection a link's text (a selected URL becomes its target) |
 | ⌘-click | Open a link |
 
 ## Troubleshooting
@@ -174,7 +177,7 @@ Tests:
 
 ```sh
 swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, backups
-cd editor && npm test       # editor helpers: search ranking, links, line insertion, counts
+cd editor && npm test       # editor helpers: search ranking, links, line insertion, formatting, counts
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
 

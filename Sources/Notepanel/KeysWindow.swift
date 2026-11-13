@@ -73,6 +73,9 @@ private let editingKeys = [
     ("Rectangular selection", "⇧⌥-drag"),
     ("Find and replace", "⌘F"),
     ("Next / previous match", "⌘G / ⇧⌘G"),
+    ("Bold / italic", "⌘B / ⌘I"),
+    ("Strikethrough / code", "⇧⌘X / ⌘E"),
+    ("Make a link", "⌘K"),
     ("Open a link", "⌘-click"),
 ]
 

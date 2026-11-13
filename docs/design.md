@@ -142,7 +142,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 
 CodeMirror 6 に次の拡張を入れる。
 
-- キーマップ：`defaultKeymap`（`standardKeymap` を含む）、`historyKeymap`、`searchKeymap`、`indentWithTab`。その前に ⌘L（`selectLine`）と ⇧⌘Enter（上に行を挿入）を置く。
+- キーマップ：`defaultKeymap`（`standardKeymap` を含む）、`historyKeymap`、`searchKeymap`、`indentWithTab`。その前に ⌘L（`selectLine`）、⇧⌘Enter（上に行を挿入）、書式記号のキー（⌘B・⌘I・⇧⌘X・⌘E・⌘K、表5）を置く。⌘I は、既定の割り当て（`selectParentSyntax`：構文上の親を選択）より前に置いて、斜体を優先する。
 - `history()`、`drawSelection()`、`dropCursor()`、`highlightSpecialChars()`、`EditorState.allowMultipleSelections`
 - `EditorView.clickAddsSelectionRange`：⌥クリックでカーソルを追加する（VS Code と同じ。CodeMirror の既定は ⌘クリック）
 - `rectangularSelection`：⇧⌥ドラッグで矩形選択する（VS Code と同じ。CodeMirror の既定は ⌥ドラッグ）
@@ -281,6 +281,8 @@ Undo・Redo はメニューにも第 1 段にも入れない。メニュー経�
 | Tab / ⇧Tab、⌘] / ⌘[ | インデント／インデント解除 | `indentMore` / `indentLess` |
 | Enter | 箇条書き・番号付きリスト・タスクを継続。空の項目で終了 | `insertNewlineContinueMarkup` |
 | ⌘F、⌘G / ⇧⌘G | 検索・置換パネル、次／前を検索 | `openSearchPanel`、`findNext` / `findPrevious` |
+| ⌘B / ⌘I / ⇧⌘X / ⌘E | 選択範囲を `**`・`*`・`~~`・`` ` `` で囲む（太字／斜体／取り消し線／コード）。すでに囲まれていれば外す。選択範囲の両端の空白と改行は囲まない。カーソルだけなら空の組を入れ、その間に置く | 独自（`toggleMark`） |
+| ⌘K | 選択範囲を `[選択範囲]()` にし、カーソルを `()` に置く。選択範囲が URL なら `[](URL)` にし、カーソルを `[]` に置く | 独自（`insertLink`） |
 
 ## 7. 技術リスク
 
@@ -367,6 +369,7 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 | E16 | ⌘クリックでリンクを開く | 任意 | 採用 |
 | E17 | 文字数の表示 | 任意 | 採用 |
 | E18 | リンクにポインタを乗せると、開くとコピーのボタンを出す（§5.5） | 任意 | 採用 |
+| E19 | ⌘B・⌘I・⇧⌘X・⌘E で書式記号を付け外しし、⌘K でリンクにする（表5） | 任意 | 採用（v0.4 の後に H から移した） |
 
 ### F. 保存
 
@@ -415,7 +418,7 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 | 機能 | 由来 | 理由 |
 |---|---|---|
 | Markdown のライブ描画（記号を隠す表示） | tinycast | 優先しない。⌘← の問題の原因でもある |
-| 書式バー、⌘B・⌘I などの書式コマンド、見出しメニュー | tinycast | Markdown の描画を前提にした機能 |
+| 書式バー、見出しメニュー | tinycast | Markdown の描画を前提にした機能（⌘B・⌘I などの書式キーは E19 で採用した） |
 | チェックボックスのクリック | tinycast | 同上 |
 | スニペットの展開 | tinycast | tinycast 本体の別機能 |
 | ブロック、計算・通貨、言語の自動判定、整形 | Heynote | メモには不要 |
@@ -441,7 +444,7 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 テスト：
 
 - `NotepanelCore`（高さの計算、表示名、命名、名前の検証、保存・衝突・名前変更）は、アサーションで確かめる実行ファイル `NotepanelChecks` で確かめる（`swift run NotepanelChecks`）。XCTest は Xcode にしか含まれず、Command Line Tools だけでは使えないため。
-- エディタの純粋関数（あいまい一致と並べ替え、URL の抽出、上への行挿入、文字数）は Node の `node --test` で確かめる。
+- エディタの純粋関数（あいまい一致と並べ替え、URL の抽出、上への行挿入、書式記号の付け外し、リンクの挿入、文字数）は Node の `node --test` で確かめる。
 - R1〜R6 と IME は実機で確かめる。実機での利用で問題が出なかったため、v0.4 で README の確認手順と、確認用の切り替え（`activateOnShow`）を外した。
 
 ビルド：Xcode プロジェクトは作らない。SwiftPM と `scripts/bundle.sh`（.app の生成と ad-hoc 署名）を使い、Command Line Tools だけでビルドできるようにする。そのため、Xcode にしか実装（マクロのプラグイン）が含まれない SwiftUI のマクロ（macOS 27 SDK の `@State` など）は使わず、状態は `@Observable` のモデルに持たせる。エディタは `editor/` で `npm run build` を実行し、`web/editor.js` を出力する。`web/editor.js` はリポジトリに含めるので、エディタを変更しない限り Node は不要。
