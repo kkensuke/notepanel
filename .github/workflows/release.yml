@@ -15,7 +15,7 @@ concurrency:
 jobs:
   release:
     name: Publish GitHub and Homebrew releases
-    runs-on: macos-latest
+    runs-on: xcode-27
     environment: release
     permissions:
       contents: write

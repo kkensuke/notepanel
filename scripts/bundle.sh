@@ -6,10 +6,13 @@ cd "$(dirname "$0")/.."
 version="0.1.0" # The release workflow checks that the tag matches this.
 
 # ARCHS="arm64 x86_64" builds a universal app, as the release workflow does.
+# shortcut: Swift Build, the default from Swift 6.4, links with the Command Line Tools recording the
+# deployment target (macOS 14) as the SDK version, so the app gets the look from before macOS 26;
+# drop --build-system native once Swift Build records the real SDK version.
 set --
 for arch in ${ARCHS:-$(uname -m)}; do
-    swift build -c release --product Notepanel --arch "$arch"
-    set -- "$@" "$(swift build -c release --arch "$arch" --show-bin-path)/Notepanel"
+    swift build -c release --build-system native --product Notepanel --arch "$arch"
+    set -- "$@" "$(swift build -c release --build-system native --arch "$arch" --show-bin-path)/Notepanel"
 done
 app="build/notepanel.app"
 

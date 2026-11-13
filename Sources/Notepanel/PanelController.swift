@@ -22,7 +22,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private let saveIcon = NSImageView()
     private var saveIconWidth: NSLayoutConstraint!
     private var saveIconGap: NSLayoutConstraint!
-    private var buttons: [NSToolbarItem.Identifier: NSButton] = [:]
+    private var buttons: [NSButton] = []
+    /// The buttons, as one toolbar item.
+    private let buttonsView = NSStackView()
     private var previousApp: NSRunningApplication?
     private var uiFontSize: CGFloat = 15
     private var options: NSDictionary = [:]
@@ -39,9 +41,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     private enum Item {
         static let title = NSToolbarItem.Identifier("title")
-        static let new = NSToolbarItem.Identifier("new")
-        static let browse = NSToolbarItem.Identifier("browse")
-        static let folder = NSToolbarItem.Identifier("folder")
+        static let buttons = NSToolbarItem.Identifier("buttons")
     }
 
     init(store: NoteStore) {
@@ -502,10 +502,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             titleField.bottomAnchor.constraint(equalTo: titleView.bottomAnchor),
         ])
         buttons = [
-            Item.new: toolbarButton("square.and.pencil", "New Note (⌘N)", #selector(newNoteClicked)),
-            Item.browse: toolbarButton("list.bullet", "Browse Notes (⌘P)", #selector(browseClicked)),
-            Item.folder: toolbarButton("folder", "Open Notes Folder (⌘O)", #selector(openFolderClicked)),
+            toolbarButton("square.and.pencil", "New Note (⌘N)", #selector(newNoteClicked)),
+            toolbarButton("list.bullet", "Browse Notes (⌘P)", #selector(browseClicked)),
+            toolbarButton("folder", "Open Notes Folder (⌘O)", #selector(openFolderClicked)),
         ]
+        // The spacing the toolbar gave them before macOS 26, which spaces separate items for glass.
+        buttonsView.spacing = 12
+        for button in buttons { buttonsView.addArrangedSubview(button) }
         applyUIFontSize()
 
         // A toolbar sizes the title bar to the title and buttons and keeps the traffic lights
@@ -568,7 +571,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Item.title, .flexibleSpace, Item.new, Item.browse, Item.folder]
+        [.flexibleSpace, Item.title, .flexibleSpace, Item.buttons]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -580,14 +583,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         willBeInsertedIntoToolbar flag: Bool
     ) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
-        if identifier == Item.title {
-            item.view = titleView
-        } else if let button = buttons[identifier] {
-            item.view = button
-            item.label = button.toolTip ?? ""
-        } else {
-            return nil
+        switch identifier {
+        case Item.title: item.view = titleView
+        case Item.buttons: item.view = buttonsView
+        default: return nil
         }
+        // From macOS 26 every toolbar item sits on glass, which put the name and the buttons in capsules.
+        item.isBordered = false
         return item
     }
 
@@ -604,7 +606,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func applyUIFontSize() {
         titleField.font = .systemFont(ofSize: uiFontSize, weight: .semibold)
         let configuration = NSImage.SymbolConfiguration(pointSize: uiFontSize + 1, weight: .regular)
-        for button in buttons.values {
+        for button in buttons {
             guard let symbol = button.identifier?.rawValue else { continue }
             button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: button.toolTip)?
                 .withSymbolConfiguration(configuration)
@@ -649,9 +651,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         let text = titleField.attributedStringValue.size().width
         let width = (text + 16).rounded(.up)
         let gap: CGFloat = 5
-        // shortcut: spacing taken from one screenshot (about 12 pt per button, plus 8 pt to keep a
-        // gap before the title); measure the laid-out buttons if another macOS spaces them wider.
-        let buttonsWidth = buttons.values.map { $0.fittingSize.width + 12 }.reduce(8, +)
+        // shortcut: margins taken from one screenshot (about 20 pt for the toolbar's edge and a gap
+        // before the title); measure the laid-out buttons if another macOS sets them wider.
+        let buttonsWidth = buttonsView.fittingSize.width + 20
         let room = panel.frame.width - 2 * buttonsWidth - saveIconWidth.constant - gap
         titleWidth.constant = max(0, min(max(width, 80), 360, room))
         // The name is centered in its field, so the icon moves in over the space left of it and
