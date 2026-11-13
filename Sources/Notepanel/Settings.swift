@@ -406,7 +406,7 @@ struct SettingsView: View {
         }
     }
 
-    /// "Custom · 620 × 410", or "Standard · 480 × 388, centered".
+    /// "Custom · 620 × 410", or "Standard · 480 × 360, centered", with the window's size.
     private func placeSummary(_ place: DefaultPlace) -> String {
         let size = "\(Int(place.size.width)) × \(Int(place.size.height))"
         return place.custom ? "Custom · \(size)" : "Standard · \(size), centered"
