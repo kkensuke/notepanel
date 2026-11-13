@@ -39,6 +39,8 @@ const editorElement = $("editor")
 const footer = $("footer")
 const statusElement = $("status")
 const countElement = $("count")
+// Kept up to date in the footer's section below.
+let footerHeight = 0
 const switcher = $("switcher")
 const query = $("query")
 const results = $("results")
@@ -63,7 +65,8 @@ const theme = EditorView.theme({
   "&": {height: "100%", fontSize: "var(--size)", color: "var(--fg)", backgroundColor: "transparent"},
   "&.cm-focused": {outline: "none"},
   ".cm-scroller": {fontFamily: "var(--font)", lineHeight: "1.6"},
-  ".cm-content": {padding: "6px 0", caretColor: "var(--fg)"},
+  // Room at the end, so the last line can scroll clear of the footer.
+  ".cm-content": {padding: "6px 0 calc(6px + var(--footer-height, 0px))", caretColor: "var(--fg)"},
   ".cm-line": {padding: "0 12px"},
   ".cm-cursor, .cm-dropCursor": {borderLeftColor: "var(--fg)"},
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground":
@@ -94,7 +97,7 @@ const theme = EditorView.theme({
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
   ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
   ".cm-panels.cm-panels-top": {borderBottom: "1px solid var(--border)"},
-  ".cm-panels.cm-panels-bottom": {borderTop: "1px solid var(--border)"},
+  ".cm-panels.cm-panels-bottom": {borderTop: "1px solid var(--border)", marginBottom: "var(--footer-height, 0px)"},
   ".cm-textfield, .cm-button": {
     backgroundColor: "var(--bg)",
     backgroundImage: "none",
@@ -219,6 +222,8 @@ const extensions = [
   rectangularSelection({eventFilter: event => event.altKey && event.shiftKey && event.button === 0}),
   highlightSelectionMatches(),
   EditorView.lineWrapping,
+  // The cursor's line stays clear of the footer.
+  EditorView.scrollMargins.of(() => ({bottom: footerHeight})),
   hangingIndents,
   linkPopup,
   markdown({base: markdownLanguage}),
@@ -300,6 +305,19 @@ function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, i
 }
 
 // ---- Footer
+
+// The footer lies over the note's last lines. Its height and the boxes of its texts, with room for
+// the note to fade out, go to style.css, which hides the note only behind those texts.
+const room = 12
+const footerObserver = new ResizeObserver(() => {
+  footerHeight = footer.offsetHeight
+  const {style} = editorElement
+  style.setProperty("--footer-height", `${footerHeight}px`)
+  const status = statusElement.offsetWidth && statusElement.offsetLeft + statusElement.offsetWidth + room
+  style.setProperty("--status-width", `${status}px`)
+  style.setProperty("--count-width", `${footer.clientWidth - countElement.offsetLeft + room}px`)
+})
+for (const element of [footer, statusElement, countElement]) footerObserver.observe(element)
 
 let countTimer = 0
 function scheduleCount() {
