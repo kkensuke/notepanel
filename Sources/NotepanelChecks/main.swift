@@ -1,5 +1,6 @@
 // Assertion-based checks for NotepanelCore. Run with `swift run NotepanelChecks`.
 // They stand in for XCTest, which the Command Line Tools don't include.
+import CoreGraphics
 import Foundation
 import NotepanelCore
 
