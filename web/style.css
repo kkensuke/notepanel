@@ -69,13 +69,25 @@ body {
   flex-direction: column;
 }
 
+/* The note runs on under the footer and is hidden only behind the footer's texts, whose boxes
+   main.js gives as --status-width, --count-width and --footer-height. It fades out over the 12 px
+   before each text rather than being cut through its letters. */
 #editor {
   flex: 1;
   min-height: 0;
+  mask:
+    linear-gradient(to left, transparent, #000 12px) left bottom / var(--status-width, 0px) var(--footer-height, 0px) no-repeat,
+    linear-gradient(to right, transparent, #000 12px) right bottom / var(--count-width, 0px) var(--footer-height, 0px) no-repeat,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
 }
 
 footer {
-  flex: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
   display: flex;
   justify-content: space-between;
   gap: 12px;
