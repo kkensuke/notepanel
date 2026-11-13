@@ -48,7 +48,7 @@ enum Prefs {
     static let backups = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("notepanel/Backups", isDirectory: true)
 
-    /// The frame ⌥⌘0 gives the panel on a display, set in Settings, by `NSScreen.displayKey`; nil for
+    /// The frame ⌃⌘M gives the panel on a display, set in Settings, by `NSScreen.displayKey`; nil for
     /// the standard one. It's relative to the display's bottom-left corner, so it moves with the
     /// display when displays are rearranged.
     static func defaultFrame(for display: String) -> NSRect? {
@@ -128,7 +128,7 @@ final class SettingsModel {
     let searchShortcut = ShortcutRecorder(name: "hotkey.search")
     let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", global: false)
     let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", global: false)
-    /// The display the panel is on and its default for ⌥⌘0, and setting that default. The app sets
+    /// The display the panel is on and its default for ⌃⌘M, and setting that default. The app sets
     /// these, as it has the panel.
     var describePlace: () -> DefaultPlace? = { nil }
     var useCurrentFrame: () -> Void = {}
@@ -238,7 +238,7 @@ enum SettingsTab {
     case general, shortcuts
 }
 
-/// A display, as the Default place section shows it, and the size ⌥⌘0 gives the panel there.
+/// A display, as the Default place section shows it, and the size ⌃⌘M gives the panel there.
 struct DefaultPlace {
     var display: String
     var builtIn: Bool
@@ -346,7 +346,7 @@ struct SettingsView: View {
         } header: {
             HStack {
                 Text("Default place")
-                keysText("⌥⌘0")
+                keysText("⌃⌘M")
                     .foregroundStyle(.secondary)
                 Spacer()
                 Button("Reset", action: model.useStandardFrame)

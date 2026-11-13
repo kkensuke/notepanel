@@ -48,7 +48,7 @@ private let panelKeys = [
     ("Open the notes folder", "⌘O"),
     ("Bigger / smaller note text", "⌘+ / ⌘−"),
     ("Default note text size", "⌘0"),
-    ("Default place and size, and back", "⌥⌘0"),
+    ("Default place and size, and back", "⌃⌘M"),
     ("Hide", "⌘W or Esc"),
 ]
 
@@ -118,7 +118,7 @@ private struct KeysView: View {
     }
 }
 
-/// Keys as text, with a slashed zero so that ⌥⌘0 doesn't read as ⌥⌘O. The zero takes the font's
+/// Keys as text, with a slashed zero so that ⌘0 doesn't read as ⌘O. The zero takes the font's
 /// fixed-width variant: SF Mono slashes its zero, SF Pro doesn't.
 func keysText(_ keys: String) -> Text {
     let parts = keys.split(separator: "0", omittingEmptySubsequences: false)
