@@ -103,6 +103,7 @@ final class SettingsWindow {
             window.animationBehavior = .none
             // Above the note panel, which floats.
             window.level = .floating
+            centerTitle(of: window)
             window.center()
             self.window = window
         }
@@ -114,6 +115,36 @@ final class SettingsWindow {
     /// For ⌘,: a second press closes the window.
     func toggle() {
         if window?.isVisible == true { window?.close() } else { show() }
+    }
+}
+
+/// From macOS 26, a window's title sits at the leading edge of the title bar. This hides it and
+/// shows the same title centered over the window, as before. Where the title bar isn't laid out
+/// as expected, the system's title stays.
+@MainActor
+func centerTitle(of window: NSWindow) {
+    guard let close = window.standardWindowButton(.closeButton), let bar = close.superview,
+        let content = window.contentView
+    else { return }
+    window.titleVisibility = .hidden
+    let title = NSHostingView(rootView: WindowTitle(text: window.title))
+    title.translatesAutoresizingMaskIntoConstraints = false
+    bar.addSubview(title)
+    NSLayoutConstraint.activate([
+        title.centerXAnchor.constraint(equalTo: content.centerXAnchor),
+        title.centerYAnchor.constraint(equalTo: close.centerYAnchor),
+    ])
+}
+
+/// A window title in the title bar's font, dimmed while its window isn't key, as the system's is.
+private struct WindowTitle: View {
+    let text: String
+    @Environment(\.controlActiveState) private var state
+
+    var body: some View {
+        Text(text)
+            .font(Font(NSFont.titleBarFont(ofSize: 0) as CTFont))
+            .foregroundStyle(state == .key ? HierarchicalShapeStyle.primary : .tertiary)
     }
 }
 
