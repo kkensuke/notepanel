@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         controller = PanelController(store: NoteStore(folder: Prefs.folder, backups: Prefs.backups))
         controller.toggleSettings = { [weak self] in self?.settingsWindow.toggle() }
+        settingsWindow.model.useCurrentFrame = { [weak self] in self?.controller.useCurrentFrameAsDefault() }
         NSApp.mainMenu = mainMenu()
         setUpStatusItem()
         applySettings()

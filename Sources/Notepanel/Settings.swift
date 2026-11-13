@@ -48,6 +48,12 @@ enum Prefs {
     static let backups = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("notepanel/Backups", isDirectory: true)
 
+    /// The panel's default frame set in Settings, which ⌥⌘0 goes to; nil for the standard one.
+    static var defaultFrame: NSRect? {
+        guard let stored = UserDefaults.standard.string(forKey: "defaultFrame"), !stored.isEmpty else { return nil }
+        return NSRectFromString(stored)
+    }
+
     /// A shortcut that was never set has its default; one stored as an empty string is off.
     static func shortcut(_ name: String) -> Shortcut? {
         guard let stored = UserDefaults.standard.string(forKey: name) else { return defaultShortcuts[name] }
@@ -76,7 +82,7 @@ enum Prefs {
 
 @MainActor
 final class SettingsWindow {
-    private let model = SettingsModel()
+    let model = SettingsModel()
     private var window: NSWindow?
 
     func show() {
@@ -115,6 +121,8 @@ final class SettingsModel {
     let searchShortcut = ShortcutRecorder(name: "hotkey.search")
     let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", global: false)
     let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", global: false)
+    /// Makes the panel's frame now its default; set by the app, which has the panel.
+    var useCurrentFrame: () -> Void = {}
     /// The fixed-pitch font families on this Mac, for the note font menu.
     private(set) var monospacedFonts: [String] = []
 
@@ -223,6 +231,7 @@ struct SettingsView: View {
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
     @AppStorage("showWhitespace") private var showWhitespace = false
     @AppStorage("indentSize") private var indentSize = 4
+    @AppStorage("defaultFrame") private var defaultFrame = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -292,6 +301,21 @@ struct SettingsView: View {
                 Button("Use Default") { folder = Prefs.defaultFolder }
                     .disabled(folder == Prefs.defaultFolder)
                 Button("Choose…", action: chooseFolder)
+            }
+        }
+        // Set by placing the panel and clicking Use Current, rather than by typing numbers.
+        Section {
+            Text(
+                defaultFrame.isEmpty
+                    ? "Standard: 480 × 360, in the middle of the screen"
+                    : "Your own: where the panel was when you clicked Use Current")
+        } header: {
+            HStack {
+                Text("Default place and size (⌥⌘0)")
+                Spacer()
+                Button("Use Standard") { defaultFrame = "" }
+                    .disabled(defaultFrame.isEmpty)
+                Button("Use Current") { model.useCurrentFrame() }
             }
         }
         // The notes' text size has no control here: ⌘+, ⌘− and ⌘0 in the panel change it.

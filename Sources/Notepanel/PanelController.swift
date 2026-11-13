@@ -117,18 +117,28 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return false
     }
 
-    /// ⌥⌘0: the panel's first size, centered on its screen. Pressed again before the panel moves or
-    /// changes size, it goes back to where it was.
+    /// ⌥⌘0: the default frame set in Settings, or else the panel's first size, centered on its
+    /// screen. Pressed again before the panel moves or changes size, it goes back to where it was.
     private func toggleDefaultFrame() {
         if let previous = frameBeforeDefault, panel.frame == defaultFrame {
             panel.setFrame(previous, display: true)
             frameBeforeDefault = nil
+            return
+        }
+        frameBeforeDefault = panel.frame
+        // A frame set on a display that's no longer connected falls back to the standard one.
+        if let own = Prefs.defaultFrame, NSScreen.screens.contains(where: { $0.frame.contains(own) }) {
+            panel.setFrame(own, display: true)
         } else {
-            frameBeforeDefault = panel.frame
             panel.setFrame(NSRect(origin: panel.frame.origin, size: defaultSize), display: true)
             panel.center()
-            defaultFrame = panel.frame
         }
+        defaultFrame = panel.frame
+    }
+
+    /// Settings' Use Current: ⌥⌘0 will put the panel where it is now.
+    func useCurrentFrameAsDefault() {
+        UserDefaults.standard.set(NSStringFromRect(panel.frame), forKey: "defaultFrame")
     }
 
     func windowDidResize(_ notification: Notification) {
