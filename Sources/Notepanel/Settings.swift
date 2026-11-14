@@ -273,6 +273,8 @@ enum SettingsTab {
 struct DefaultPlace {
     var display: String
     var builtIn: Bool
+    var displaySize: NSSize
+    var menuBar: CGFloat
     /// From the display's top-left corner, y down.
     var frame: NSRect
     /// Set with Use Current, rather than the standard place and size.
@@ -363,17 +365,17 @@ struct SettingsView: View {
         // clicking Use Current, rather than by typing numbers.
         Section {
             if let place = model.place {
-                HStack(spacing: 10) {
-                    Image(systemName: place.builtIn ? "laptopcomputer" : "display")
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 14) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(verbatim: place.display)
-                            .lineLimit(1)
+                            .lineLimit(2)
                         Text(verbatim: placeSummary(place))
                             .font(.system(size: uiFontSize - 2))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    DisplayMap(place: place, unit: uiFontSize / 15)
                 }
             }
         } header: {
@@ -455,6 +457,52 @@ struct SettingsView: View {
         panel.prompt = "Choose"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         folder = (url.path as NSString).abbreviatingWithTildeInPath
+    }
+}
+
+/// The panel's display in miniature, with the panel where ⌃⌘M puts it. `unit` is 1 at the
+/// standard interface text size, 15 pt.
+private struct DisplayMap: View {
+    let place: DefaultPlace
+    let unit: CGFloat
+
+    var body: some View {
+        // The screen fits in 64 × 36, a 16:9 display's shape, so a 16:10 one is narrower.
+        let scale = unit * min(64 / place.displaySize.width, 36 / place.displaySize.height)
+        let screen = CGSize(width: place.displaySize.width * scale, height: place.displaySize.height * scale)
+        let panel = place.frame
+        VStack(spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                Rectangle()
+                    .fill(.quaternary)
+                    .frame(height: place.menuBar * scale)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentColor)
+                    .frame(width: max(3, panel.width * scale), height: max(3, panel.height * scale))
+                    .offset(x: panel.minX * scale, y: panel.minY * scale)
+            }
+            .frame(width: screen.width, height: screen.height, alignment: .topLeading)
+            // Darker than the form's box in dark mode and in light mode.
+            .background(Color(nsColor: .windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 3))
+            .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(.tertiary))
+            if place.builtIn {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(.tertiary)
+                    .frame(width: screen.width + 8 * unit, height: 2.5 * unit)
+            } else {
+                Rectangle()
+                    .fill(.tertiary)
+                    .frame(width: 4 * unit, height: 3 * unit)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(.tertiary)
+                    .frame(width: 18 * unit, height: 2 * unit)
+            }
+        }
+        .frame(width: 72 * unit)
+        .animation(.easeOut(duration: 0.25), value: place.frame)
+        // The text beside it says the same.
+        .accessibilityHidden(true)
     }
 }
 

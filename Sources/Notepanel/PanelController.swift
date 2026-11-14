@@ -147,7 +147,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         let display = screen.frame
         let frame = placeOnDisplay(saved: saved, size: defaultSize, display: display, visible: screen.visibleFrame)
         return DefaultPlace(
-            display: screen.localizedName, builtIn: builtIn,
+            display: screen.localizedName, builtIn: builtIn, displaySize: display.size,
+            menuBar: display.maxY - screen.visibleFrame.maxY,
             // AppKit's y goes up from the bottom; screen positions are usually shown from the top-left.
             frame: NSRect(
                 x: frame.minX - display.minX, y: display.maxY - frame.maxY, width: frame.width, height: frame.height),
