@@ -102,6 +102,8 @@ panel), copy the new app to `/Applications`, and open it.
 
 Open Settings with `Cmd+,` in the panel, or from the menu bar icon's menu.
 
+<img src="docs/img/settings.png" width="360" alt="settings">
+
 - **General:** the data folder, which holds your notes and their history, how long to keep
   history, the panel's default place and size on the display it's on (for
   `Ctrl+Cmd+M`; **Reset** goes back to the standard one), the
