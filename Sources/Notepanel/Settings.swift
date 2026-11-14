@@ -269,11 +269,12 @@ enum SettingsTab {
     case general, shortcuts
 }
 
-/// A display, as the Default place section shows it, and the size ⌃⌘M gives the panel there.
+/// A display, as the Default place section shows it, and where ⌃⌘M puts the panel there.
 struct DefaultPlace {
     var display: String
     var builtIn: Bool
-    var size: NSSize
+    /// From the display's top-left corner, y down.
+    var frame: NSRect
     /// Set with Use Current, rather than the standard place and size.
     var custom: Bool
 }
@@ -371,6 +372,7 @@ struct SettingsView: View {
                         Text(verbatim: placeSummary(place))
                             .font(.system(size: uiFontSize - 2))
                             .foregroundStyle(.secondary)
+                            .monospacedDigit()
                     }
                 }
             }
@@ -437,10 +439,12 @@ struct SettingsView: View {
         }
     }
 
-    /// "Custom · 620 × 410", or "Standard · 480 × 360, centered", with the window's size.
+    /// "Custom · 620 × 410 at (100, 60)", or "Standard · 480 × 360, centered", with the window's size.
     private func placeSummary(_ place: DefaultPlace) -> String {
-        let size = "\(Int(place.size.width)) × \(Int(place.size.height))"
-        return place.custom ? "Custom · \(size)" : "Standard · \(size), centered"
+        let frame = place.frame
+        let size = "\(Int(frame.width)) × \(Int(frame.height))"
+        return place.custom
+            ? "Custom · \(size) at (\(Int(frame.minX)), \(Int(frame.minY)))" : "Standard · \(size), centered"
     }
 
     private func chooseFolder() {
