@@ -44,6 +44,7 @@ private let windowKeys = [
 private let panelKeys = [
     ("New note", "⌘N"),
     ("Switch notes", "⌘P"),
+    ("Earlier versions of the note", "⌘Y"),
     ("Open a pinned note", "⌘1 … ⌘9"),
     ("Open the notes folder", "⌘O"),
     ("Bigger / smaller note text", "⌘+ / ⌘−"),
@@ -56,6 +57,14 @@ private let switcherKeys = [
     ("Open it", "↩"),
     ("Move it to the Trash", "⌘⌫"),
     ("Move a pinned note up / down", "⌥↑ / ⌥↓"),
+]
+
+private let historyKeys = [
+    ("Choose a version", "↑ / ↓"),
+    ("Copy all of it", "↩"),
+    ("Select all of it", "⌘A"),
+    ("Copy what’s selected", "⌘C"),
+    ("Close", "Esc or ⌘Y"),
 ]
 
 private let editingKeys = [
@@ -98,6 +107,7 @@ private struct KeysView: View {
                 setting("Default place and size, and back", "shortcut.defaultFrame")
             }
             Section("In the switcher") { rows(switcherKeys) }
+            Section("In earlier versions") { rows(historyKeys) }
             Section("Editing") { rows(editingKeys) }
         }
         .formStyle(.grouped)
