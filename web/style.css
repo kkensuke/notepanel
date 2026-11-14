@@ -49,8 +49,9 @@
   box-shadow: inset 0 0 0 1px var(--whitespace);
 }
 
-/* The switcher no longer hides the note by covering it, since its background is see-through. */
-body:has(#switcher:not([hidden])) > :not(#switcher) {
+/* The switcher and the history don't hide the note by covering it, since their background is
+   see-through. */
+body:has(#switcher:not([hidden]), #history:not([hidden])) > :not(#switcher, #history) {
   opacity: 0;
 }
 
@@ -109,7 +110,8 @@ footer {
   flex: none;
 }
 
-#switcher {
+#switcher,
+#history {
   position: absolute;
   inset: 0;
   background: var(--bg);
@@ -117,8 +119,13 @@ footer {
   flex-direction: column;
 }
 
-#switcher[hidden] {
+#switcher[hidden],
+#history[hidden] {
   display: none;
+}
+
+#history:focus {
+  outline: none;
 }
 
 .box {
@@ -154,7 +161,8 @@ footer {
   list-style: none;
 }
 
-#results li {
+#results li,
+#versions li {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
@@ -165,12 +173,50 @@ footer {
 }
 
 /* The row under the pointer gets about half the selected row's tint. */
-#results li:hover {
+#results li:hover,
+#versions li[role="option"]:hover {
   background: var(--match);
 }
 
-#results li[aria-selected="true"] {
+#results li[aria-selected="true"],
+#versions li[aria-selected="true"] {
   background: var(--selection);
+}
+
+/* The list takes at most the top part, and the chosen version's text the rest. */
+#versions {
+  flex: none;
+  max-height: 40%;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+#versions li {
+  grid-template-columns: 1fr auto;
+}
+
+#versions .empty {
+  display: block;
+  color: var(--muted);
+}
+
+#version {
+  flex: 1;
+  min-height: 0;
+  margin: 6px 0 0;
+  padding: 6px 4px;
+  border-top: 1px solid var(--border);
+  overflow-y: auto;
+  font: var(--size) / 1.6 var(--font);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* With no versions, the list's message stands alone. */
+#version:empty {
+  display: none;
 }
 
 .title,

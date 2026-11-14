@@ -12,6 +12,7 @@ import {
   insertLink,
   toggleTask,
   countCharacters,
+  versionLabel,
 } from "../src/logic.js"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 
@@ -152,4 +153,14 @@ test("countCharacters counts graphemes and skips line breaks", () => {
   assert.equal(countCharacters("あいう"), 3)
   assert.equal(countCharacters("\u{1F468}‍\u{1F469}‍\u{1F467}"), 1)
   assert.equal(countCharacters(""), 0)
+})
+
+test("versionLabel says today, yesterday, the date, or the date and year", () => {
+  const now = new Date(2026, 10, 14, 20, 30)
+  assert.equal(versionLabel(new Date(2026, 10, 14, 9, 5), now), "Today 9:05")
+  assert.equal(versionLabel(new Date(2026, 10, 13, 23, 40), now), "Yesterday 23:40")
+  assert.equal(versionLabel(new Date(2026, 10, 3, 14, 20), now), "Nov 3, 14:20")
+  assert.equal(versionLabel(new Date(2025, 10, 3, 14, 20), now), "Nov 3, 2025")
+  // Yesterday comes before the year: just after New Year, last night is yesterday.
+  assert.equal(versionLabel(new Date(2026, 11, 31, 23, 30), new Date(2027, 0, 1, 0, 10)), "Yesterday 23:30")
 })

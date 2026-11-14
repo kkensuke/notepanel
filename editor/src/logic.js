@@ -176,3 +176,17 @@ export function countCharacters(text) {
   for (const _ of segmenter.segment(text.replace(/\r?\n/g, ""))) count++
   return count
 }
+
+// When a version was kept, as the history lists it: "Today 9:05", "Yesterday 23:40",
+// "Nov 3, 14:20", and "Nov 3, 2025" in another year.
+export function versionLabel(date, now = new Date()) {
+  const time = `${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`
+  const midnight = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  // Rounded, since a day with a change of clocks is 23 or 25 hours long.
+  const days = Math.round((midnight(now) - midnight(date)) / 86_400_000)
+  if (days === 0) return `Today ${time}`
+  if (days === 1) return `Yesterday ${time}`
+  const day = {month: "short", day: "numeric"}
+  if (date.getFullYear() !== now.getFullYear()) return date.toLocaleDateString("en-US", {...day, year: "numeric"})
+  return `${date.toLocaleDateString("en-US", day)}, ${time}`
+}

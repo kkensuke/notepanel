@@ -1,4 +1,4 @@
-// The editor page: CodeMirror 6 for the note, and the note switcher on top of it.
+// The editor page: CodeMirror 6 for the note, and the note switcher and its history on top of it.
 // Swift calls `receive(message)`; the page answers with `post(type, data)`.
 import {EditorState, Compartment, RangeSetBuilder} from "@codemirror/state"
 import {
@@ -29,6 +29,7 @@ import {
   insertLink,
   toggleTask,
   countCharacters,
+  versionLabel,
 } from "./logic.js"
 
 // Outside the app (in a plain browser) there is no handler, so nothing is sent.
@@ -44,6 +45,9 @@ let footerHeight = 0
 const switcher = $("switcher")
 const query = $("query")
 const results = $("results")
+const historyView = $("history")
+const versionList = $("versions")
+const versionText = $("version")
 
 const highlight = HighlightStyle.define([
   {tag: tags.heading1, fontWeight: "bold", fontSize: "1.3em"},
@@ -287,6 +291,8 @@ function openNote(id, text, keepSwitcher) {
   view.dispatch({effects: settings.reconfigure(settingsExtensions())})
   currentId = id
   if (!keepSwitcher) closeSwitcher()
+  // Its versions are another note's.
+  closeHistory()
   updateCount()
 }
 
@@ -376,6 +382,7 @@ function dragPinned(event, note) {
 }
 
 function openSwitcher(list) {
+  closeHistory()
   notes = list
   selected = 0
   query.value = ""
@@ -515,6 +522,89 @@ query.addEventListener("keydown", event => {
   if (handled) event.preventDefault()
 })
 
+// ---- History
+
+// The open note's earlier versions, newest first, to copy from. Nothing here changes the note.
+let versions = []
+let chosen = 0
+
+const isHistoryOpen = () => !historyView.hidden
+
+function openHistory(list) {
+  closeSwitcher()
+  versions = list
+  chosen = 0
+  historyView.hidden = false
+  renderHistory()
+  historyView.focus()
+}
+
+function closeHistory() {
+  if (!isHistoryOpen()) return
+  historyView.hidden = true
+  view.focus()
+}
+
+function renderHistory() {
+  const now = new Date()
+  const rows = versions.map((version, index) => versionRow(version, index, now))
+  versionList.replaceChildren(...(rows.length ? rows : [element("li", "empty", "No earlier versions")]))
+  versionText.textContent = versions[chosen]?.text ?? ""
+  versionText.scrollTop = 0
+  const active = rows[chosen]
+  if (active) historyView.setAttribute("aria-activedescendant", active.id)
+  else historyView.removeAttribute("aria-activedescendant")
+  active?.scrollIntoView({block: "nearest"})
+}
+
+function versionRow(version, index, now) {
+  const item = document.createElement("li")
+  item.id = `version-${index}`
+  item.setAttribute("role", "option")
+  item.setAttribute("aria-selected", String(index === chosen))
+  const actions = element("span", "actions", "")
+  actions.append(actionButton("copy", "Copy This Version (↩)", () => copyVersion(index)))
+  item.append(element("span", "title", versionLabel(new Date(version.date), now)), actions)
+  item.addEventListener("mousedown", event => {
+    event.preventDefault()
+    chosen = index
+    renderHistory()
+  })
+  return item
+}
+
+// The row's button shows a tick for a moment, as the link popup's Copy button does.
+function copyVersion(index) {
+  const version = versions[index]
+  if (!version) return
+  post("copy", {text: version.text})
+  const button = versionList.children[index]?.querySelector(".action.copy")
+  if (!button) return
+  button.innerHTML = iconSVG("check")
+  clearTimeout(button.timer)
+  button.timer = setTimeout(() => (button.innerHTML = iconSVG("copy")), 1500)
+}
+
+function chooseVersion(index) {
+  chosen = Math.max(0, Math.min(index, versions.length - 1))
+  renderHistory()
+}
+
+// ⌘C copies what's selected in the version, as anywhere on the page.
+historyView.addEventListener("keydown", event => {
+  const plain = !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey
+  const command = event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey
+  let handled = true
+  if (plain && event.key === "ArrowDown") chooseVersion(chosen + 1)
+  else if (plain && event.key === "ArrowUp") chooseVersion(chosen - 1)
+  else if (plain && event.key === "Enter") copyVersion(chosen)
+  else if (plain && event.key === "Escape") closeHistory()
+  // Only the version, not the list too.
+  else if (command && event.key.toLowerCase() === "a") getSelection().selectAllChildren(versionText)
+  else handled = false
+  if (handled) event.preventDefault()
+})
+
 // ---- Messages from Swift
 
 window.receive = ({type, data}) => {
@@ -547,8 +637,13 @@ window.receive = ({type, data}) => {
         render()
       }
       break
+    case "history":
+      if (isHistoryOpen()) closeHistory()
+      else openHistory(data.versions)
+      break
     case "focus":
       if (isSwitcherOpen()) query.focus()
+      else if (isHistoryOpen()) historyView.focus()
       else view.focus()
       break
     case "options":
