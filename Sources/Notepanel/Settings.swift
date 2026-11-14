@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import NotepanelCore
 import ServiceManagement
 import SwiftUI
 
@@ -205,11 +206,13 @@ final class SettingsModel {
 @Observable
 final class ShortcutRecorder {
     let name: String
-    /// A global shortcut needs Command, Control or Option, so typing can't trigger it. One that
-    /// works only in the panel may use Shift alone.
+    /// Works from any app, rather than only in the panel. `allowsShortcut` says which modifiers each
+    /// may use.
     let global: Bool
     private(set) var shortcut: Shortcut?
     private(set) var recording = false
+    /// Why the keys just pressed weren't taken, while recording goes on.
+    private(set) var problem: String?
     @ObservationIgnored private var monitor: Any?
 
     init(name: String, global: Bool = true) {
@@ -229,6 +232,7 @@ final class ShortcutRecorder {
     func stop() {
         if let monitor { NSEvent.removeMonitor(monitor) }
         monitor = nil
+        problem = nil
         guard recording else { return }
         recording = false
         NotificationCenter.default.post(name: .recordingShortcut, object: false)
@@ -252,13 +256,17 @@ final class ShortcutRecorder {
             return
         }
         let flags = event.modifierFlags.intersection([.control, .option, .shift, .command])
-        guard !flags.isDisjoint(with: global ? [.control, .option, .command] : [.control, .option, .command, .shift])
-        else {
-            NSSound.beep()
+        guard allowsShortcut(ShortcutModifiers(flags), global: global) else {
+            refuse(global ? "Needs ⌃ or ⌥, or ⇧⌘" : "Needs ⌘ or ⌃")
             return
         }
         save(Shortcut(keyCode: keyCode, modifiers: carbonModifiers(flags), display: symbols(flags) + keyName(event)))
         stop()
+    }
+
+    private func refuse(_ why: String) {
+        problem = why
+        NSSound.beep()
     }
 
     private func save(_ new: Shortcut?) {
@@ -516,7 +524,7 @@ struct ShortcutField: View {
     let recorder: ShortcutRecorder
 
     var body: some View {
-        LabeledContent(title) {
+        LabeledContent {
             HStack(spacing: 6) {
                 Button(recorder.recording ? "Type a shortcut…" : (recorder.shortcut?.display ?? "Record Shortcut")) {
                     recorder.toggle()
@@ -531,6 +539,13 @@ struct ShortcutField: View {
                     .help("Remove shortcut")
                     .accessibilityLabel("Remove shortcut")
                 }
+            }
+        } label: {
+            Text(title)
+            // Under the title, as a form row's second line.
+            if let problem = recorder.problem {
+                Text(problem)
+                    .foregroundStyle(.red)
             }
         }
         .onDisappear { recorder.stop() }
@@ -552,6 +567,16 @@ func carbonModifiers(_ flags: NSEvent.ModifierFlags) -> Int {
     if flags.contains(.control) { result |= controlKey }
     if flags.contains(.shift) { result |= shiftKey }
     return result
+}
+
+extension ShortcutModifiers {
+    init(_ flags: NSEvent.ModifierFlags) {
+        self = []
+        if flags.contains(.command) { insert(.command) }
+        if flags.contains(.control) { insert(.control) }
+        if flags.contains(.option) { insert(.option) }
+        if flags.contains(.shift) { insert(.shift) }
+    }
 }
 
 private let keyNames: [Int: String] = [
