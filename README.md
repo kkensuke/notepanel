@@ -194,6 +194,7 @@ Editing:
 | `editor/` | The editor page (CodeMirror 6), built into `web/editor.js` |
 | `web/` | The page the panel shows in a web view |
 | `docs/design.md` | The design and the feature list (in Japanese) |
+| `docs/releasing.md` | How to publish a release |
 
 Node is needed only to change the editor page. `web/editor.js` and `web/THIRD_PARTY_LICENSES.txt`,
 the licenses of the packages bundled into it, are kept in the repository:
@@ -216,22 +217,6 @@ cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Ma
 comes only with Xcode. The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't
 in `/Applications`. To inspect the editor page in the running app, enable Safari's Develop menu;
 notepanel's page is listed there.
-
-### Releases
-
-A `vX.Y.Z` tag on `main` publishes a release. `.github/workflows/release.yml` builds the app for
-Apple silicon and Intel, attaches `notepanel-X.Y.Z.zip` to a GitHub release, and pushes
-`Casks/notepanel.rb` to [kkensuke/homebrew-tap](https://github.com/kkensuke/homebrew-tap). The tag
-must match `version` in `scripts/bundle.sh`, so set that on `main` first, then:
-
-```sh
-git tag -s vX.Y.Z -m "notepanel X.Y.Z"
-git push origin vX.Y.Z
-```
-
-`ARCHS="arm64 x86_64" scripts/bundle.sh` builds the same universal app locally. The workflow pushes
-to the tap with the secret `HOMEBREW_TAP_TOKEN` of the GitHub environment `release`: a
-fine-grained token with read and write access to the contents of `homebrew-tap` only.
 
 ## Credits
 
