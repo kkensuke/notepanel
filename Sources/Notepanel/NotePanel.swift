@@ -8,8 +8,9 @@ final class NotePanel: NSPanel {
     /// Cmd-plus and Cmd-minus (+1 and -1, repeating while held) and Cmd-0 (0, to reset).
     var onZoom: (Int) -> Void = { _ in }
     /// Shortcuts set in Settings that work only while the panel is key, such as cycling through
-    /// notes, which repeats while held, and ⌃⌘M, which doesn't. They're taken before AppKit routes the key, so one can be
-    /// any key, even Control-Tab, which AppKit would otherwise use to move the focus to the title.
+    /// notes, which repeats while held, and ⌃⌘M, which doesn't. They're taken before AppKit routes
+    /// the key, so one can be any key, even Control-Tab, which AppKit would otherwise use to move
+    /// the focus to the title.
     var shortcuts: [(shortcut: Shortcut, repeats: Bool, action: () -> Void)] = [] {
         didSet {
             guard monitor == nil else { return }

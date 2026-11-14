@@ -289,7 +289,8 @@ final class ShortcutRecorder {
             refuse(global ? "Needs ⌃ or ⌥, or ⇧⌘" : "Needs ⌘ or ⌃")
             return
         }
-        let new = Shortcut(keyCode: keyCode, modifiers: carbonModifiers(flags), display: symbols(flags) + keyName(event))
+        let new = Shortcut(
+            keyCode: keyCode, modifiers: carbonModifiers(flags), display: symbols(flags) + keyName(event))
         if let use = usedBy(event, new) {
             refuse("\(new.display) is already used \(use)")
             return
