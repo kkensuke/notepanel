@@ -144,8 +144,15 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         guard let screen = panelScreen, let key = screen.displayKey else { return nil }
         let saved = Prefs.defaultFrame(for: key)
         let builtIn = screen.displayID.map { CGDisplayIsBuiltin($0) != 0 } ?? false
+        let display = screen.frame
+        let frame = placeOnDisplay(saved: saved, size: defaultSize, display: display, visible: screen.visibleFrame)
         return DefaultPlace(
-            display: screen.localizedName, builtIn: builtIn, size: saved?.size ?? defaultSize, custom: saved != nil)
+            display: screen.localizedName, builtIn: builtIn, displaySize: display.size,
+            menuBar: display.maxY - screen.visibleFrame.maxY,
+            // AppKit's y goes up from the bottom; screen positions are usually shown from the top-left.
+            frame: NSRect(
+                x: frame.minX - display.minX, y: display.maxY - frame.maxY, width: frame.width, height: frame.height),
+            custom: saved != nil)
     }
 
     /// Settings' Use Current: on the panel's display, ⌃⌘M will put the panel where it is now.
