@@ -134,6 +134,7 @@ open /Applications/notepanel.app
 | `editor/` | エディタのページ（CodeMirror 6）。`web/editor.js` にビルドする |
 | `web/` | パネルが Web ビューで表示するページ |
 | `docs/design.md` | 設計と機能一覧 |
+| `docs/releasing.ja.md` | リリースの手順 |
 
 Node が必要なのは、エディタのページを変えるときだけ。`web/editor.js` と、それに同梱したパッケージのライセンスをまとめた `web/THIRD_PARTY_LICENSES.txt` は、リポジトリに含めている。
 
@@ -152,17 +153,6 @@ cd editor && npm run smoke  # エディタのページを、Mac に見せかけ�
 ```
 
 `NotepanelChecks` は、XCTest のターゲットではなく、アサーションを並べた普通の実行ファイルにしている。XCTest は Xcode にしか含まれないため。スモークテストには Google Chrome が必要で、`/Applications` にないときは、環境変数 `CHROME` にその実行ファイルのパスを指定する。動いているアプリでエディタのページを調べるには、Safari の「開発」メニューを有効にする。notepanel のページがそこに出る。
-
-### リリース
-
-`main` 上のコミットに `vX.Y.Z` のタグを付けると、リリースを公開する。`.github/workflows/release.yml` が、Apple シリコンと Intel の両方で動くアプリをビルドし、`notepanel-X.Y.Z.zip` を GitHub のリリースに添付し、`Casks/notepanel.rb` を [kkensuke/homebrew-tap](https://github.com/kkensuke/homebrew-tap) に push する。タグは `scripts/bundle.sh` の `version` と一致していなければならない。先に `main` でこの値を変えてから、次を実行する。
-
-```sh
-git tag -s vX.Y.Z -m "notepanel X.Y.Z"
-git push origin vX.Y.Z
-```
-
-`ARCHS="arm64 x86_64" scripts/bundle.sh` で、同じユニバーサルアプリを手元でもビルドできる。ワークフローは、GitHub の environment `release` にある secret `HOMEBREW_TAP_TOKEN` を使って tap に push する。この secret には、`homebrew-tap` の contents だけを読み書きできる fine-grained token を入れる。
 
 ## クレジット
 
