@@ -219,9 +219,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     func setNoteShortcuts(next: Shortcut?, previous: Shortcut?) {
-        var shortcuts: [(Shortcut, () -> Void)] = []
-        if let next { shortcuts.append((next, { [weak self] in self?.cycle(1) })) }
-        if let previous { shortcuts.append((previous, { [weak self] in self?.cycle(-1) })) }
+        var shortcuts: [(shortcut: Shortcut, repeats: Bool, action: () -> Void)] = []
+        if let next { shortcuts.append((next, true, { [weak self] in self?.cycle(1) })) }
+        if let previous { shortcuts.append((previous, true, { [weak self] in self?.cycle(-1) })) }
         panel.shortcuts = shortcuts
     }
 

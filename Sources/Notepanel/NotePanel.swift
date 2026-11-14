@@ -10,9 +10,9 @@ final class NotePanel: NSPanel {
     /// Option-Cmd-0: the panel's default size and place, and back. It doesn't repeat while held.
     var onDefaultFrame: () -> Void = {}
     /// Shortcuts set in Settings that work only while the panel is key, such as cycling through
-    /// notes. They repeat while held. They're taken before AppKit routes the key, so one can be any
-    /// key, even Control-Tab, which AppKit would otherwise use to move the focus to the title.
-    var shortcuts: [(Shortcut, () -> Void)] = [] {
+    /// notes, which repeats while held. They're taken before AppKit routes the key, so one can be
+    /// any key, even Control-Tab, which AppKit would otherwise use to move the focus to the title.
+    var shortcuts: [(shortcut: Shortcut, repeats: Bool, action: () -> Void)] = [] {
         didSet {
             guard monitor == nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -73,10 +73,11 @@ final class NotePanel: NSPanel {
     }
 
     private func runShortcut(_ event: NSEvent) -> Bool {
-        guard event.window === self, let action = shortcuts.first(where: { $0.0.matches(event) })?.1 else {
+        guard event.window === self, let match = shortcuts.first(where: { $0.shortcut.matches(event) }) else {
             return false
         }
-        action()
+        // One that doesn't repeat still takes the repeats, so that they don't reach the editor.
+        if match.repeats || !event.isARepeat { match.action() }
         return true
     }
 
