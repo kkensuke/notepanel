@@ -1,6 +1,6 @@
 # notepanel 履歴機能 設計書
 
-- 状態：決定済み。決定事項は §10 にまとめた。
+- 状態：実装済み。決定事項は §10 にまとめた。
 - 作成：2026-11-14
 - 対象のコード：`kkensuke/notepanel` の `c339216`
 - 関連：`docs/design.md` の §5.3（ノートとファイル）、§5.7（保存）、§5.8（設定）、§5.9（ブリッジのメッセージ）、§6（ショートカット一覧）
@@ -173,7 +173,7 @@
 - 版を作る時機、間隔（最短 10 分）、空のファイルを残さないこと、失敗しても保存を続けることは、現状と同じ（§2）。
 - 間隔は、そのノートの履歴フォルダでいちばん新しい版の日時から測る。メモリ上の `lastBackup` は廃止する（§4.6）。
   - 再起動しても、改名しても（フォルダごと移るので）、他の Mac が版を作っても、同じ規則で判定できる。
-  - 版を書いた直後の間引き（§5.3）にも同じ一覧を使うので、フォルダを読むのは 1 回の保存につき 1 回で済む。フォルダの中は多くても数百のファイルなので、300 ms ごとの保存を遅くしない。
+  - 版を作らない保存では、フォルダを 1 回読むだけで済む。版を作ったときは、間引き（§5.3）のためにもう 1 回読む。フォルダの中は多くても数百のファイルなので、300 ms ごとの保存を遅くしない。
 - 版は `History/<ノート名>/<日時>.md` に置く。
   - `<日時>` は `yyyy-MM-dd HHmmss Z`、つまりローカル時刻と UTC からのずれである（例：`2026-11-14 203000 +0900`）。ずれを付けるので、別のタイムゾーンの Mac で読んでも同じ時刻になる。同じ名前のファイルがあれば ` 2`、` 3` …を付ける（`makeUniqueName`）。
   - ノート名はフォルダ名にだけ使うので、先頭 100 文字への切り詰めは要らなくなる。
@@ -261,7 +261,8 @@ public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> 
 |---|---|
 | ↑ / ↓ | 版を選ぶ |
 | ↩ | 選んだ版の全文をコピーする |
-| ⌘C | 本文をマウスで選んだ部分をコピーする |
+| ⌘A | 本文だけを全文選択する（一覧は選ばない） |
+| ⌘C | 本文で選んだ部分をコピーする |
 | Esc / ⌘Y | 閉じてノートに戻る |
 
 ### 5.6 設定画面
@@ -312,7 +313,7 @@ public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> 
   - 既定のフォルダのままなら、何もしなくてよい（ノートの場所は変わらない）。
   - ノートのフォルダを変更していた利用者は、更新後は既定の notepanel フォルダで開く。notepanel フォルダを選び直し、ノートをその中の `Notes/` に移してもらう。元のノートはそのまま残り、失われない。
   - 以上をリリースノートに書く。
-- Homebrew の cask（`kkensuke/homebrew-tap`）：README によれば `brew uninstall --zap` は設定とバックアップを消すので、`zap` の対象を、既定の notepanel フォルダの `Backups`・`History`・`settings.json` にする（cask の中身は未確認）。既定の場所以外にある notepanel フォルダは、ノートと同じく `zap` の対象外とする。
+- Homebrew の cask：`.github/workflows/release.yml` が書く cask の `zap` に、既定の notepanel フォルダの `History` と `settings.json` を加える。旧 `Backups` も残す。既定の場所以外にある notepanel フォルダは、ノートと同じく `zap` の対象外とする。
 - 文書を更新する：`docs/design.md`（§5.1 のメニュー、§5.3、§5.7、§5.8 の表、§5.9、§6、§8）、`README.md`、`README.ja.md`（バックアップの説明、メニュー、アンインストール）。
 
 ## 7. 変更するファイル
@@ -329,7 +330,8 @@ public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> 
 | `Sources/Notepanel/KeysWindow.swift` | ⌘Y と、履歴画面のキーを加える |
 | `editor/src/main.js`、`editor/src/logic.js` | 履歴画面（一覧、本文、コピー、キー操作）と、日時の書式を作る関数を加える |
 | `web/index.html`、`web/style.css` | 履歴画面の要素と見た目を加える。行の見た目は切替画面のものを使い回す |
-| `Sources/NotepanelChecks/main.swift`、`editor/test/logic.test.js` | テスト（§8）。`NoteStore` の初期化を使う既存の 10 か所も直す |
+| `Sources/NotepanelChecks/main.swift`、`editor/test/logic.test.js`、`editor/smoke/browser.mjs` | テスト（§8）。`NoteStore` の初期化を使う既存の 10 か所も直す |
+| `.github/workflows/release.yml` | cask の `zap`（§6） |
 | `docs/design.md`、`README.md`、`README.ja.md` | §6 のとおり |
 
 ## 8. テスト
@@ -354,6 +356,8 @@ public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> 
 - `setFolder` のあと、版と `settings.json` が新しい notepanel フォルダで読み書きされる。
 
 `editor/test/logic.test.js` で、日時の書式を作る関数（Today、Yesterday、同じ年、前の年）を確かめる。
+
+`editor/smoke/browser.mjs`（ヘッドレス Chrome）で、履歴画面を確かめる：⌘Y で開いて本文が見えなくなること、↑↓ で選ぶこと、↩ と行のボタンでのコピー、⌘A が本文だけを選ぶこと、Esc で閉じてノートが変わっていないこと、版がないときの表示、⌘Y・切替画面・別のノートを開くことで閉じること。
 
 ## 9. 既知の制約
 

@@ -93,9 +93,12 @@ jobs:
 
             uninstall quit: "io.github.kkensuke.notepanel"
 
-            # The notes folder (by default ~/Library/Application Support/notepanel/Notes) is left alone.
+            # The notes (by default in ~/Library/Application Support/notepanel/Notes) are left alone.
+            # Backups is where versions were kept before History.
             zap trash: [
               "~/Library/Application Support/notepanel/Backups",
+              "~/Library/Application Support/notepanel/History",
+              "~/Library/Application Support/notepanel/settings.json",
               "~/Library/Preferences/io.github.kkensuke.notepanel.plist",
             ]
           end
