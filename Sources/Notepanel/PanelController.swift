@@ -201,10 +201,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     // MARK: - Settings
 
-    func setFolder(_ folder: URL) {
-        guard folder.standardizedFileURL != store.folder.standardizedFileURL else { return }
+    func setFolder(_ dataFolder: URL) {
+        guard dataFolder.standardizedFileURL != store.dataFolder.standardizedFileURL else { return }
         finishTitle()
-        store.setFolder(folder)
+        store.setFolder(dataFolder)
         UserDefaults.standard.removeObject(forKey: "lastNote")
         openSomeNote()
     }
@@ -426,6 +426,15 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         bridge.send("switcher", ["notes": notesForSwitcher(), "force": false])
     }
 
+    /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes
+    /// the note.
+    private func toggleHistory() {
+        guard let name = store.current else { return }
+        let dates = ISO8601DateFormatter()
+        let versions = store.versions(of: name).map { ["date": dates.string(from: $0.date), "text": $0.text] }
+        bridge.send("history", ["id": name, "versions": versions])
+    }
+
     /// Pinned notes first, in the order the user gave them, then the rest, newest first. The
     /// switcher, cycling and Cmd-1 to Cmd-9 share it.
     private func orderedNotes() -> [NoteInfo] {
@@ -481,6 +490,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
             "p": { [weak self] in self?.toggleSwitcher() },
+            "y": { [weak self] in self?.toggleHistory() },
             "w": { [weak self] in self?.hide() },
             "o": { [weak self] in self?.openFolder() },
             ",": { [weak self] in self?.toggleSettings() },

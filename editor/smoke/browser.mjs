@@ -324,6 +324,54 @@ assert.equal(await page.$eval("#count", e => e.textContent), "4 characters")
 await receive("status", "Couldn't save")
 assert.equal(await page.$eval("#status", e => e.textContent), "Couldn't save")
 
+// The history lists the note's versions over the note. Return copies the chosen one, Cmd-A selects
+// only its text, nothing there changes the note, and Escape goes back to it.
+await receive("open", {id: "Plan", text: "now"})
+await clear()
+const earlier = [
+  {date: new Date().toISOString(), text: "a minute ago"},
+  {date: new Date(Date.now() - 40 * 86_400_000).toISOString(), text: "older\ntext"},
+]
+const historyOpen = () => page.evaluate(() => !document.getElementById("history").hidden)
+await receive("history", {id: "Plan", versions: earlier})
+assert.equal(await historyOpen(), true)
+assert.equal(await page.evaluate(() => document.activeElement.id), "history")
+assert.equal(await page.$eval("#editor", e => getComputedStyle(e).opacity), "0", "the note is out of sight")
+assert.match(await page.$eval("#versions li .title", e => e.textContent), /^Today \d+:\d\d$/)
+assert.equal(await page.$eval("#version", e => e.textContent), "a minute ago")
+await press("ArrowDown")
+assert.equal(await page.$eval("#version", e => e.textContent), "older\ntext")
+await press("Enter")
+assert.equal((await last("copy"))?.text, "older\ntext")
+assert.ok(
+  await page.$eval("#versions li[aria-selected='true'] .action.copy", e => e.innerHTML.includes("M5 12.5")),
+  "the button ticks")
+await press("a", ["Meta"])
+assert.equal(await page.evaluate(() => getSelection().toString()), "older\ntext")
+await press("Tab", ["Shift"])
+await page.keyboard.type("x")
+assert.equal(await page.evaluate(() => document.activeElement.id), "history", "Tab stays in the history")
+await page.click("#versions li:first-child .action.copy")
+assert.equal((await last("copy"))?.text, "a minute ago")
+await page.click("#versions li:first-child")
+assert.equal(await page.$eval("#version", e => e.textContent), "a minute ago")
+await press("Escape")
+assert.equal(await historyOpen(), false)
+assert.equal(await doc(), "now")
+assert.equal(await last("changed"), undefined, "the note never changed")
+// Cmd-Y again closes it, and the switcher or another note takes its place.
+await receive("history", {id: "Plan", versions: []})
+assert.equal(await page.$eval("#versions", e => e.textContent), "No earlier versions")
+await receive("history", {id: "Plan", versions: []})
+assert.equal(await historyOpen(), false)
+await receive("history", {id: "Plan", versions: earlier})
+await receive("switcher", {notes, force: true})
+assert.equal(await historyOpen(), false)
+await press("Escape")
+await receive("history", {id: "Plan", versions: earlier})
+await receive("open", {id: "Count", text: "ab\ncd"})
+assert.equal(await historyOpen(), false)
+
 assert.deepEqual(errors, [])
 console.log("smoke test passed")
 await browser.close()

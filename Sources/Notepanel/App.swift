@@ -22,7 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var showsIcon = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        controller = PanelController(store: NoteStore(folder: Prefs.folder, backups: Prefs.backups))
+        controller = PanelController(store: NoteStore(dataFolder: Prefs.dataFolder))
         controller.toggleSettings = { [weak self] in self?.settingsWindow.toggle() }
         controller.onScreenChange = { [weak self] in self?.settingsWindow.model.refreshPlace() }
         let model = settingsWindow.model
@@ -30,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.useCurrentFrame = { [weak self] in self?.controller.useCurrentFrameAsDefault() }
         model.useStandardFrame = { [weak self] in self?.controller.useStandardFrame() }
         model.panelTakes = { [weak self] in self?.controller.panelTakes($0) ?? false }
+        model.readKeepHistory = { [weak self] in self?.controller.store.keepHistory ?? .forever }
+        model.writeKeepHistory = { [weak self] in try self?.controller.store.setKeepHistory($0) }
         NSApp.mainMenu = mainMenu()
         setUpStatusItem()
         applySettings()
@@ -70,7 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applySettings() {
         registerHotKeys()
         let defaults = UserDefaults.standard
-        controller.setFolder(Prefs.folder)
+        controller.setFolder(Prefs.dataFolder)
+        // The data folder holds how long the history keeps versions.
+        settingsWindow.model.refreshKeepHistory()
         controller.setOptions(
             fontFamily: defaults.string(forKey: "fontFamily") ?? "",
             fontSize: defaults.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize,
@@ -156,7 +160,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(menuItem("Settings…", #selector(openSettings), ","))
         // Shown as ⇧⌘/, as the docs write it. This menu only shows the key; the panel handles it.
         menu.addItem(menuItem("Keyboard Shortcuts", #selector(openKeys), "/", [.command, .shift]))
-        menu.addItem(menuItem("Open Backups Folder", #selector(openBackups)))
+        menu.addItem(menuItem("Open History Folder", #selector(openHistory)))
         menu.addItem(.separator())
         menu.addItem(menuItem("Quit notepanel", #selector(quit), "q"))
         statusItem.menu = menu
@@ -179,9 +183,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openKeys() { KeysWindow.show() }
     @objc private func toggleSettings() { settingsWindow.toggle() }
     @objc private func toggleKeys() { KeysWindow.toggle() }
-    @objc private func openBackups() {
-        try? FileManager.default.createDirectory(at: Prefs.backups, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(Prefs.backups)
+    @objc private func openHistory() {
+        let history = controller.store.history
+        try? FileManager.default.createDirectory(at: history, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(history)
     }
     @objc private func quit() { NSApp.terminate(nil) }
 }

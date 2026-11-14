@@ -26,7 +26,7 @@ extension Notification.Name {
 
 /// Settings live in UserDefaults. The settings window edits the same keys through @AppStorage.
 enum Prefs {
-    static let defaultFolder = "~/Library/Application Support/notepanel/Notes"
+    static let defaultDataFolder = "~/Library/Application Support/notepanel"
     static let defaultFontSize = 14.0
     static let fontSizes = 9.0...36.0
     /// The text size of everything but the note: the title bar, the switcher, the footer and the
@@ -45,14 +45,11 @@ enum Prefs {
         "shortcut.defaultFrame": Shortcut(keyCode: kVK_ANSI_M, modifiers: controlKey | cmdKey, display: "⌃⌘M"),
     ]
 
-    static var folder: URL {
-        let path = UserDefaults.standard.string(forKey: "folder") ?? defaultFolder
+    /// Holds the notes, their history and settings.json, which `NoteStore` keeps there.
+    static var dataFolder: URL {
+        let path = UserDefaults.standard.string(forKey: "dataFolder") ?? defaultDataFolder
         return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
     }
-
-    /// Outside the notes folder, so backups never show up as notes.
-    static let backups = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("notepanel/Backups", isDirectory: true)
 
     /// The frame ⌃⌘M gives the panel on a display, set in Settings, by `NSScreen.displayKey`; nil for
     /// the standard one. It's relative to the display's bottom-left corner, so it moves with the
@@ -174,6 +171,12 @@ final class SettingsModel {
     var useCurrentFrame: () -> Void = {}
     var useStandardFrame: () -> Void = {}
     private(set) var place: DefaultPlace?
+    /// How long the history keeps versions, and saving it. It's in the data folder rather than
+    /// UserDefaults, so the app sets these, as it has the note store.
+    var readKeepHistory: () -> KeepHistory = { .forever }
+    var writeKeepHistory: (KeepHistory) throws -> Void = { _ in }
+    private(set) var keepHistory = KeepHistory.forever
+    private(set) var historyError: String?
     /// The fixed-pitch font families on this Mac, for the note font menu.
     private(set) var monospacedFonts: [String] = []
 
@@ -199,10 +202,38 @@ final class SettingsModel {
         place = describePlace()
     }
 
+    /// Another Mac using the same data folder can change it, so it's read when the window shows.
+    func refreshKeepHistory() {
+        keepHistory = readKeepHistory()
+    }
+
+    /// A limit deletes older versions of every note, which can't be undone, so it asks first.
+    /// Setting the same value again afterwards also puts the menu back if the answer was no.
+    func chooseKeepHistory(_ keep: KeepHistory) {
+        defer { refreshKeepHistory() }
+        guard keep != keepHistory else { return }
+        if keep.limit != nil {
+            let alert = NSAlert()
+            alert.messageText = "Delete versions older than 1 year?"
+            alert.informativeText = "This deletes them for every note in this data folder. You can’t undo this."
+            // Cancel comes first, so Return doesn't delete.
+            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: "Delete").hasDestructiveAction = true
+            guard alert.runModal() == .alertSecondButtonReturn else { return }
+        }
+        do {
+            try writeKeepHistory(keep)
+            historyError = nil
+        } catch {
+            historyError = "Couldn’t save: \(error.localizedDescription)"
+        }
+    }
+
     /// The login item can be changed in System Settings too, and fonts can be installed, so both
     /// are read each time the window shows.
     func refresh() {
         refreshPlace()
+        refreshKeepHistory()
         openAtLogin = SMAppService.mainApp.status == .enabled
         let names = NSFontManager.shared.availableFontNames(with: .fixedPitchFontMask) ?? []
         // Families starting with "." are the system's own, hidden from users.
@@ -328,7 +359,7 @@ struct DefaultPlace {
 
 struct SettingsView: View {
     let model: SettingsModel
-    @AppStorage("folder") private var folder = Prefs.defaultFolder
+    @AppStorage("dataFolder") private var dataFolder = Prefs.defaultDataFolder
     @AppStorage("fontFamily") private var fontFamily = ""
     @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
     @AppStorage("backgroundOpacity") private var backgroundOpacity = Prefs.defaultBackgroundOpacity
@@ -394,16 +425,36 @@ struct SettingsView: View {
 
     @ViewBuilder private var general: some View {
         Section {
-            Text(folder)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(dataFolder)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                // What it holds, so that choosing a notes folder itself shows up as Notes/Notes.
+                ForEach(["Notes", "History"], id: \.self) { name in
+                    Text(verbatim: (dataFolder as NSString).appendingPathComponent(name))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .font(.system(size: uiFontSize - 2))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Picker(
+                "Keep history",
+                selection: Binding(get: { model.keepHistory }, set: { model.chooseKeepHistory($0) })
+            ) {
+                Text("Forever").tag(KeepHistory.forever)
+                Text("For 1 year").tag(KeepHistory.oneYear)
+            }
+            if let historyError = model.historyError {
+                Text(historyError).font(.caption).foregroundStyle(.red)
+            }
         } header: {
             HStack {
-                Text("Notes folder")
+                Text("Data folder")
                 Spacer()
-                Button("Use Default") { folder = Prefs.defaultFolder }
-                    .disabled(folder == Prefs.defaultFolder)
+                Button("Use Default") { dataFolder = Prefs.defaultDataFolder }
+                    .disabled(dataFolder == Prefs.defaultDataFolder)
                 Button("Choose…", action: chooseFolder)
             }
         }
@@ -504,7 +555,7 @@ struct SettingsView: View {
         panel.canCreateDirectories = true
         panel.prompt = "Choose"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        folder = (url.path as NSString).abbreviatingWithTildeInPath
+        dataFolder = (url.path as NSString).abbreviatingWithTildeInPath
     }
 }
 

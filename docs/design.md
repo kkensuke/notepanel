@@ -95,7 +95,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 ### 5.1 呼び出し
 
 - ホットキー（既定は ⌃⌘N）で表示・非表示を切り替える。表示中でも前面になければ、前面に出してカーソルを置く。新規ノートと検索のホットキーは、既定では割り当てない。
-- メニューバーアイコンは既定で表示し、設定で隠せる。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「New Note」「Search Notes」「Settings…」「Keyboard Shortcuts」「Open Backups Folder」「Quit notepanel」を出す。各項目の右には、パネルで同じことをするキーを表示する。アイコンを隠しているときは、パネルで ⌘, を押すか、アプリをもう一度開く（Finder や Spotlight から）と設定画面が開く。パネル、設定画面、キー操作の一覧では ⌘Q で終了する。
+- メニューバーアイコンは既定で表示し、設定で隠せる。クリックで表示・非表示を切り替え、右クリック（または ⌃・⌥ クリック）で「New Note」「Search Notes」「Settings…」「Keyboard Shortcuts」「Open History Folder」「Quit notepanel」を出す。各項目の右には、パネルで同じことをするキーを表示する。アイコンを隠しているときは、パネルで ⌘, を押すか、アプリをもう一度開く（Finder や Spotlight から）と設定画面が開く。パネル、設定画面、キー操作の一覧では ⌘Q で終了する。
 - 表示する直前に最前面のアプリを記録する。隠すときに、そのアプリがまだ最前面ならフォーカスを戻す。別のアプリに移っていれば何もしない（tinycast と同じ）。
 - パネルの設定は tinycast に合わせる：`.nonactivatingPanel`、`isFloatingPanel = true`、`hidesOnDeactivate = false`、`collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]`、`level = .floating`。
 - 表示・非表示にアニメーションを付けない（パネルと設定画面の `animationBehavior = .none`）。隠すときは、先にパネルを隠してから保存する。ホットキーはキーを押した時点で働く（離した時点ではない）。
@@ -116,7 +116,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 
 ### 5.3 ノートとファイル
 
-- 保存先の既定は `~/Library/Application Support/notepanel/Notes`。設定画面でフォルダを選べる。
+- 設定画面で選ぶのはデータフォルダ（既定は `~/Library/Application Support/notepanel`）で、ノートはその中の `Notes` に置く（保存先フォルダ）。データフォルダには、ほかにノートの履歴（`History`）と `settings.json` を置く（`docs/history.md` §5.1）。データフォルダをクラウドのフォルダに置けば、ノートと履歴が一緒に同期される。
 - 1 ノート＝1 つの `.md` ファイル。ファイル名がそのままノート名で、アプリに表示する名前とファイル名は常に一致する。メタデータ、データベース、隠しファイルは作らない。
 - 対象は保存先フォルダ直下の `.md` だけ。サブフォルダ、隠しファイル、シンボリックリンクは無視する。
 - 新規ノートは `Untitled.md`、`Untitled 2.md` …と名付ける。
@@ -127,7 +127,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 - 一覧は更新日時の新しい順に並べる。
 - 常に 1 つのノートを開いている状態を保つ。フォルダが空なら `Untitled.md` を作る。
 - 名前に使えないもの：空文字、`.` で始まる名前、`/` と `:` を含む名前、240 バイトを超える名前。大文字・小文字だけの変更はできる。
-- 削除は `FileManager.trashItem` でゴミ箱へ移す。誤操作を防ぐため、移す前に確認する（`NSAlert` のシート。既定ボタンは「Move to Trash」、Esc で取り消し）。
+- 削除は `FileManager.trashItem` でゴミ箱へ移す。誤操作を防ぐため、移す前に確認する（`NSAlert` のシート。既定ボタンは「Move to Trash」、Esc で取り消し）。履歴はそのまま残す（`docs/history.md` §5.4）。
 
 ### 5.4 切替画面
 
@@ -138,6 +138,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 - ピン留めしたノートは、一覧の先頭に（ピン留めしたものの中では利用者が決めた順に）並べ、アイコンを塗りつぶして示す。新しくピン留めしたノートは最後に加わる。検索欄が空のときは、行の左のつまみをドラッグするか、⌥↑ / ⌥↓ で並べ替える。検索中は一致の順に並ぶので並べ替えない。⌘1〜⌘9 で 1〜9 番目のピン留めを開く。そのキーは、ピン留めの行のピンの左に薄く表示する。ピン留めは `UserDefaults` に保存先フォルダごとに記録し、ノートの名前が変われば追従し、ゴミ箱へ移せば外す。ノートのフォルダには何も書かない。
 - 日本語入力の変換中は、Enter・Esc・矢印キーを切替画面の操作に使わない。
 - 本文の検索に使うため、切替画面を開くときに全ノートの本文をまとめて JS に渡す。
+- ⌘Y で開く以前の版の画面も、切替画面と同じくパネル全体を覆う。2 つは同時に開かない（`docs/history.md` §5.5）。
 
   `// shortcut: 全ノートの本文を一括送信する。合計が数十 MB になったら Swift 側の検索に切り替える`
 
@@ -175,7 +176,7 @@ CodeMirror 6 に次の拡張を入れる。
 
 非アクティブ化パネルでは、アプリが非アクティブのままなので、メインメニューのキー割り当てに頼れない。tinycast も、この場合に備えてパネル側でキーを処理している（`NotesPanel.performKeyEquivalent`）。本設計では、キー入力を次の順に処理する。
 
-1. `NotePanel.performKeyEquivalent`：アプリのコマンド（⌘N、⌘P、⌘W、⌘O、⌘1〜⌘9、⌘,、⇧⌘/、⌘Q）を処理する。リピートは無視する。設定で変えられるパネル内のショートカット（⌃Tab、⌃⇧Tab、⌃⌘M）は、これより前にローカルモニタで受け取る（§5.8）。
+1. `NotePanel.performKeyEquivalent`：アプリのコマンド（⌘N、⌘P、⌘Y、⌘W、⌘O、⌘1〜⌘9、⌘,、⇧⌘/、⌘Q）を処理する。リピートは無視する。設定で変えられるパネル内のショートカット（⌃Tab、⌃⇧Tab、⌃⌘M）は、これより前にローカルモニタで受け取る（§5.8）。
 2. 同じ場所で ⌘X・⌘C・⌘V を受け、`NSApp.sendAction` で `cut:`・`copy:`・`paste:` を最初のレスポンダに送る。WKWebView では WebKit が DOM のクリップボードイベントを出し、CodeMirror が処理する。ノート名の編集中は、テキストフィールドが処理する。
 3. ノート名の編集中（最初のレスポンダが `NSText`）だけ、⌘A・⌘Z・⇧⌘Z をテキストフィールドで処理する（すべて選択・取り消し・やり直し）。エディタのこれらのキーは次の段で CodeMirror に届ける。
 4. それ以外は `super` に渡す。WKWebView が DOM の `keydown` にし、CodeMirror のキーマップが処理する（⌘Z、⇧⌘Z、⌘A、⌘D、⌘F、⌘⌫、⌘← など）。この経路ではリピートを止めない。
@@ -187,7 +188,7 @@ Undo・Redo はメニューに入れず、エディタでは第 1 段でも扱�
 
 - 入力が止まって 300 ms 後に自動保存する。隠すとき、ノートを切り替えるとき、終了するときは、待たずに保存する。
 - 書き込みは `Data.write(options: .atomic)` で行う。
-- バックアップ：保存でファイルを上書きする前に、その時点の内容を `~/Library/Application Support/notepanel/Backups/` に `日時 名前.md` として残す。1 ノートにつき最短 10 分ごとで、空のファイルは残さない。30 日より古いバックアップは起動時に消す。メニューバーアイコンの「Open Backups Folder」で開ける。バックアップに失敗しても保存は続ける。
+- 履歴：保存でファイルを上書きする前に、その時点の内容を版としてデータフォルダの `History/<ノート名>/` に残す。1 ノートにつき最短 10 分ごとで、空のファイルは残さない。版は時間とともに間引く。メニューバーアイコンの「Open History Folder」で開ける。版を残せなくても保存は続ける。詳細は `docs/history.md`。
 - 外部変更の検知：最後に読み書きしたときの更新日時とサイズを覚えておく。
   - 表示するときに変化があり、未保存の変更がなければ読み直す。
   - 保存しようとしたときに変化があれば、元ファイルは上書きしない。`<名前> (conflict 2026-11-07 1530).md` という名前で別に保存し、そのノートを開いたままにする。フッターで知らせる。
@@ -205,7 +206,8 @@ Undo・Redo はメニューに入れず、エディタでは第 1 段でも扱�
 | 表示・非表示のホットキー | `hotkey.toggle` | ⌃⌘N |
 | 新規ノートのホットキー | `hotkey.create` | なし |
 | ノートを検索のホットキー | `hotkey.search` | なし |
-| 保存先フォルダ | `folder` | `~/Library/Application Support/notepanel/Notes` |
+| データフォルダ（中に `Notes`、`History`、`settings.json`） | `dataFolder` | `~/Library/Application Support/notepanel` |
+| 履歴の週ごとの版を残す期間（"Forever" か "For 1 year"。`UserDefaults` ではなくデータフォルダの `settings.json` に置く。`docs/history.md` §5.6） | `keepHistory` | `forever` |
 | ⌃⌘M で移す既定の位置と大きさ（ディスプレイごと。パネルを置いて「Use Current」で決める。ディスプレイの UUID から、ディスプレイの左下を原点とする `NSStringFromRect` の文字列への辞書） | `defaultFrames` | 空（どのディスプレイも、初めて開くときの大きさで中央） |
 | ノートのフォント（この Mac の等幅フォントからメニューで選ぶ） | `fontFamily` | 空（SF Mono） |
 | ノートの文字サイズ（⌘+ / ⌘− / ⌘0 で変える。設定画面には置かない） | `fontSize` | 14（9〜36） |
@@ -251,12 +253,13 @@ Undo・Redo はメニューに入れず、エディタでは第 1 段でも扱�
 | Swift→JS | `options` | `{fontFamily, fontSize, uiFontSize, showWhitespace, indentSize}` |
 | Swift→JS | `status` | フッターに出すメッセージ（空文字で消す） |
 | JS→Swift | `ready` | ページの読み込み完了。これより前に送るメッセージは Swift 側で待たせる |
+| Swift→JS | `history` | `{id, versions: [{date, text}]}`：以前の版の画面を開閉する。`date` は ISO 8601 |
 | JS→Swift | `changed` | `{id, text}`：入力ごとに送る。保存のタイミングは Swift 側で決める |
 | JS→Swift | `select`、`trash` | `{id}`：切替画面の操作 |
 | JS→Swift | `orderPins` | `{ids}`：並べ替えた後のピン留めの順 |
 | JS→Swift | `pin` | `{id}`：ピン留めの切り替え |
 | JS→Swift | `openURL` | `{url}` |
-| JS→Swift | `copy` | `{text}`：クリップボードに書く（リンクのボタンのコピー） |
+| JS→Swift | `copy` | `{text}`：クリップボードに書く（リンクのボタンのコピーと、以前の版のコピー） |
 | JS→Swift | `escape` | Esc の最終処理 |
 
 ## 6. ショートカット一覧
@@ -267,6 +270,7 @@ Undo・Redo はメニューに入れず、エディタでは第 1 段でも扱�
 |---|---|---|
 | ⌘N | 新規ノート | tinycast |
 | ⌘P | 切替画面を開く。開いていれば閉じる | tinycast |
+| ⌘Y | 開いているノートの以前の版の画面を開く。開いていれば閉じる（`docs/history.md` §5.5） | ブラウザの履歴 |
 | ⌘W | 隠す | tinycast |
 | ⌘O | 保存先フォルダを Finder で開き、開いているノートのファイルを選ぶ | tinycast |
 | ⌘, | 設定画面を開く。開いていれば閉じる（設定画面とキー操作の一覧でも働く） | 新規 |
@@ -276,7 +280,7 @@ Undo・Redo はメニューに入れず、エディタでは第 1 段でも扱�
 | ⌃Tab / ⌃⇧Tab | 次／前のノートを開く（設定で変更できる） | 新規 |
 | ⌘1〜⌘9 | 1〜9 番目のピン留めを開く | ブラウザのタブ |
 | ⌘Q | 終了する（保存してから終わり、保存できない変更があれば確認する。設定画面とキー操作の一覧でも働く） | 標準 |
-| Esc | 検索パネル → 複数カーソル → 切替画面 → ウィンドウの順に閉じる | tinycast＋CodeMirror |
+| Esc | 検索パネル → 複数カーソル → 切替画面・以前の版 → ウィンドウの順に閉じる | tinycast＋CodeMirror |
 
 表5：編集操作（CodeMirror 6 の標準キーマップ。Heynote の macOS の割り当てとほぼ同じ）
 
@@ -350,7 +354,7 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 | ID | 機能 | 区分 | 採否 |
 |---|---|---|---|
 | C1 | 1 ノート 1 .md、保存先フォルダ直下のみ | 必須 | 採用 |
-| C2 | 保存先フォルダの指定（設定画面で選ぶ） | 必須 | 採用 |
+| C2 | 保存先フォルダの指定（設定画面で選ぶ。K2 でデータフォルダの指定に変えた） | 必須 | 採用 |
 | C3 | 前回のノートを開く | 必須 | 採用 |
 | C4 | 新規作成（`Untitled.md`、`Untitled 2.md` …） | 必須 | 採用 |
 | C5 | `Untitled` のうちは 1 行目を表示名にする | 推奨 | 採用 |
@@ -433,6 +437,17 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 | J6 | ピン留め | §5.4 |
 | J7 | ノートの巡回 | §5.8。⌃Tab / ⌃⇧Tab、設定で変更できる |
 
+### K. 履歴で加えた・変えた機能
+
+設計は `docs/history.md` にまとめた。
+
+| ID | 機能 | 内容 |
+|---|---|---|
+| K1 | ノートごとの履歴 | I2（バックアップ）と 30 日での削除を置き換える。版は時間とともに間引く |
+| K2 | データフォルダ | C2 の保存先フォルダの指定を置き換える。中に `Notes`、`History`、`settings.json` を置く |
+| K3 | 以前の版の画面（⌘Y） | 版を一覧し、全体か一部をコピーする。ノートは変えない |
+| K4 | 履歴を残す期間の設定 | "Forever"（既定）か "For 1 year"。データフォルダの `settings.json` に置く |
+
 ### H. 採用しない機能（参考）
 
 | 機能 | 由来 | 理由 |
@@ -484,7 +499,7 @@ notepanel/
 
 ## 11. 決定事項
 
-1. 保存先：tinycast とは共有しない。既定は `~/Library/Application Support/notepanel/Notes` で、設定画面で変更できる。
+1. 保存先：tinycast とは共有しない。既定は `~/Library/Application Support/notepanel/Notes` で、設定画面でデータフォルダ（`Notes` の親）を変更できる。履歴の決定事項は `docs/history.md` §10 にある。
 2. 既定のホットキー：⌃⌘N（表示・非表示）。
 3. アプリ名：notepanel。
 4. ⌘+ / ⌘− は、ノートの文字サイズの設定をコマンドで変えるもの（同じ設定値を変える）。

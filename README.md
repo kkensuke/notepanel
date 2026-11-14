@@ -23,7 +23,7 @@ other editor, sync them or back them up as you like.
   marks with `Cmd+B`, `Cmd+I` and the like.
 - **Plain files.** Each note is a `.md` file named after its first line.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
-  keeps earlier versions as backups.
+  keeps earlier versions of each note, which `Cmd+Y` shows.
 - **Quick to switch notes.** `Cmd+P` searches the names and text of your notes, and
   `Ctrl+Tab` goes to the next one. Pinned notes come first, in the order you give them, and
   `Cmd+1` to `Cmd+9` open them.
@@ -68,6 +68,10 @@ panel), copy the new app to `/Applications`, and open it.
 - **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher: type to search,
   then press `Return` to open the note. A note found by its text opens with the match selected.
   Each row has a pin button and a trash button.
+- **Earlier versions.** `Cmd+Y` lists the note's earlier versions, newest first, with the chosen
+  one's text below. `Return` or a row's button copies a whole version; to copy part of one, select
+  it and press `Cmd+C`. Nothing there changes the note: to go back to a version, copy it, press
+  `Esc`, and paste it over the note.
 - **Pinned notes.** Pinned notes come first in the switcher and when you go through notes with
   `Ctrl+Tab`. To change their order, drag the handle at the left of a row, or press `Option+Up`
   and `Option+Down`, while the search field is empty. `Cmd+1` to `Cmd+9` open the first to ninth
@@ -83,7 +87,7 @@ panel), copy the new app to `/Applications`, and open it.
   where you drop it. The file itself isn't opened or changed. Several files go in on separate
   lines, and files that aren't text are skipped. `Cmd+Z` undoes it.
 - **Menu.** Right-click the menu bar icon (or Control-click it) for New Note, Search Notes,
-  Settings, Keyboard Shortcuts, the backups folder and Quit. Each item shows its key in the panel.
+  Settings, Keyboard Shortcuts, the history folder and Quit. Each item shows its key in the panel.
 - **Keys.** `Shift+Cmd+/` in the panel lists all the keys. The list is also in Settings →
   Shortcuts and in the menu bar icon's menu.
 - **Size.** The panel keeps the size you give it. `Cmd+Plus` and `Cmd+Minus` change the
@@ -98,7 +102,8 @@ panel), copy the new app to `/Applications`, and open it.
 
 Open Settings with `Cmd+,` in the panel, or from the menu bar icon's menu.
 
-- **General:** the notes folder, the panel's default place and size on the display it's on (for
+- **General:** the data folder, which holds your notes and their history, how long to keep
+  history, the panel's default place and size on the display it's on (for
   `Ctrl+Cmd+M`; **Reset** goes back to the standard one), the
   note font (one of the monospaced fonts on your Mac), the size of the interface text, the opacity
   of the panel's background, whether to show spaces, tabs and full-width spaces, how many spaces
@@ -117,9 +122,10 @@ open notepanel again from Finder or Spotlight.
 
 ## Your notes and their safety
 
-- **Where they are.** Notes are kept in `~/Library/Application Support/notepanel/Notes` unless
-  you choose another folder in Settings. notepanel lists the `.md` files at the top of that folder,
-  not in subfolders. Choosing another folder doesn't move your notes.
+- **Where they are.** Notes are kept in the `Notes` folder of notepanel's data folder, which is
+  `~/Library/Application Support/notepanel` unless you choose another one in Settings, such as a
+  folder that syncs. notepanel lists the `.md` files at the top of `Notes`, not in subfolders.
+  Choosing another data folder doesn't move your notes: move them into its `Notes` folder.
 - **Saving.** Text is saved 0.3 seconds after you stop typing, and at once when you hide the
   panel, switch notes or quit. The icon left of the note's name shows a dashed circle while the text
   isn't saved yet and a checked circle once it is. If a save fails, the icon turns into a red warning, the bottom
@@ -127,9 +133,13 @@ open notepanel again from Finder or Spotlight.
 - **Changes from other apps.** notepanel reads a note again when you show the panel or open the
   note. If the file changed on disk while you had unsaved text, your text goes to a separate copy
   named `… (conflict date time).md`, and the file on disk is left alone.
-- **Backups.** Before a save replaces a note, the earlier text is copied to
-  `~/Library/Application Support/notepanel/Backups`, at most once every 10 minutes per note.
-  Backups older than 30 days are deleted when notepanel starts.
+- **History.** Before a save replaces a note, the earlier text is kept as a version in the data
+  folder's `History`, in a folder named after the note, at most once every 10 minutes per note.
+  All versions from the last hour stay, then the newest in each hour for a day, in each day for a
+  week, and in each week after that: forever, or for a year if you choose so in Settings. A note's
+  history follows it when notepanel renames it, and stays when the note goes to the Trash. If a
+  new note later takes the name of one that's gone, the old history is renamed
+  `… (old date time)`. Versions are plain text files named with the date and time.
 - **Deleting.** Moving a note to the Trash asks first, and you can restore it from the Trash in
   Finder.
 - **Other files.** notepanel won't open a file that isn't UTF-8 text, and leaves it unchanged.
@@ -150,13 +160,15 @@ In the panel:
 | Key | Does |
 |---|---|
 | ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder with this note selected |
+| ⌘Y | Earlier versions of this note |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
 | ⌃⌘M | Panel to its default place and size on the pointer's display; again, back to where it was (change it in Settings) |
-| ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
+| ⌘W, Esc | Hide (Esc first closes search, extra cursors, the switcher or earlier versions) |
 | In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
 | In the switcher: ⌥↑ / ⌥↓ | Move a pinned note up / down (with the search field empty) |
+| In earlier versions: ↑↓, Return, ⌘A, ⌘C | Choose, copy all of it, select all of it, copy the selection |
 
 Editing:
 
@@ -179,14 +191,15 @@ Editing:
 
 - **`Ctrl+Cmd+N`, `Ctrl+Cmd+M` or another shortcut does nothing.** Another app may already use
   that shortcut. Choose another one in Settings → Shortcuts.
-- **I need an earlier version of a note.** Right-click the menu bar icon and choose Open Backups
-  Folder. Each backup is named with the date and time, then the note's name.
+- **I need an earlier version of a note.** Press `Cmd+Y` in the note. For a note that's gone, or
+  one renamed in Finder, right-click the menu bar icon and choose Open History Folder: each
+  note's versions are in a folder named after it.
 - **Uninstalling.** Turn off Open at login, then run `brew uninstall notepanel`, which also quits
   notepanel. If you built the app yourself, quit notepanel and delete `/Applications/notepanel.app`.
-  Its settings are removed with `defaults delete io.github.kkensuke.notepanel`. The folder
-  `~/Library/Application Support/notepanel` holds the backups and, unless you chose another
-  folder, your notes: keep it, or move your notes out before deleting it.
-  `brew uninstall --zap notepanel` removes the settings and the backups, but not the notes.
+  Its settings are removed with `defaults delete io.github.kkensuke.notepanel`. Unless you chose
+  another data folder, `~/Library/Application Support/notepanel` holds your notes and their
+  history: keep it, or move your notes out before deleting it.
+  `brew uninstall --zap notepanel` removes the settings and the history there, but not the notes.
 
 ## Development
 
@@ -197,6 +210,7 @@ Editing:
 | `editor/` | The editor page (CodeMirror 6), built into `web/editor.js` |
 | `web/` | The page the panel shows in a web view |
 | `docs/design.md` | The design and the feature list (in Japanese) |
+| `docs/history.md` | The design of note history (in Japanese) |
 | `docs/releasing.md` | How to publish a release |
 
 Node is needed only to change the editor page. `web/editor.js` and `web/THIRD_PARTY_LICENSES.txt`,
@@ -211,7 +225,7 @@ npm run build   # writes ../web/editor.js and ../web/THIRD_PARTY_LICENSES.txt
 Tests:
 
 ```sh
-swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, backups
+swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, history
 cd editor && npm test       # editor helpers: search ranking, links, line insertion, formatting, tasks, counts
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```

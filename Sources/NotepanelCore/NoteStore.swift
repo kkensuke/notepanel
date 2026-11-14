@@ -6,6 +6,12 @@ public struct NoteInfo: Equatable {
     public let modified: Date
 }
 
+/// One of a note's earlier versions: its text when it was kept.
+public struct NoteVersion: Equatable {
+    public let date: Date
+    public let text: String
+}
+
 public enum NoteStoreError: Error, Equatable {
     case invalidName
     case exists
@@ -20,24 +26,27 @@ public enum SaveState {
     case failed
 }
 
-/// Notes are the `.md` files directly inside `folder`, and a file's name is its note's name.
+/// Notes are the `.md` files directly inside `folder`, and a file's name is its note's name. A
+/// note's history is the folder of the same name in `history`.
 ///
 /// Losing text is the worst failure, so text only ever moves forward:
 /// - Writes are atomic, and a failed write keeps the text unsaved, to be tried again.
 /// - A file changed elsewhere since it was read is never overwritten; the text goes to a
 ///   conflict copy instead.
-/// - Before a note's file is overwritten, its current contents are copied to `backups`, at most
-///   once per `backupInterval` per note. Backups older than 30 days are deleted on launch.
+/// - Before a note's file is overwritten, its current contents are kept as a version, at most
+///   once per `versionInterval` per note. The versions are then thinned (`versionsToKeep`).
 /// - Renames never replace another file, and deleted notes go to the Trash.
 ///
 /// Everything runs on the main thread: the files are small, and one thread keeps saving simple.
 public final class NoteStore {
-    public private(set) var folder: URL
-    public let backups: URL?
+    /// Holds `Notes`, `History` and settings.json, so that the three move and sync together.
+    public private(set) var dataFolder: URL
+    public var folder: URL { dataFolder.appendingPathComponent("Notes", isDirectory: true) }
+    public var history: URL { dataFolder.appendingPathComponent("History", isDirectory: true) }
     public private(set) var current: String?
     public private(set) var text = ""
     public var saveDelay: TimeInterval = 0.3
-    public var backupInterval: TimeInterval = 10 * 60
+    public var versionInterval: TimeInterval = 10 * 60
     /// A message for the footer, or nil to clear it.
     public var onStatus: (String?) -> Void = { _ in }
     /// A note has a new name: the user renamed it, it followed its first line, or its text was
@@ -59,12 +68,9 @@ public final class NoteStore {
     private var savedText = ""
     private var pending: DispatchWorkItem?
     private var statusShown = false
-    private var lastBackup: [String: Date] = [:]
 
-    public init(folder: URL, backups: URL? = nil) {
-        self.folder = folder
-        self.backups = backups
-        pruneBackups()
+    public init(dataFolder: URL) {
+        self.dataFolder = dataFolder
     }
 
     /// True while the open note has text that isn't on disk, such as after a failed write.
@@ -133,7 +139,7 @@ public final class NoteStore {
         if let known = stamp, let now = fileStamp(name), now != known {
             target = makeUniqueName(conflictName(name, date: Date())) { exists($0) }
         } else {
-            backUp(name)
+            keepVersion(name)
         }
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -149,6 +155,7 @@ public final class NoteStore {
         savedText = text
         stamp = fileStamp(target)
         if target != name {
+            setAsideHistory(target)
             current = target
             onRenamed(name, target)
             report("“\(name)” was changed in another app, so your text was saved as “\(target)”.")
@@ -180,6 +187,7 @@ public final class NoteStore {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = makeUniqueName("Untitled") { exists($0) }
         try Data().write(to: url(name), options: .withoutOverwriting)
+        setAsideHistory(name)
         current = name
         text = ""
         savedText = ""
@@ -210,7 +218,8 @@ public final class NoteStore {
     }
 
     /// Moves a note to the Trash after saving it, so the Trash holds the latest text.
-    /// Returns the name the note had, which saving may have changed.
+    /// Returns the name the note had, which saving may have changed. Its history stays under the
+    /// same name, so a note put back from the Trash finds it again.
     @discardableResult
     public func trash(_ name: String) throws -> String {
         var name = name
@@ -223,11 +232,10 @@ public final class NoteStore {
         return name
     }
 
-    /// Saves the open note into the old folder, then forgets it.
+    /// Saves the open note into the old data folder, then forgets it.
     public func setFolder(_ newFolder: URL) {
         flush()
-        folder = newFolder
-        lastBackup = [:]
+        dataFolder = newFolder
         closeCurrent()
     }
 
@@ -236,7 +244,51 @@ public final class NoteStore {
         report(message)
     }
 
+    // MARK: - History
+
+    /// A note's earlier versions with their text, newest first. Any that isn't UTF-8 text is
+    /// left out.
+    public func versions(of name: String) -> [NoteVersion] {
+        versions(in: historyFolder(name)).compactMap { version in
+            guard let data = try? Data(contentsOf: version.url), let text = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+            return NoteVersion(date: version.date, text: text)
+        }
+    }
+
+    /// How long versions a week apart are kept, from the data folder's settings.json. It's read
+    /// each time, so a change made on another Mac counts once the file has synced.
+    public var keepHistory: KeepHistory {
+        KeepHistory(settings: try? Data(contentsOf: settingsFile))
+    }
+
+    /// Saves how long to keep versions. With a limit, the versions now past it go at once, from
+    /// every folder in `history`, including those of notes that are gone.
+    public func setKeepHistory(_ keep: KeepHistory) throws {
+        let data = try JSONSerialization.data(
+            withJSONObject: ["keepHistory": keep.rawValue], options: [.prettyPrinted, .sortedKeys])
+        try FileManager.default.createDirectory(at: dataFolder, withIntermediateDirectories: true)
+        try data.write(to: settingsFile, options: .atomic)
+        guard keep.limit != nil else { return }
+        let keys: Set<URLResourceKey> = [.isDirectoryKey]
+        let folders =
+            (try? FileManager.default.contentsOfDirectory(
+                at: history, includingPropertiesForKeys: Array(keys), options: [.skipsHiddenFiles])) ?? []
+        for folder in folders where (try? folder.resourceValues(forKeys: keys).isDirectory) == true {
+            thin(folder)
+        }
+    }
+
     // MARK: - Private
+
+    private var settingsFile: URL {
+        dataFolder.appendingPathComponent("settings.json", isDirectory: false)
+    }
+
+    private func historyFolder(_ name: String) -> URL {
+        history.appendingPathComponent(name, isDirectory: true)
+    }
 
     /// Renames the file after the first line of the saved text, numbering it if the name is
     /// taken. If that fails, the text is still saved; only the name lags behind.
@@ -246,46 +298,64 @@ public final class NoteStore {
         guard move(name, to: new) else { return }
         current = new
         stamp = fileStamp(new)
-        lastBackup[new] = lastBackup.removeValue(forKey: name)
         onRenamed(name, new)
     }
 
-    /// Copies the note's file as it is now into `backups`, unless it's empty or was copied
-    /// recently. A failed copy doesn't stop the save: the note itself matters more.
-    private func backUp(_ name: String) {
-        guard let backups, let size = fileStamp(name)?.size, size > 0,
-            Date().timeIntervalSince(lastBackup[name] ?? .distantPast) >= backupInterval
-        else { return }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd HHmmss"
-        let base = "\(formatter.string(from: Date())) \(name.prefix(100))"
-        let copyName = makeUniqueName(base) {
-            FileManager.default.fileExists(atPath: backups.appendingPathComponent($0 + ".md").path)
+    /// Keeps the note's file as it is now as a version, unless it's empty or the newest version
+    /// is recent, then thins the note's versions. The newest version is read from the folder
+    /// rather than remembered, so it holds after a restart or a rename, and counts a version
+    /// another Mac kept. A failed copy doesn't stop the save: the note itself matters more.
+    private func keepVersion(_ name: String) {
+        guard let size = fileStamp(name)?.size, size > 0 else { return }
+        let folder = historyFolder(name)
+        let now = Date()
+        if let newest = versions(in: folder).first?.date, now.timeIntervalSince(newest) < versionInterval { return }
+        let copy = makeUniqueName(versionName(now)) {
+            FileManager.default.fileExists(atPath: folder.appendingPathComponent($0 + ".md").path)
         }
         do {
-            try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
-            // Written rather than copied, so the backup's date is when it was made.
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try Data(contentsOf: url(name)).write(
-                to: backups.appendingPathComponent(copyName + ".md"), options: .withoutOverwriting)
-            lastBackup[name] = Date()
+                to: folder.appendingPathComponent(copy + ".md"), options: .withoutOverwriting)
         } catch {
             return
         }
+        thin(folder, now: now)
     }
 
-    private func pruneBackups() {
-        guard let backups else { return }
-        let keys: Set<URLResourceKey> = [.contentModificationDateKey]
-        let cutoff = Date().addingTimeInterval(-30 * 24 * 60 * 60)
+    /// The versions in a history folder, newest first: the `.md` files `versionName` named.
+    /// Anything else in the folder is left alone.
+    private func versions(in folder: URL) -> [(url: URL, date: Date)] {
         let files =
-            (try? FileManager.default.contentsOfDirectory(at: backups, includingPropertiesForKeys: Array(keys)))
-            ?? []
-        for file in files where file.pathExtension == "md" {
-            if let date = try? file.resourceValues(forKeys: keys).contentModificationDate, date < cutoff {
-                try? FileManager.default.removeItem(at: file)
-            }
+            (try? FileManager.default.contentsOfDirectory(
+                at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])) ?? []
+        return files.compactMap { file -> (url: URL, date: Date)? in
+            let name = file.deletingPathExtension().lastPathComponent
+            guard file.pathExtension == "md", let date = versionDate(name) else { return nil }
+            return (file, date)
         }
+        .sorted { $0.date > $1.date }
+    }
+
+    private func thin(_ folder: URL, now: Date = Date()) {
+        let all = versions(in: folder)
+        let kept = versionsToKeep(all.map(\.date), now: now, limit: keepHistory.limit)
+        for version in all where !kept.contains(version.date) {
+            try? FileManager.default.removeItem(at: version.url)
+        }
+    }
+
+    /// Moves the history folder under `name` aside, to `name (old 2026-11-14 2208)`, as a note
+    /// takes the name. Names never clash in `folder`, so a history folder under a new name was
+    /// left by a note that's gone: deleted, or renamed in Finder. If moving it fails, the new
+    /// note's versions join the old ones, but none are lost.
+    private func setAsideHistory(_ name: String) {
+        let manager = FileManager.default
+        guard manager.fileExists(atPath: historyFolder(name).path) else { return }
+        let aside = makeUniqueName(oldHistoryName(name, date: Date())) {
+            manager.fileExists(atPath: self.historyFolder($0).path)
+        }
+        _ = Darwin.rename(historyFolder(name).path, historyFolder(aside).path)
     }
 
     private func closeCurrent() {
@@ -301,8 +371,14 @@ public final class NoteStore {
         onStatus(message)
     }
 
+    /// Renames a note's file, then its history folder, after moving a gone note's history out of
+    /// the way. A change only in case finds the same history folder under both names on a
+    /// case-insensitive volume, so that one is just renamed.
     private func move(_ old: String, to new: String) -> Bool {
-        Darwin.rename(url(old).path, url(new).path) == 0
+        guard Darwin.rename(url(old).path, url(new).path) == 0 else { return false }
+        if !isSameItem(historyFolder(old), historyFolder(new)) { setAsideHistory(new) }
+        _ = Darwin.rename(historyFolder(old).path, historyFolder(new).path)
+        return true
     }
 
     private func exists(_ name: String) -> Bool {
@@ -310,9 +386,13 @@ public final class NoteStore {
     }
 
     private func isSameFile(_ a: String, _ b: String) -> Bool {
+        isSameItem(url(a), url(b))
+    }
+
+    private func isSameItem(_ a: URL, _ b: URL) -> Bool {
         let key: Set<URLResourceKey> = [.fileResourceIdentifierKey]
-        guard let x = try? url(a).resourceValues(forKeys: key).fileResourceIdentifier,
-            let y = try? url(b).resourceValues(forKeys: key).fileResourceIdentifier
+        guard let x = try? a.resourceValues(forKeys: key).fileResourceIdentifier,
+            let y = try? b.resourceValues(forKeys: key).fileResourceIdentifier
         else { return false }
         return x.isEqual(y)
     }
