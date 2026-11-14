@@ -117,6 +117,15 @@ equal(
     centered)
 equal(placeOnDisplay(saved: nil, size: firstSize, display: display, visible: visible), centered)
 
+// MARK: - Shortcuts
+
+// One in the panel needs ⌘ or ⌃; one from any app needs ⌃ or ⌥, or ⌘ with another modifier.
+let modifiers: [ShortcutModifiers] = [
+    [], [.shift], [.option], [.shift, .option], [.command], [.shift, .command], [.option, .command], [.control],
+]
+equal(modifiers.map { allowsShortcut($0, global: false) }, [false, false, false, false, true, true, true, true])
+equal(modifiers.map { allowsShortcut($0, global: true) }, [false, false, true, true, false, true, true, true])
+
 // MARK: - NoteStore
 
 inFolder { folder in

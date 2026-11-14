@@ -7,12 +7,11 @@ final class NotePanel: NSPanel {
     var commands: [String: () -> Void] = [:]
     /// Cmd-plus and Cmd-minus (+1 and -1, repeating while held) and Cmd-0 (0, to reset).
     var onZoom: (Int) -> Void = { _ in }
-    /// Option-Cmd-0: the panel's default size and place, and back. It doesn't repeat while held.
-    var onDefaultFrame: () -> Void = {}
     /// Shortcuts set in Settings that work only while the panel is key, such as cycling through
-    /// notes. They repeat while held. They're taken before AppKit routes the key, so one can be any
-    /// key, even Control-Tab, which AppKit would otherwise use to move the focus to the title.
-    var shortcuts: [(Shortcut, () -> Void)] = [] {
+    /// notes, which repeats while held, and ⌃⌘M, which doesn't. They're taken before AppKit routes
+    /// the key, so one can be any key, even Control-Tab, which AppKit would otherwise use to move
+    /// the focus to the title.
+    var shortcuts: [(shortcut: Shortcut, repeats: Bool, action: () -> Void)] = [] {
         didSet {
             guard monitor == nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -37,10 +36,6 @@ final class NotePanel: NSPanel {
             let step = Self.zoomSteps[key]
         {
             onZoom(step)
-            return true
-        }
-        if modifiers == [.command, .control], event.charactersIgnoringModifiers?.lowercased() == "m" {
-            if !event.isARepeat { onDefaultFrame() }
             return true
         }
         // With Shift, a command is looked up by the character typed, such as "?" for ⇧⌘/.
@@ -72,11 +67,24 @@ final class NotePanel: NSPanel {
         return super.performKeyEquivalent(with: event)
     }
 
-    private func runShortcut(_ event: NSEvent) -> Bool {
-        guard event.window === self, let action = shortcuts.first(where: { $0.0.matches(event) })?.1 else {
+    /// Whether `performKeyEquivalent` always keeps this key for the panel: zoom, a command, or cut,
+    /// copy or paste. Settings won't give a shortcut these keys. Keep it in step with that method.
+    func takes(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        guard modifiers.subtracting(.shift) == .command, let typed = event.charactersIgnoringModifiers else {
             return false
         }
-        action()
+        let key = modifiers.contains(.shift) ? typed : typed.lowercased()
+        return Self.zoomSteps[typed] != nil || commands[key] != nil
+            || (modifiers == .command && Self.editActions[key] != nil)
+    }
+
+    private func runShortcut(_ event: NSEvent) -> Bool {
+        guard event.window === self, let match = shortcuts.first(where: { $0.shortcut.matches(event) }) else {
+            return false
+        }
+        // One that doesn't repeat still takes the repeats, so that they don't reach the editor.
+        if match.repeats || !event.isARepeat { match.action() }
         return true
     }
 

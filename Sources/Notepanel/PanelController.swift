@@ -155,6 +155,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             custom: saved != nil)
     }
 
+    /// Whether the panel's own commands use this key, which Settings won't give a shortcut.
+    func panelTakes(_ event: NSEvent) -> Bool {
+        panel.takes(event)
+    }
+
     /// Settings' Use Current: on the panel's display, ⌃⌘M will put the panel where it is now.
     func useCurrentFrameAsDefault() {
         guard let screen = panelScreen, let key = screen.displayKey else { return }
@@ -218,10 +223,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
     }
 
-    func setNoteShortcuts(next: Shortcut?, previous: Shortcut?) {
-        var shortcuts: [(Shortcut, () -> Void)] = []
-        if let next { shortcuts.append((next, { [weak self] in self?.cycle(1) })) }
-        if let previous { shortcuts.append((previous, { [weak self] in self?.cycle(-1) })) }
+    func setPanelShortcuts(next: Shortcut?, previous: Shortcut?, defaultFrame: Shortcut?) {
+        var shortcuts: [(shortcut: Shortcut, repeats: Bool, action: () -> Void)] = []
+        if let next { shortcuts.append((next, true, { [weak self] in self?.cycle(1) })) }
+        if let previous { shortcuts.append((previous, true, { [weak self] in self?.cycle(-1) })) }
+        if let defaultFrame { shortcuts.append((defaultFrame, false, { [weak self] in self?.toggleDefaultFrame() })) }
         panel.shortcuts = shortcuts
     }
 
@@ -472,7 +478,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         bridge.webView.setValue(false, forKey: "drawsBackground")
         panel.contentView = background(behind: bridge.webView)
         panel.onZoom = { [weak self] step in self?.zoom(step) }
-        panel.onDefaultFrame = { [weak self] in self?.toggleDefaultFrame() }
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
             "p": { [weak self] in self?.toggleSwitcher() },

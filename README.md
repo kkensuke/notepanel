@@ -106,8 +106,11 @@ Open Settings with `Cmd+,` in the panel, or from the menu bar icon's menu.
   translucent background, which a short mark under the slider shows: move it left to see more of
   what's behind the panel, or right for a solid background. The text stays as it is.
 - **Shortcuts:** the shortcuts that work from any app (show or hide notes, new note, search notes)
-  and the ones that work in the panel (next and previous note). Click a shortcut and press the
-  keys. `Esc` cancels, and the × button removes the shortcut.
+  and the ones that work in the panel (next and previous note, default place). Click a shortcut and
+  press the keys. `Esc` cancels, and the × button removes the shortcut. So that a shortcut doesn't
+  take keys you type with, one from any app needs Control or Option, or Shift and Command, and one
+  in the panel needs Command or Control. Keys that another shortcut or the panel already uses
+  aren't taken, and the field says why.
 
 If you hide the menu bar icon, you can still reach Settings: press `Cmd+,` in the panel, or
 open notepanel again from Finder or Spotlight.
@@ -150,7 +153,7 @@ In the panel:
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
-| ⌃⌘M | Panel to its default place and size on the pointer's display; again, back to where it was |
+| ⌃⌘M | Panel to its default place and size on the pointer's display; again, back to where it was (change it in Settings) |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors or the switcher) |
 | In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
 | In the switcher: ⌥↑ / ⌥↓ | Move a pinned note up / down (with the search field empty) |
@@ -174,8 +177,8 @@ Editing:
 
 ## Troubleshooting
 
-- **`Ctrl+Cmd+N` does nothing.** Another app may already use that shortcut. Choose another one in
-  Settings → Shortcuts.
+- **`Ctrl+Cmd+N`, `Ctrl+Cmd+M` or another shortcut does nothing.** Another app may already use
+  that shortcut. Choose another one in Settings → Shortcuts.
 - **I need an earlier version of a note.** Right-click the menu bar icon and choose Open Backups
   Folder. Each backup is named with the date and time, then the note's name.
 - **Uninstalling.** Turn off Open at login, then run `brew uninstall notepanel`, which also quits

@@ -75,6 +75,25 @@ public func placeOnDisplay(saved: CGRect?, size: CGSize, display: CGRect, visibl
         width: size.width, height: size.height)
 }
 
+/// The modifier keys of a shortcut.
+public struct ShortcutModifiers: OptionSet, Sendable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+    public static let command = ShortcutModifiers(rawValue: 1)
+    public static let control = ShortcutModifiers(rawValue: 2)
+    public static let option = ShortcutModifiers(rawValue: 4)
+    public static let shift = ShortcutModifiers(rawValue: 8)
+}
+
+/// Whether Settings takes a shortcut with these modifiers. One that works only in the panel needs
+/// Command or Control: Shift or Option alone types characters (⇧A, and ⌥A for å) or edits (⇧Tab
+/// outdents, ⌥↑ moves lines). One that works from any app needs Command, Control or Option, but
+/// not Command alone, which every app uses for its own commands, such as ⌘C.
+public func allowsShortcut(_ modifiers: ShortcutModifiers, global: Bool) -> Bool {
+    guard global else { return !modifiers.isDisjoint(with: [.command, .control]) }
+    return !modifiers.isDisjoint(with: [.command, .control, .option]) && modifiers != .command
+}
+
 public func conflictName(_ name: String, date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
