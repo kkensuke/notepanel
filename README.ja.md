@@ -135,12 +135,12 @@ open /Applications/notepanel.app
 | `web/` | パネルが Web ビューで表示するページ |
 | `docs/design.md` | 設計と機能一覧 |
 
-Node が必要なのは、エディタのページを変えるときだけ。`web/editor.js` はリポジトリに含めている。
+Node が必要なのは、エディタのページを変えるときだけ。`web/editor.js` と、それに同梱したパッケージのライセンスをまとめた `web/THIRD_PARTY_LICENSES.txt` は、リポジトリに含めている。
 
 ```sh
 cd editor
 npm ci
-npm run build   # ../web/editor.js を書き出す
+npm run build   # ../web/editor.js と ../web/THIRD_PARTY_LICENSES.txt を書き出す
 ```
 
 テスト：
