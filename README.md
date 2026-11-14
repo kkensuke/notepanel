@@ -237,9 +237,7 @@ notepanel's page is listed there.
 
 ## Credits
 
-notepanel takes the way it opens and its panel from the Notes feature of
-[tinycast](https://github.com/abue-ammar/tinycast), and its editing from
-[Heynote](https://github.com/heyman/heynote). The editor is [CodeMirror 6](https://codemirror.net).
+The editor is [CodeMirror 6](https://codemirror.net).
 
 ## License
 
