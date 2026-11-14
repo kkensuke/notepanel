@@ -270,7 +270,7 @@ public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> 
 **Data folder**
 
 - 見出し「Notes folder」を「Data folder」に改め、ここで notepanel フォルダを選ぶ。「Use Default」と「Choose…」はそのまま残す。
-- 選んだパスの下に、中の `Notes` と `History` のパスを小さく表示する。誤って既存の Notes フォルダそのものを選んだ場合（`Notes/Notes` ができてしまう場合）も、これで気づける。この誤りを自動で検出する処理は作らない。
+- 表示するのは選んだパスだけで、中の `Notes` と `History` のパスは表示しない。誤って既存の Notes フォルダそのものを選んだ場合（`Notes/Notes` ができてしまう場合）を自動で検出する処理も作らない。
 - 設定のキーは `folder` から新しいキー `dataFolder` に替える。既定は `~/Library/Application Support/notepanel`（§6）。
 - フォルダを切り替えたら、`NoteStore.setFolder` でノートのフォルダ、履歴フォルダ、`settings.json` の場所をまとめて替える。今は `backups` が `let` なので、ノートのフォルダしか替わらない。
 
@@ -324,7 +324,7 @@ public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> 
 |---|---|
 | `Sources/NotepanelCore/Logic.swift` | `versionsToKeep`、版のファイル名を日時（UTC からのずれ付き）から作る関数と日時に読む関数、`settings.json` の値を保持期間に読む関数を加える |
 | `Sources/NotepanelCore/NoteStore.swift` | notepanel フォルダを受け取り、`Notes`、`History`、`settings.json` の場所をそこから決める。版の置き場所をノートごとのフォルダにし、版を作る間隔をそのフォルダの最新の版から測り、版を書いた直後に間引く。`lastBackup` を削除する。`move` で履歴のフォルダを移す。ノートが新しい名前を得るとき（`create`、`move`、衝突による別名保存）に、古い履歴フォルダを退ける。`setFolder` で 3 つの場所をまとめて替える。保持期間の読み書きと、全ノートの版の一括の間引きを加える。版の一覧と本文を返すメソッドを加える。`pruneBackups` を削除する |
-| `Sources/Notepanel/Settings.swift` | `Prefs.dataFolder` を加え、`Prefs.folder` と `Prefs.backups` を置き換える。Data folder の見出し、キー、パスの表示を変える。Keep history のメニューと確認を加える |
+| `Sources/Notepanel/Settings.swift` | `Prefs.dataFolder` を加え、`Prefs.folder` と `Prefs.backups` を置き換える。Data folder の見出しとキーを変える。Keep history のメニューと確認を加える |
 | `Sources/Notepanel/App.swift` | `NoteStore` の初期化と、設定変更時の `setFolder` を直す。メニューの項目を変える |
 | `Sources/Notepanel/PanelController.swift` | ⌘Y で版を読み、`history` を送る |
 | `Sources/Notepanel/KeysWindow.swift` | ⌘Y と、履歴画面のキーを加える |

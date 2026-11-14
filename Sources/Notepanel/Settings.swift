@@ -425,20 +425,10 @@ struct SettingsView: View {
 
     @ViewBuilder private var general: some View {
         Section {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(dataFolder)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .textSelection(.enabled)
-                // What it holds, so that choosing a notes folder itself shows up as Notes/Notes.
-                ForEach(["Notes", "History"], id: \.self) { name in
-                    Text(verbatim: (dataFolder as NSString).appendingPathComponent(name))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .font(.system(size: uiFontSize - 2))
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text(dataFolder)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
             Picker(
                 "Keep history",
                 selection: Binding(get: { model.keepHistory }, set: { model.chooseKeepHistory($0) })
