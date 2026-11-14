@@ -167,3 +167,7 @@ git push origin vX.Y.Z
 ## クレジット
 
 notepanel は、呼び出し方とパネルを [tinycast](https://github.com/abue-ammar/tinycast) の Notes 機能から、編集を [Heynote](https://github.com/heyman/heynote) から取り入れた。エディタは [CodeMirror 6](https://codemirror.net)。
+
+## ライセンス
+
+[MIT](LICENSE)
