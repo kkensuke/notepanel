@@ -155,6 +155,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             custom: saved != nil)
     }
 
+    /// Whether the panel's own commands use this key, which Settings won't give a shortcut.
+    func panelTakes(_ event: NSEvent) -> Bool {
+        panel.takes(event)
+    }
+
     /// Settings' Use Current: on the panel's display, ⌃⌘M will put the panel where it is now.
     func useCurrentFrameAsDefault() {
         guard let screen = panelScreen, let key = screen.displayKey else { return }

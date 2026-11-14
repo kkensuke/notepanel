@@ -29,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.describePlace = { [weak self] in self?.controller.defaultPlace() }
         model.useCurrentFrame = { [weak self] in self?.controller.useCurrentFrameAsDefault() }
         model.useStandardFrame = { [weak self] in self?.controller.useStandardFrame() }
+        model.panelTakes = { [weak self] in self?.controller.panelTakes($0) ?? false }
         NSApp.mainMenu = mainMenu()
         setUpStatusItem()
         applySettings()

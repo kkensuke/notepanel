@@ -66,6 +66,18 @@ final class NotePanel: NSPanel {
         return super.performKeyEquivalent(with: event)
     }
 
+    /// Whether `performKeyEquivalent` always keeps this key for the panel: zoom, a command, or cut,
+    /// copy or paste. Settings won't give a shortcut these keys. Keep it in step with that method.
+    func takes(_ event: NSEvent) -> Bool {
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        guard modifiers.subtracting(.shift) == .command, let typed = event.charactersIgnoringModifiers else {
+            return false
+        }
+        let key = modifiers.contains(.shift) ? typed : typed.lowercased()
+        return Self.zoomSteps[typed] != nil || commands[key] != nil
+            || (modifiers == .command && Self.editActions[key] != nil)
+    }
+
     private func runShortcut(_ event: NSEvent) -> Bool {
         guard event.window === self, let match = shortcuts.first(where: { $0.shortcut.matches(event) }) else {
             return false

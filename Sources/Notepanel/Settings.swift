@@ -13,6 +13,10 @@ struct Shortcut: Codable, Equatable {
     func matches(_ event: NSEvent) -> Bool {
         Int(event.keyCode) == keyCode && carbonModifiers(event.modifierFlags) == modifiers
     }
+
+    func hasKeys(of other: Shortcut) -> Bool {
+        keyCode == other.keyCode && modifiers == other.modifiers
+    }
 }
 
 extension Notification.Name {
@@ -156,12 +160,14 @@ final class SettingsModel {
     var tab = SettingsTab.general
     private(set) var openAtLogin = false
     private(set) var loginError: String?
-    let toggleShortcut = ShortcutRecorder(name: "hotkey.toggle")
-    let createShortcut = ShortcutRecorder(name: "hotkey.create")
-    let searchShortcut = ShortcutRecorder(name: "hotkey.search")
-    let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", global: false)
-    let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", global: false)
-    let defaultFrameShortcut = ShortcutRecorder(name: "shortcut.defaultFrame", global: false)
+    let toggleShortcut = ShortcutRecorder(name: "hotkey.toggle", title: "Show or hide notes")
+    let createShortcut = ShortcutRecorder(name: "hotkey.create", title: "New note")
+    let searchShortcut = ShortcutRecorder(name: "hotkey.search", title: "Search notes")
+    let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", title: "Next note", global: false)
+    let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", title: "Previous note", global: false)
+    let defaultFrameShortcut = ShortcutRecorder(name: "shortcut.defaultFrame", title: "Default place", global: false)
+    /// Whether the panel's own commands use a key. The app sets it, as it has the panel.
+    var panelTakes: (NSEvent) -> Bool = { _ in false }
     /// The display the panel is on and its default for ⌃⌘M, and setting that default. The app sets
     /// these, as it has the panel.
     var describePlace: () -> DefaultPlace? = { nil }
@@ -170,6 +176,24 @@ final class SettingsModel {
     private(set) var place: DefaultPlace?
     /// The fixed-pitch font families on this Mac, for the note font menu.
     private(set) var monospacedFonts: [String] = []
+
+    init() {
+        for recorder in recorders {
+            recorder.usedBy = { [weak self, unowned recorder] event, keys in
+                self?.use(of: event, keys, besides: recorder)
+            }
+        }
+    }
+
+    private var recorders: [ShortcutRecorder] {
+        [toggleShortcut, createShortcut, searchShortcut, nextShortcut, previousShortcut, defaultFrameShortcut]
+    }
+
+    /// What already uses these keys, besides `recorder`: "in the panel", or "for" another shortcut.
+    private func use(of event: NSEvent, _ keys: Shortcut, besides recorder: ShortcutRecorder) -> String? {
+        if panelTakes(event) { return "in the panel" }
+        return recorders.first { $0 !== recorder && $0.shortcut?.hasKeys(of: keys) == true }.map { "for \($0.title)" }
+    }
 
     func refreshPlace() {
         place = describePlace()
@@ -206,17 +230,22 @@ final class SettingsModel {
 @Observable
 final class ShortcutRecorder {
     let name: String
+    /// What the shortcut does, as Settings shows it.
+    let title: String
     /// Works from any app, rather than only in the panel. `allowsShortcut` says which modifiers each
     /// may use.
     let global: Bool
+    /// What else uses the keys pressed, if anything. The settings model sets it.
+    @ObservationIgnored var usedBy: (NSEvent, Shortcut) -> String? = { _, _ in nil }
     private(set) var shortcut: Shortcut?
     private(set) var recording = false
     /// Why the keys just pressed weren't taken, while recording goes on.
     private(set) var problem: String?
     @ObservationIgnored private var monitor: Any?
 
-    init(name: String, global: Bool = true) {
+    init(name: String, title: String, global: Bool = true) {
         self.name = name
+        self.title = title
         self.global = global
         shortcut = Prefs.shortcut(name)
     }
@@ -260,7 +289,12 @@ final class ShortcutRecorder {
             refuse(global ? "Needs ⌃ or ⌥, or ⇧⌘" : "Needs ⌘ or ⌃")
             return
         }
-        save(Shortcut(keyCode: keyCode, modifiers: carbonModifiers(flags), display: symbols(flags) + keyName(event)))
+        let new = Shortcut(keyCode: keyCode, modifiers: carbonModifiers(flags), display: symbols(flags) + keyName(event))
+        if let use = usedBy(event, new) {
+            refuse("\(new.display) is already used \(use)")
+            return
+        }
+        save(new)
         stop()
     }
 
@@ -342,14 +376,14 @@ struct SettingsView: View {
 
     @ViewBuilder private var shortcuts: some View {
         Section("Shortcuts from any app") {
-            ShortcutField(title: "Show or hide notes", recorder: model.toggleShortcut)
-            ShortcutField(title: "New note", recorder: model.createShortcut)
-            ShortcutField(title: "Search notes", recorder: model.searchShortcut)
+            ShortcutField(recorder: model.toggleShortcut)
+            ShortcutField(recorder: model.createShortcut)
+            ShortcutField(recorder: model.searchShortcut)
         }
         Section("Shortcuts in the panel") {
-            ShortcutField(title: "Next note", recorder: model.nextShortcut)
-            ShortcutField(title: "Previous note", recorder: model.previousShortcut)
-            ShortcutField(title: "Default place", recorder: model.defaultFrameShortcut)
+            ShortcutField(recorder: model.nextShortcut)
+            ShortcutField(recorder: model.previousShortcut)
+            ShortcutField(recorder: model.defaultFrameShortcut)
         }
         HStack {
             Spacer()
@@ -520,7 +554,6 @@ private struct DisplayMap: View {
 }
 
 struct ShortcutField: View {
-    let title: String
     let recorder: ShortcutRecorder
 
     var body: some View {
@@ -541,7 +574,7 @@ struct ShortcutField: View {
                 }
             }
         } label: {
-            Text(title)
+            Text(recorder.title)
             // Under the title, as a form row's second line.
             if let problem = recorder.problem {
                 Text(problem)
