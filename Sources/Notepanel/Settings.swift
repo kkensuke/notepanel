@@ -37,6 +37,7 @@ enum Prefs {
         "hotkey.toggle": Shortcut(keyCode: kVK_ANSI_N, modifiers: controlKey | cmdKey, display: "⌃⌘N"),
         "shortcut.nextNote": Shortcut(keyCode: kVK_Tab, modifiers: controlKey, display: "⌃⇥"),
         "shortcut.previousNote": Shortcut(keyCode: kVK_Tab, modifiers: controlKey | shiftKey, display: "⌃⇧⇥"),
+        "shortcut.defaultFrame": Shortcut(keyCode: kVK_ANSI_M, modifiers: controlKey | cmdKey, display: "⌃⌘M"),
     ]
 
     static var folder: URL {
@@ -159,6 +160,7 @@ final class SettingsModel {
     let searchShortcut = ShortcutRecorder(name: "hotkey.search")
     let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", global: false)
     let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", global: false)
+    let defaultFrameShortcut = ShortcutRecorder(name: "shortcut.defaultFrame", global: false)
     /// The display the panel is on and its default for ⌃⌘M, and setting that default. The app sets
     /// these, as it has the panel.
     var describePlace: () -> DefaultPlace? = { nil }
@@ -339,6 +341,7 @@ struct SettingsView: View {
         Section("Shortcuts in the panel") {
             ShortcutField(title: "Next note", recorder: model.nextShortcut)
             ShortcutField(title: "Previous note", recorder: model.previousShortcut)
+            ShortcutField(title: "Default place", recorder: model.defaultFrameShortcut)
         }
         HStack {
             Spacer()
@@ -381,8 +384,10 @@ struct SettingsView: View {
         } header: {
             HStack {
                 Text("Default place")
-                keysText("⌃⌘M")
-                    .foregroundStyle(.secondary)
+                if let keys = model.defaultFrameShortcut.shortcut?.display {
+                    keysText(keys)
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
                 Button("Reset", action: model.useStandardFrame)
                     .disabled(model.place?.custom != true)

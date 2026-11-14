@@ -218,10 +218,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
     }
 
-    func setNoteShortcuts(next: Shortcut?, previous: Shortcut?) {
+    func setPanelShortcuts(next: Shortcut?, previous: Shortcut?, defaultFrame: Shortcut?) {
         var shortcuts: [(shortcut: Shortcut, repeats: Bool, action: () -> Void)] = []
         if let next { shortcuts.append((next, true, { [weak self] in self?.cycle(1) })) }
         if let previous { shortcuts.append((previous, true, { [weak self] in self?.cycle(-1) })) }
+        if let defaultFrame { shortcuts.append((defaultFrame, false, { [weak self] in self?.toggleDefaultFrame() })) }
         panel.shortcuts = shortcuts
     }
 
@@ -472,7 +473,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         bridge.webView.setValue(false, forKey: "drawsBackground")
         panel.contentView = background(behind: bridge.webView)
         panel.onZoom = { [weak self] step in self?.zoom(step) }
-        panel.onDefaultFrame = { [weak self] in self?.toggleDefaultFrame() }
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
             "p": { [weak self] in self?.toggleSwitcher() },
