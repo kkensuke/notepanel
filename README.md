@@ -195,12 +195,13 @@ Editing:
 | `web/` | The page the panel shows in a web view |
 | `docs/design.md` | The design and the feature list (in Japanese) |
 
-Node is needed only to change the editor page. `web/editor.js` is kept in the repository:
+Node is needed only to change the editor page. `web/editor.js` and `web/THIRD_PARTY_LICENSES.txt`,
+the licenses of the packages bundled into it, are kept in the repository:
 
 ```sh
 cd editor
 npm ci
-npm run build   # writes ../web/editor.js
+npm run build   # writes ../web/editor.js and ../web/THIRD_PARTY_LICENSES.txt
 ```
 
 Tests:

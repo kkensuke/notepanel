@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/main.js --bundle --minify --format=iife --target=safari17 --outfile=../web/editor.js",
+    "build": "node build.mjs",
     "test": "node --test",
     "smoke": "node smoke/browser.mjs"
   },

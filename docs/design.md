@@ -461,7 +461,7 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 - エディタの純粋関数（あいまい一致と並べ替え、URL の抽出、上への行挿入、書式記号の付け外し、リンクの挿入、タスクの切り替え、文字数）は Node の `node --test` で確かめる。
 - R1〜R6 と IME は実機で確かめる。実機での利用で問題が出なかったため、v0.4 で README の確認手順と、確認用の切り替え（`activateOnShow`）を外した。
 
-ビルド：Xcode プロジェクトは作らない。SwiftPM と `scripts/bundle.sh`（.app の生成と ad-hoc 署名）を使い、Command Line Tools だけでビルドできるようにする。そのため、Xcode にしか実装（マクロのプラグイン）が含まれない SwiftUI のマクロ（macOS 27 SDK の `@State` など）は使わず、状態は `@Observable` のモデルに持たせる。`scripts/bundle.sh` は `swift build --build-system native` でビルドする。Swift 6.4 から既定になった Swift Build は、Command Line Tools でリンクすると実行ファイルの SDK の版数に最低対応 OS（14.0）を記録する。macOS はこの版数が 26 未満のアプリを macOS 26 より前のデザインで表示するため、リリース版と見た目が変わる。CI とリリースは GitHub の `xcode-27` ランナーでビルドし、手元と同じ macOS 27 SDK を使う。AppKit は SDK の版数によって動きを変えるため、手元で確かめた見た目のまま配布できる。エディタは `editor/` で `npm run build` を実行し、`web/editor.js` を出力する。`web/editor.js` はリポジトリに含めるので、エディタを変更しない限り Node は不要。
+ビルド：Xcode プロジェクトは作らない。SwiftPM と `scripts/bundle.sh`（.app の生成と ad-hoc 署名）を使い、Command Line Tools だけでビルドできるようにする。そのため、Xcode にしか実装（マクロのプラグイン）が含まれない SwiftUI のマクロ（macOS 27 SDK の `@State` など）は使わず、状態は `@Observable` のモデルに持たせる。`scripts/bundle.sh` は `swift build --build-system native` でビルドする。Swift 6.4 から既定になった Swift Build は、Command Line Tools でリンクすると実行ファイルの SDK の版数に最低対応 OS（14.0）を記録する。macOS はこの版数が 26 未満のアプリを macOS 26 より前のデザインで表示するため、リリース版と見た目が変わる。CI とリリースは GitHub の `xcode-27` ランナーでビルドし、手元と同じ macOS 27 SDK を使う。AppKit は SDK の版数によって動きを変えるため、手元で確かめた見た目のまま配布できる。エディタは `editor/` で `npm run build`（`editor/build.mjs`）を実行し、`web/editor.js` を出力する。同時に、`web/editor.js` に同梱したパッケージのライセンスを `web/THIRD_PARTY_LICENSES.txt` に書き出す。MIT ライセンスは、配布するコピーに著作権表示と許諾表示を含めるよう求めるからである。この 2 つはリポジトリに含めるので、エディタを変更しない限り Node は不要。
 
 ```
 notepanel/
@@ -471,8 +471,8 @@ notepanel/
 │   │                       # HotKeys.swift, EditorBridge.swift, Settings.swift
 │   ├── NotepanelCore/      # NoteStore.swift, Logic.swift
 │   └── NotepanelChecks/    # main.swift（swift run NotepanelChecks）
-├── web/                    # index.html, style.css, editor.js（生成物）
-├── editor/                 # package.json, src/main.js, src/logic.js, test/
+├── web/                    # index.html, style.css, editor.js, THIRD_PARTY_LICENSES.txt（後の 2 つは生成物）
+├── editor/                 # package.json, build.mjs, src/main.js, src/logic.js, test/
 ├── scripts/bundle.sh
 └── docs/design.md
 ```
