@@ -601,6 +601,8 @@ historyView.addEventListener("keydown", event => {
   else if (plain && event.key === "Escape") closeHistory()
   // Only the version, not the list too.
   else if (command && event.key.toLowerCase() === "a") getSelection().selectAllChildren(versionText)
+  // Focus stays here: Shift-Tab would reach the hidden note, and typing would change it.
+  else if (event.key === "Tab") {}
   else handled = false
   if (handled) event.preventDefault()
 })
