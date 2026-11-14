@@ -3,7 +3,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 
-version="0.1.3" # The release workflow checks that the tag matches this.
+version="0.1.4" # The release workflow checks that the tag matches this.
 
 # ARCHS="arm64 x86_64" builds a universal app, as the release workflow does.
 # shortcut: Swift Build, the default from Swift 6.4, links with the Command Line Tools recording the
