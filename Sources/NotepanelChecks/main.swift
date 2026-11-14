@@ -95,6 +95,49 @@ equal(validNoteName(String(repeating: "\u{3042}", count: 81)), nil)
 
 let date = DateComponents(calendar: Calendar(identifier: .gregorian), year: 2026, month: 11, day: 7, hour: 15, minute: 30)
 equal(conflictName("Plan", date: date.date!), "Plan (conflict 2026-11-07 1530)")
+equal(oldHistoryName("Plan", date: date.date!), "Plan (old 2026-11-07 1530)")
+
+// MARK: - Versions
+
+// A version's name holds its offset from UTC, so any time zone reads the same moment from it.
+var utc = Calendar(identifier: .gregorian)
+utc.timeZone = TimeZone(identifier: "UTC")!
+let moment = utc.date(from: DateComponents(year: 2026, month: 11, day: 14, hour: 11, minute: 30))!
+equal(versionDate("2026-11-14 203000 +0900"), moment)
+equal(versionDate("2026-11-14 113000 +0000"), moment)
+equal(versionDate("2026-11-14 203000 +0900 2"), moment)
+equal(versionDate(versionName(moment)), moment)
+equal(versionDate("2026-11-14 203000"), nil)
+equal(versionDate("2026-11-14 203000 +0900x"), nil)
+equal(versionDate("notes"), nil)
+
+// All from the last hour stay; then the newest in each hour, day and week, up to the limit.
+let minute: TimeInterval = 60, hour = 60 * minute, day = 24 * hour, week = 7 * day
+let now = Date(timeIntervalSince1970: 2900 * week)  // On an hour, a day and a week's start.
+let ago = { (seconds: TimeInterval) in now.addingTimeInterval(-seconds) }
+let versions = [
+    ago(10 * minute), ago(50 * minute),  // The last hour: both stay.
+    ago(80 * minute), ago(110 * minute),  // The same hour: the newer stays.
+    ago(3 * day - 5 * hour), ago(3 * day - hour),  // The same day.
+    ago(3 * week - 2 * day), ago(3 * week - day),  // The same week.
+    ago(400 * day),
+]
+let forever: Set = [
+    ago(10 * minute), ago(50 * minute), ago(80 * minute), ago(3 * day - 5 * hour), ago(3 * week - 2 * day),
+    ago(400 * day),
+]
+equal(versionsToKeep(versions, now: now, limit: nil), forever)
+let oneYear = KeepHistory.oneYear.limit
+equal(versionsToKeep(versions, now: now, limit: oneYear), forever.subtracting([ago(400 * day)]))
+// Thinning what's left changes nothing.
+equal(versionsToKeep(Array(forever), now: now, limit: nil), forever)
+
+// settings.json says how long; anything else keeps versions forever.
+equal(KeepHistory(settings: Data(#"{"keepHistory": "1 year"}"#.utf8)), .oneYear)
+equal(KeepHistory(settings: Data(#"{"keepHistory": "forever"}"#.utf8)), .forever)
+equal(KeepHistory(settings: Data(#"{"keepHistory": "2 years"}"#.utf8)), .forever)
+equal(KeepHistory(settings: Data("{".utf8)), .forever)
+equal(KeepHistory(settings: nil), .forever)
 
 // MARK: - Default place
 
@@ -129,7 +172,7 @@ equal(modifiers.map { allowsShortcut($0, global: true) }, [false, false, true, t
 // MARK: - NoteStore
 
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     let name = try store.create()
     equal(name, "Untitled")
     store.edit("hello")
@@ -142,7 +185,7 @@ inFolder { folder in
 
 // The file name follows the first line, stays unique, and stops following once renamed.
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     var renames: [String] = []
     store.onRenamed = { renames.append("\($0) -> \($1)") }
     _ = try store.create()
@@ -169,7 +212,7 @@ inFolder { folder in
 
 // A file changed elsewhere is never overwritten; the text goes to a conflict copy.
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     var renames: [(from: String, to: String)] = []
     store.onRenamed = { renames.append(($0, $1)) }
     _ = try store.create()
@@ -188,7 +231,7 @@ inFolder { folder in
 
 // A file deleted elsewhere is written again.
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     let name = try store.create()
     try FileManager.default.removeItem(at: store.url(name))
     store.edit("still here")
@@ -196,33 +239,118 @@ inFolder { folder in
     equal(try contents(store, try unwrapped(store.current)), "still here")
 }
 
-// The contents a save replaces are kept in the backups folder.
+// MARK: - History
+
+/// The texts of a note's versions, newest first.
+func kept(_ store: NoteStore, _ name: String) -> [String] {
+    store.versions(of: name).map(\.text)
+}
+
+// The contents a save replaces are kept in the note's history folder.
 inFolder { folder in
-    let backups = folder.appendingPathComponent("Backups")
-    let store = NoteStore(folder: folder.appendingPathComponent("Notes"), backups: backups)
-    let backedUp = { () throws -> [String] in
-        try FileManager.default.contentsOfDirectory(at: backups, includingPropertiesForKeys: nil)
-            .map { try String(contentsOf: $0, encoding: .utf8) }.sorted()
-    }
+    let store = NoteStore(dataFolder: folder)
     _ = try store.create()
     store.edit("v1")
     store.flush()  // The file was empty, so there is nothing to keep.
-    check(!FileManager.default.fileExists(atPath: backups.path), "no backup of an empty note")
+    check(!FileManager.default.fileExists(atPath: store.history.path), "no version of an empty note")
     store.edit("v1\nmore")
     store.flush()
-    equal(try backedUp(), ["v1"])
+    equal(kept(store, "v1"), ["v1"])
     store.edit("v1\nmore still")
-    store.flush()  // Too soon after the last backup.
-    equal(try backedUp(), ["v1"])
-    store.backupInterval = 0
-    store.edit("v1\nmore than ever")
+    store.flush()  // Too soon after the last version.
+    equal(kept(store, "v1"), ["v1"])
+    // The last version is read from the folder, so it's still recent after a restart.
+    let restarted = NoteStore(dataFolder: folder)
+    restarted.open("v1")
+    restarted.edit("v1\nafter a restart")
+    restarted.flush()
+    equal(kept(restarted, "v1"), ["v1"])
+    restarted.versionInterval = 0
+    restarted.edit("v1\nmore than ever")
+    restarted.flush()
+    equal(kept(restarted, "v1").count, 2)
+}
+
+// A note's history follows it when it follows its first line, and when the user renames it.
+inFolder { folder in
+    let store = NoteStore(dataFolder: folder)
+    store.versionInterval = 0
+    _ = try store.create()
+    store.edit("Plan")
     store.flush()
-    equal(try backedUp().count, 2)
+    store.edit("Plan\nsteps")
+    store.flush()
+    store.edit("Goals\nsteps")
+    store.flush()
+    equal(store.current, "Goals")
+    equal(kept(store, "Goals").count, 2)
+    equal(try store.rename("Goals", to: "Aims"), "Aims")
+    equal(kept(store, "Aims").count, 2)
+    equal(kept(store, "Goals"), [])
+}
+
+// The history of a note that's gone is moved aside when another note takes its name.
+inFolder { folder in
+    let store = NoteStore(dataFolder: folder)
+    store.versionInterval = 0
+    let manager = FileManager.default
+    _ = try store.create()
+    store.edit("Todo")
+    store.flush()
+    store.edit("Todo\nold")
+    store.flush()
+    equal(kept(store, "Todo"), ["Todo"])
+    try manager.removeItem(at: store.url("Todo"))  // Deleted in Finder, or trashed.
+    _ = try store.create()
+    store.edit("Todo")
+    store.flush()  // The new note follows its first line to the name.
+    equal(store.current, "Todo")
+    equal(kept(store, "Todo"), [])
+    let folders = try manager.contentsOfDirectory(atPath: store.history.path)
+    check(folders.contains { $0.hasPrefix("Todo (old ") }, "the old history moved aside: \(folders)")
+
+    // Renaming to a gone note's name moves its history aside too.
+    store.edit("Todo\nnew")
+    store.flush()
+    equal(kept(store, "Todo"), ["Todo"])
+    try manager.removeItem(at: store.url("Todo"))
+    _ = try store.create()
+    store.edit("Draft")
+    store.flush()
+    store.edit("Draft\nnew")
+    store.flush()
+    equal(try store.rename("Draft", to: "Todo"), "Todo")
+    equal(kept(store, "Todo"), ["Draft"])
+    // A change only in case keeps the note's own history.
+    equal(try store.rename("Todo", to: "todo"), "todo")
+    equal(kept(store, "todo"), ["Draft"])
+}
+
+// How long versions are kept is in the data folder's settings.json. A limit thins every history
+// folder at once, and leaves files that aren't versions alone.
+inFolder { folder in
+    let store = NoteStore(dataFolder: folder)
+    equal(store.keepHistory, .forever)
+    let gone = store.history.appendingPathComponent("Gone", isDirectory: true)
+    try FileManager.default.createDirectory(at: gone, withIntermediateDirectories: true)
+    let longAgo = Date().addingTimeInterval(-400 * 24 * 60 * 60)
+    for (name, text) in [(versionName(longAgo), "long ago"), (versionName(Date()), "now"), ("notes", "mine")] {
+        try Data(text.utf8).write(to: gone.appendingPathComponent(name + ".md"))
+    }
+    equal(kept(store, "Gone"), ["now", "long ago"])
+    try store.setKeepHistory(.oneYear)
+    equal(store.keepHistory, .oneYear)
+    equal(kept(store, "Gone"), ["now"])
+    let manager = FileManager.default
+    check(manager.fileExists(atPath: gone.appendingPathComponent("notes.md").path), "not a version")
+    check(manager.fileExists(atPath: folder.appendingPathComponent("settings.json").path), "settings.json")
+    store.setFolder(folder.appendingPathComponent("Elsewhere"))
+    equal(store.keepHistory, .forever)
 }
 
 // Edits made elsewhere are picked up, but never over unsaved text.
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     let name = try store.create()
     equal(store.reloadIfChanged(), nil)
     try Data("from outside".utf8).write(to: store.url(name))
@@ -236,15 +364,15 @@ inFolder { folder in
 
 // Saving is still possible after a failed write, and the text stays unsaved until then.
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     var states: [SaveState] = []
     store.onSaveState = { states.append($0) }
     _ = try store.create()
-    try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
+    try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: store.folder.path)
     store.edit("kept")
     store.flush()
     check(store.hasUnsavedChanges, "unsaved after a failed write")
-    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
+    try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: store.folder.path)
     store.flush()
     check(!store.hasUnsavedChanges, "saved once writing works again")
     equal(try contents(store, try unwrapped(store.current)), "kept")
@@ -252,7 +380,7 @@ inFolder { folder in
 }
 
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     let first = try store.create()
     let second = try store.create()
     throwsError(NoteStoreError.exists) { try store.rename(first, to: second) }
@@ -267,21 +395,23 @@ inFolder { folder in
 // Subfolders, other extensions, hidden files and links are not notes.
 inFolder { folder in
     let manager = FileManager.default
-    try manager.createDirectory(at: folder.appendingPathComponent("sub"), withIntermediateDirectories: true)
+    let store = NoteStore(dataFolder: folder)
+    let notes = store.folder
+    try manager.createDirectory(at: notes.appendingPathComponent("sub"), withIntermediateDirectories: true)
     for name in ["a.md", "b.txt", ".hidden.md", "sub/c.md"] {
-        try Data().write(to: folder.appendingPathComponent(name))
+        try Data().write(to: notes.appendingPathComponent(name))
     }
     try manager.createSymbolicLink(
-        at: folder.appendingPathComponent("link.md"), withDestinationURL: folder.appendingPathComponent("a.md"))
-    equal(NoteStore(folder: folder).list().map(\.name), ["a"])
+        at: notes.appendingPathComponent("link.md"), withDestinationURL: notes.appendingPathComponent("a.md"))
+    equal(store.list().map(\.name), ["a"])
 }
 
 // Text that isn't UTF-8 is not opened, and the footer says why.
 inFolder { folder in
-    let store = NoteStore(folder: folder)
+    let store = NoteStore(dataFolder: folder)
     var status: String?
     store.onStatus = { status = $0 }
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: store.folder, withIntermediateDirectories: true)
     try Data([0xFF, 0xFE, 0xFD]).write(to: store.url("bad"))
     equal(store.open("bad"), nil)
     equal(store.current, nil)

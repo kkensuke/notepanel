@@ -95,8 +95,78 @@ public func allowsShortcut(_ modifiers: ShortcutModifiers, global: Bool) -> Bool
 }
 
 public func conflictName(_ name: String, date: Date) -> String {
+    datedName(name, "conflict", date)
+}
+
+/// The name a gone note's history folder moves to, so that a new note can take the name.
+public func oldHistoryName(_ name: String, date: Date) -> String {
+    datedName(name, "old", date)
+}
+
+private func datedName(_ name: String, _ label: String, _ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "yyyy-MM-dd HHmm"
-    return "\(name) (conflict \(formatter.string(from: date)))"
+    return "\(name) (\(label) \(formatter.string(from: date)))"
+}
+
+// MARK: - History
+
+/// Local time with its offset from UTC, so that a Mac in another time zone reads the same moment.
+private let versionFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd HHmmss Z"
+    return formatter
+}()
+
+/// A version's file name, without `.md`: when it was kept, such as `2026-11-14 203000 +0900`.
+public func versionName(_ date: Date) -> String {
+    versionFormatter.string(from: date)
+}
+
+/// When a version was kept, from its file name without `.md`, which may end in ` 2` and so on.
+/// Nil for a name `versionName` doesn't make.
+public func versionDate(_ name: String) -> Date? {
+    let stamp = String(name.prefix(23))
+    guard isNumbered(name, base: stamp) else { return nil }
+    return versionFormatter.date(from: stamp)
+}
+
+/// The versions to keep: all from the last hour, then the newest in each hour for a day,
+/// in each day for a week, and in each week until `limit` (nil keeps them all).
+public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> Set<Date> {
+    let hour: TimeInterval = 60 * 60, day = 24 * hour, week = 7 * day
+    var kept = Set<Date>(), buckets = Set<[TimeInterval]>()
+    for date in dates.sorted(by: >) {
+        let size: TimeInterval
+        switch now.timeIntervalSince(date) {
+        case ..<hour: kept.insert(date); continue
+        case ..<day: size = hour
+        case ..<week: size = day
+        case ..<(limit ?? .infinity): size = week
+        default: continue
+        }
+        // Fixed lengths from 1970 in UTC, so every Mac keeps the same versions in any time zone.
+        let bucket = [size, (date.timeIntervalSince1970 / size).rounded(.down)]
+        if buckets.insert(bucket).inserted { kept.insert(date) }
+    }
+    return kept
+}
+
+/// How long a note's history keeps the versions a week apart. It lives in the data folder's
+/// settings.json, as `{"keepHistory": "1 year"}`, so every Mac using the folder keeps the same.
+public enum KeepHistory: String, Sendable {
+    case forever
+    case oneYear = "1 year"
+
+    /// Anything that can't be read, or no file at all, keeps versions forever: a damaged file
+    /// never deletes them.
+    public init(settings: Data?) {
+        let object = settings.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+        self = (object?["keepHistory"] as? String).flatMap(KeepHistory.init(rawValue:)) ?? .forever
+    }
+
+    /// The age past which versions go, or nil to keep them.
+    public var limit: TimeInterval? { self == .oneYear ? 365 * 24 * 60 * 60 : nil }
 }
