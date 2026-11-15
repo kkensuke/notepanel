@@ -198,8 +198,9 @@ final class SettingsModel {
     }
 
     /// What already uses these keys, besides `recorder`: "in the panel", or "for" another shortcut.
-    private func use(of event: NSEvent, _ keys: Shortcut, besides recorder: ShortcutRecorder) -> String? {
-        if panelTakes(event) { return "in the panel" }
+    /// Only keys pressed come with an event, which the panel's commands are matched against.
+    private func use(of event: NSEvent?, _ keys: Shortcut, besides recorder: ShortcutRecorder) -> String? {
+        if let event, panelTakes(event) { return "in the panel" }
         return recorders.first { $0 !== recorder && $0.shortcut?.hasKeys(of: keys) == true }.map { "for \($0.title)" }
     }
 
@@ -271,13 +272,16 @@ final class ShortcutRecorder {
     /// Works from any app, rather than only in the panel. `allowsShortcut` says which modifiers each
     /// may use.
     let global: Bool
-    /// What else uses the keys pressed, if anything. The settings model sets it.
-    @ObservationIgnored var usedBy: (NSEvent, Shortcut) -> String? = { _, _ in nil }
+    /// What else uses the keys pressed, or the default (with no event), if anything. The settings
+    /// model sets it.
+    @ObservationIgnored var usedBy: (NSEvent?, Shortcut) -> String? = { _, _ in nil }
     /// Runs as recording starts. The settings model sets it.
     @ObservationIgnored var willRecord: () -> Void = {}
+    let defaultShortcut: Shortcut?
     private(set) var shortcut: Shortcut?
     private(set) var recording = false
-    /// Why the keys just pressed weren't taken, while recording goes on.
+    /// Why the keys just pressed, or the default, weren't taken. It goes when recording starts or
+    /// stops, or the shortcut changes.
     private(set) var problem: String?
     @ObservationIgnored private var monitor: Any?
 
@@ -285,7 +289,14 @@ final class ShortcutRecorder {
         self.name = name
         self.title = title
         self.global = global
+        defaultShortcut = Prefs.defaultShortcuts[name]
         shortcut = Prefs.shortcut(name)
+    }
+
+    /// There's a default, and the field has other keys.
+    var canReset: Bool {
+        guard let defaultShortcut else { return false }
+        return shortcut?.hasKeys(of: defaultShortcut) != true
     }
 
     func toggle() {
@@ -294,6 +305,18 @@ final class ShortcutRecorder {
 
     func clear() {
         save(nil)
+    }
+
+    /// Puts the default back without recording it: while a field records, notepanel's hot keys are
+    /// off, and another app's hot key with the same keys takes them before the field sees them.
+    func reset() {
+        guard let defaultShortcut else { return }
+        // Not checked against the panel's commands, which use ⌘ alone or ⇧⌘, as no default does.
+        if let use = usedBy(nil, defaultShortcut) {
+            refuse("\(defaultShortcut.display) is already used \(use)")
+            return
+        }
+        save(defaultShortcut)
     }
 
     func stop() {
@@ -308,6 +331,7 @@ final class ShortcutRecorder {
     private func start() {
         willRecord()
         recording = true
+        problem = nil
         // Otherwise pressing a registered shortcut would trigger it instead of recording it.
         NotificationCenter.default.post(name: .recordingShortcut, object: true)
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
@@ -344,6 +368,7 @@ final class ShortcutRecorder {
     }
 
     private func save(_ new: Shortcut?) {
+        problem = nil
         shortcut = new
         Prefs.setShortcut(new, for: name)
     }
@@ -611,6 +636,16 @@ struct ShortcutField: View {
             HStack(spacing: 6) {
                 Button(recorder.recording ? "Type a shortcut…" : (recorder.shortcut?.display ?? "Record Shortcut")) {
                     recorder.toggle()
+                }
+                if let defaultShortcut = recorder.defaultShortcut, recorder.canReset, !recorder.recording {
+                    Button {
+                        recorder.reset()
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Reset to \(defaultShortcut.display)")
+                    .accessibilityLabel("Reset to default shortcut")
                 }
                 if recorder.shortcut != nil, !recorder.recording {
                     Button {

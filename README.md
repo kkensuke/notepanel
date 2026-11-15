@@ -114,10 +114,11 @@ Open Settings with `Cmd+,` in the panel, or from the menu bar icon's menu.
   what's behind the panel, or right for a solid background. The text stays as it is.
 - **Shortcuts:** the shortcuts that work from any app (show or hide notes, new note, search notes)
   and the ones that work in the panel (next and previous note, default place). Click a shortcut and
-  press the keys. `Esc` cancels, and the × button removes the shortcut. So that a shortcut doesn't
-  take keys you type with, one from any app needs Control or Option, or Shift and Command, and one
-  in the panel needs Command or Control. Keys that another shortcut or the panel already uses
-  aren't taken, and the field says why.
+  press the keys. `Esc` cancels, and the × button removes the shortcut. While a shortcut differs
+  from its default, the ↺ button puts the default back without recording it. So that a shortcut
+  doesn't take keys you type with, one from any app needs Control or Option, or Shift and Command,
+  and one in the panel needs Command or Control. Keys that another shortcut or the panel already
+  uses aren't taken, and the field says why.
 
 If you hide the menu bar icon, you can still reach Settings: press `Cmd+,` in the panel, or
 open notepanel again from Finder or Spotlight.
@@ -193,6 +194,9 @@ Editing:
 
 - **`Ctrl+Cmd+N`, `Ctrl+Cmd+M` or another shortcut does nothing.** Another app may already use
   that shortcut. Choose another one in Settings → Shortcuts.
+- **Pressing the keys while recording a shortcut does nothing.** Another app uses those keys as
+  its own shortcut, even if that feature is turned off in the app. Remove the shortcut in that app,
+  or, for a default such as `Ctrl+Cmd+N`, press the ↺ button next to the field.
 - **I need an earlier version of a note.** Press `Cmd+Y` in the note. For a note that's gone, or
   one renamed in Finder, right-click the menu bar icon and choose Open History Folder: each
   note's versions are in a folder named after it.
