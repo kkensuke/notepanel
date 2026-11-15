@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsWindow = SettingsWindow()
     private var statusItem: NSStatusItem!
     private var registered: [Shortcut?] = []
+    /// While a shortcut field records, the hot keys are off so that their keys reach it.
+    private var recording = false
     private var showsIcon = true
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -42,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         center.addObserver(forName: .recordingShortcut, object: nil, queue: .main) { [weak self] notification in
             let recording = notification.object as? Bool == true
             MainActor.assumeIsolated {
+                self?.recording = recording
                 if recording { self?.hotKeys.set([]) } else { self?.registerHotKeys(force: true) }
             }
         }
@@ -98,6 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func registerHotKeys(force: Bool = false) {
+        // Removing another field's shortcut while one records changes settings; recording's end
+        // registers the hot keys.
+        guard !recording else { return }
         let shortcuts = Prefs.hotKeyNames.map(Prefs.shortcut)
         guard force || shortcuts != registered else { return }
         registered = shortcuts
