@@ -24,7 +24,8 @@ final class HotKeys {
             1, &spec, Unmanaged.passUnretained(self).toOpaque(), nil)
     }
 
-    /// Replaces every registered shortcut. One that another app already holds is skipped.
+    /// Replaces every registered shortcut. One that fails to register is skipped. Another app that
+    /// registers the same keys doesn't make it fail: both apps get the key press.
     func set(_ bindings: [(Shortcut, () -> Void)]) {
         refs.forEach { UnregisterEventHotKey($0) }
         refs = []
