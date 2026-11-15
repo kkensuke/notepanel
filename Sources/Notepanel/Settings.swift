@@ -185,6 +185,11 @@ final class SettingsModel {
             recorder.usedBy = { [weak self, unowned recorder] event, keys in
                 self?.use(of: event, keys, besides: recorder)
             }
+            // One field records at a time: otherwise the first to finish would turn the hot keys
+            // back on while the other still records, and those keys would never reach it.
+            recorder.willRecord = { [weak self, unowned recorder] in
+                self?.recorders.filter { $0 !== recorder }.forEach { $0.stop() }
+            }
         }
     }
 
@@ -268,6 +273,8 @@ final class ShortcutRecorder {
     let global: Bool
     /// What else uses the keys pressed, if anything. The settings model sets it.
     @ObservationIgnored var usedBy: (NSEvent, Shortcut) -> String? = { _, _ in nil }
+    /// Runs as recording starts. The settings model sets it.
+    @ObservationIgnored var willRecord: () -> Void = {}
     private(set) var shortcut: Shortcut?
     private(set) var recording = false
     /// Why the keys just pressed weren't taken, while recording goes on.
@@ -299,6 +306,7 @@ final class ShortcutRecorder {
     }
 
     private func start() {
+        willRecord()
         recording = true
         // Otherwise pressing a registered shortcut would trigger it instead of recording it.
         NotificationCenter.default.post(name: .recordingShortcut, object: true)
