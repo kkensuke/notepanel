@@ -24,6 +24,7 @@ import {
   urlAt,
   linkAt,
   listIndent,
+  firstWord,
   insertLineAbove,
   toggleMark,
   insertLink,
@@ -95,6 +96,7 @@ const theme = EditorView.theme({
   ".cm-linkButtons": {display: "flex", gap: "1px", padding: "0 2px", fontSize: "var(--size)"},
   ".cm-linkButtons .action": {padding: "2px", fontSize: "inherit"},
   ".cm-linkButtons .action svg": {width: "1em", height: "1em"},
+  ".cm-firstWord": {wordBreak: "break-all"},
   ".cm-taskBox": {cursor: "pointer", borderRadius: "3px"},
   ".cm-taskBox:hover": {backgroundColor: "var(--selection)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
@@ -130,7 +132,11 @@ const ideographicSpaceBoxes = ViewPlugin.define(
 
 // A list item's wrapped rows start under its text, not under its marker. The 12px is the line's
 // own padding.
-function listIndents(view) {
+// Its first word breaks anywhere, as a URL does, so a word too long for the first row starts on
+// it instead of leaving the marker alone there. The wrapped rows are no wider, so a word that
+// fits on the first row wraps as before.
+const breakAnywhere = Decoration.mark({class: "cm-firstWord"})
+function listDecorations(view) {
   const builder = new RangeSetBuilder()
   for (const {from, to} of view.visibleRanges) {
     for (let pos = from; pos <= to; ) {
@@ -139,17 +145,19 @@ function listIndents(view) {
       if (n) {
         const style = `padding-left: calc(12px + ${n}ch); text-indent: -${n}ch`
         builder.add(line.from, line.from, Decoration.line({attributes: {style}}))
+        const word = firstWord(line.text)
+        if (word) builder.add(line.from + word.from, line.from + word.to, breakAnywhere)
       }
       pos = line.to + 1
     }
   }
   return builder.finish()
 }
-const hangingIndents = ViewPlugin.define(
+const listWrapping = ViewPlugin.define(
   view => ({
-    decorations: listIndents(view),
+    decorations: listDecorations(view),
     update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = listIndents(update.view)
+      if (update.docChanged || update.viewportChanged) this.decorations = listDecorations(update.view)
     },
   }),
   {decorations: plugin => plugin.decorations},
@@ -228,7 +236,7 @@ const extensions = [
   EditorView.lineWrapping,
   // The cursor's line stays clear of the footer.
   EditorView.scrollMargins.of(() => ({bottom: footerHeight})),
-  hangingIndents,
+  listWrapping,
   linkPopup,
   markdown({base: markdownLanguage}),
   syntaxHighlighting(highlight),

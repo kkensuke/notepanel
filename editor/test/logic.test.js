@@ -7,6 +7,7 @@ import {
   urlAt,
   linkAt,
   listIndent,
+  firstWord,
   insertLineAbove,
   toggleMark,
   insertLink,
@@ -83,6 +84,16 @@ test("listIndent measures a list item's marker, and is 0 for other lines", () =>
   assert.equal(listIndent("*emphasis* only", 4), 0)
   assert.equal(listIndent("-no space", 4), 0)
   assert.equal(listIndent("", 4), 0)
+})
+
+test("firstWord spans a list item's text up to the first space", () => {
+  assert.deepEqual(firstWord("- aaaa"), {from: 2, to: 6})
+  assert.deepEqual(firstWord("  1. word and more"), {from: 5, to: 9})
+  assert.deepEqual(firstWord("- [ ] task"), {from: 6, to: 10})
+  assert.deepEqual(firstWord("\t* あいう　えお"), {from: 3, to: 6})
+  assert.equal(firstWord("- "), null)
+  assert.equal(firstWord("-   "), null)
+  assert.equal(firstWord("Plain text"), null)
 })
 
 test("insertLineAbove keeps indentation and moves the cursor up", () => {

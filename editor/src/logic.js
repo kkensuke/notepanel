@@ -72,10 +72,20 @@ export function urlAt(line, offset) {
   return linkAt(line, offset)?.url ?? null
 }
 
+const listMarker = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/
+
 // The columns before a list item's text ("- ", "  1. ", "- [ ] "), or 0 if the line isn't one.
 export function listIndent(line, tabSize) {
-  const marker = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/.exec(line)
+  const marker = listMarker.exec(line)
   return marker ? countColumn(marker[0], tabSize) : 0
+}
+
+// Where a list item's first word starts and ends (up to the first space), or null if the line
+// isn't one or has no text.
+export function firstWord(line) {
+  const marker = listMarker.exec(line)
+  const word = marker && /^\S+/.exec(line.slice(marker[0].length))
+  return word && {from: marker[0].length, to: marker[0].length + word[0].length}
 }
 
 // VS Code's Shift-Cmd-Enter: a new line above each cursor, with the same indentation.
