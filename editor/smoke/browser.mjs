@@ -62,9 +62,13 @@ await press("z", ["Meta"])
 await press("z", ["Meta"])
 assert.equal(await changedText(), "one\n\n\nfour")
 
-// Cmd-Left goes to the line start, so typing lands there; Enter continues a list.
+// Cmd-Left goes to an item's text, then to the line start; Enter continues a list.
 await receive("open", {id: "List", text: "- item"})
 await page.click(".cm-content")
+await press("ArrowLeft", ["Meta"])
+await page.keyboard.type("x")
+assert.equal(await changedText(), "- xitem")
+await press("z", ["Meta"])
 await press("ArrowLeft", ["Meta"])
 await page.keyboard.type("x")
 assert.equal(await changedText(), "x- item")
@@ -76,6 +80,35 @@ assert.equal(await changedText(), "- item\n- next")
 await press("Enter")
 await press("Enter")
 assert.equal(await changedText(), "- item\n- next\n", "an empty item ends the list")
+
+// Cmd-Left skips quote markers and a heading's #s too, but not "- " in a code block.
+const typedAtHome = async (text, line) => {
+  await receive("open", {id: "Home", text})
+  await page.click(".cm-content")
+  await press("ArrowUp", ["Meta"])
+  for (let i = 1; i < line; i++) await press("ArrowDown")
+  await press("ArrowRight", ["Meta"])
+  await press("ArrowLeft", ["Meta"])
+  await page.keyboard.type("x")
+  return (await changedText()).split("\n")[line - 1]
+}
+assert.equal(await typedAtHome("> > - quote", 1), "> > - xquote")
+assert.equal(await typedAtHome("## Heading", 1), "## xHeading")
+assert.equal(await typedAtHome("```\n- code\n```", 2), "x- code")
+
+// In a wrapped item, Cmd-Left goes to the row's start first; Shift-Cmd-Left selects the text.
+await receive("open", {id: "Home", text: `- [ ] ${"word ".repeat(30)}end`})
+await page.click(".cm-content")
+await press("ArrowDown", ["Meta"])
+await press("ArrowLeft", ["Meta"])
+await page.keyboard.type("x")
+assert.match(await changedText(), /^- \[ \] word .* x(word|end)/, "the row's start")
+await press("z", ["Meta"])
+await press("ArrowDown", ["Meta"])
+await press("ArrowLeft", ["Meta", "Shift"])
+await press("ArrowLeft", ["Meta", "Shift"])
+await page.keyboard.type("x")
+assert.equal(await changedText(), "- [ ] x")
 
 // Shift-Cmd-Enter inserts a line above; Cmd-L selects the line; Alt-Up moves it.
 await receive("open", {id: "Lines", text: "a\n  b"})

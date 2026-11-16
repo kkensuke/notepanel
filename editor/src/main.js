@@ -1,6 +1,6 @@
 // The editor page: CodeMirror 6 for the note, and the note switcher and its history on top of it.
 // Swift calls `receive(message)`; the page answers with `post(type, data)`.
-import {EditorState, Compartment, RangeSetBuilder} from "@codemirror/state"
+import {EditorState, EditorSelection, Compartment, RangeSetBuilder} from "@codemirror/state"
 import {
   EditorView,
   keymap,
@@ -24,6 +24,7 @@ import {
   urlAt,
   linkAt,
   listIndent,
+  textStart,
   insertLineAbove,
   toggleMark,
   insertLink,
@@ -211,6 +212,29 @@ function linkButtons(view, url, urlFrom) {
   }
 }
 
+// Where ⌘← takes a cursor: the start of its wrapped row, then where its line's text starts (after
+// list and quote markers too, not only indentation), then the start of the line, and from there
+// back to the text.
+function home(view, range) {
+  const line = view.state.doc.lineAt(range.head)
+  const row = view.moveToLineBoundary(range, false)
+  if (row.head > line.from && row.head < range.head) return row
+  const text = line.from + textStart(view.state, line)
+  return EditorSelection.cursor(range.head === text ? line.from : text)
+}
+const moveHome = extend => view => {
+  const selection = EditorSelection.create(
+    view.state.selection.ranges.map(range => {
+      const to = home(view, range)
+      return extend ? EditorSelection.range(range.anchor, to.head, undefined, undefined, to.assoc) : to
+    }),
+    view.state.selection.mainIndex,
+  )
+  if (selection.eq(view.state.selection)) return false
+  view.dispatch({selection, scrollIntoView: true, userEvent: "select"})
+  return true
+}
+
 // A key's command for an edit from logic.js, which takes the state and returns the transaction.
 const run = edit => view => (view.dispatch(edit(view.state)), true)
 const mark = text => run(state => toggleMark(state, text))
@@ -243,6 +267,9 @@ const extensions = [
     {key: "Mod-Shift-x", run: mark("~~")},
     {key: "Mod-e", run: mark("`")},
     {key: "Mod-k", run: run(insertLink)},
+    // Ahead of the defaults, which skip only indentation.
+    {mac: "Cmd-ArrowLeft", run: moveHome(false), shift: moveHome(true), preventDefault: true},
+    {key: "Home", run: moveHome(false), shift: moveHome(true), preventDefault: true},
     ...defaultKeymap,
     ...historyKeymap,
     ...searchKeymap,

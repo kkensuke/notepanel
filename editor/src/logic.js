@@ -72,6 +72,26 @@ export function urlAt(line, offset) {
   return linkAt(line, offset)?.url ?? null
 }
 
+// A line's indentation and its list and quote markers, in any mix: "  - ", "1. ", "- [ ] ", "> ",
+// "> - ".
+const markers = /^(?:\s*(?:>|(?:[-*+]|\d+[.)])(?=\s|$)(?:\s+\[[ xX]\](?=\s|$))?))*\s*/
+
+// Whether a line is in a ``` block, where "- ", "> " and "# " are code.
+function inCode(state, line) {
+  for (let node = syntaxTree(state).resolveInner(line.from, 1); node; node = node.parent)
+    if (node.name === "FencedCode") return true
+  return false
+}
+
+// Where a line's text starts: after its indentation, list and quote markers and a heading's #s.
+// In a ``` block, after its indentation.
+export function textStart(state, line) {
+  if (inCode(state, line)) return /^\s*/.exec(line.text)[0].length
+  const prefix = markers.exec(line.text)[0]
+  const hashes = /^#{1,6}(?=\s|$)\s*/.exec(line.text.slice(prefix.length))
+  return prefix.length + (hashes?.[0].length ?? 0)
+}
+
 // The columns before a list item's text ("- ", "  1. ", "- [ ] "), or 0 if the line isn't one.
 export function listIndent(line, tabSize) {
   const marker = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/.exec(line)
