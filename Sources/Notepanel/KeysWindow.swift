@@ -68,8 +68,8 @@ private let historyKeys = [
 ]
 
 private let editingKeys = [
-    ("Delete to the line start", "⌘⌫"),
-    ("Line start / line end", "⌘← / ⌘→"),
+    ("Delete to the text’s start, then to the line start", "⌘⌫"),
+    ("Text’s start (after “- ”), then line start / line end", "⌘← / ⌘→"),
     ("Move lines up / down", "⌥↑ / ⌥↓"),
     ("Copy lines up / down", "⇧⌥↑ / ⇧⌥↓"),
     ("Delete line", "⇧⌘K"),
