@@ -146,12 +146,15 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 
 CodeMirror 6 に次の拡張を入れる。
 
-- キーマップ：`defaultKeymap`（`standardKeymap` を含む）、`historyKeymap`、`searchKeymap`、`indentWithTab`。その前に ⌘L（`selectLine`）、⇧⌘Enter（上に行を挿入）、書式記号のキー（⌘B・⌘I・⇧⌘X・⌘E・⌘K、表5）を置く。⌘I は、既定の割り当て（`selectParentSyntax`：構文上の親を選択）より前に置いて、斜体を優先する。
+- キーマップ：`defaultKeymap`（`standardKeymap` を含む）、`historyKeymap`、`searchKeymap`、`indentWithTab`。その前に ⌘L（`selectLine`）、⇧⌘Enter（上に行を挿入）、書式記号のキー（⌘B・⌘I・⇧⌘X・⌘E・⌘K、表5）、⌘←・⇧⌘←・Home・⌘⌫（下記）を置く。⌘I は、既定の割り当て（`selectParentSyntax`：構文上の親を選択）より前に置いて、斜体を優先する。
 - `history()`、`drawSelection()`、`dropCursor()`、`highlightSpecialChars()`、`EditorState.allowMultipleSelections`
 - `EditorView.clickAddsSelectionRange`：⌥クリックでカーソルを追加する（VS Code と同じ。CodeMirror の既定は ⌘クリック）
 - `rectangularSelection`：⇧⌥ドラッグで矩形選択する（VS Code と同じ。CodeMirror の既定は ⌥ドラッグ）
 - `highlightSelectionMatches()`、`EditorView.lineWrapping`
-- 箇条書きの項目を折り返したときは、2 行目以降を項目の本文の位置（`- `、`  1. `、`- [ ] ` などの後）から始める。改行で始まる新しい項目と見分けるためである。画面に見えている行ごとに記号の幅を数え（`listIndent`）、その幅の `text-indent`（負の値）と左 padding を行の装飾で付ける。本文の段落は左端から折り返す。
+- 箇条書きの項目と引用を折り返したときは、2 行目以降を本文の位置（`- `、`  1. `、`- [ ] `、`> `、`> - ` などの後）から始める。改行で始まる新しい項目と見分けるためである。画面に見えている行ごとに記号の幅を数え（`hangIndent`）、その幅の `text-indent`（負の値）と左 padding を行の装飾で付ける。本文の段落と見出しは左端から折り返す。` ``` ` で囲んだコードの中の `- ` や `> ` はコードなので、ふつうの行と同じく左端から折り返す。コードの中かどうかは Markdown のパーサーで調べるため、パーサーの解析が進んだときにも付け直す。
+- ⌘←（Home も同じ）は、まず折り返した行の先頭へ、次に本文の先頭へ移動する。本文の先頭は、インデントと箇条書き・引用の記号と見出しの `#` の後である（`textStart`）。本文の先頭でもう一度押すと行頭へ、行頭で押すと本文の先頭へ戻る。入れ子の項目でも止まるのはこの 2 か所で、記号の前には止まらない。インデントの変更は Tab と ⇧Tab で行のどこからでもでき、記号は本文の先頭で ⌫ を押せば外せるためである。CodeMirror の既定（`cursorLineBoundaryBackward`）はインデントしか飛ばさず、箇条書きでは `- ` の前へ移動してしまう。` ``` ` の中では、記号を飛ばさずインデントだけを飛ばす。
+- ⇧⌘← は ⌘← と同じ位置まで選択する。⌘⌫ は ⌘← と同じ位置まで削除する。そのため、項目の途中で押すと本文だけが消えて記号が残り、もう一度押すと記号とインデントが消える。行頭で押すと直前の改行を消すので、押し続ければ空行を越えて削除が続く。
+- ⌃A は CodeMirror の既定（`cursorLineStart`）のままで、1 回で行頭へ移動する。
 - URL は空白を含まないので、ブラウザは 1 語として扱う。そのままでは、行の残りに収まらない URL が丸ごと次の行に送られ、`- ` だけが行に残る。これを避けるため、URL（`tags.url`）にだけ `word-break: break-all` を付け、行末まで詰めてから折り返す。本文と `[text](url)` の text は空白で折り返す。
 - `markdown({ base: markdownLanguage })`：GFM（取り消し線、タスクリスト）を含む色分け、Enter での箇条書きの継続、選択中のテキストへの URL の貼り付けによるリンク化
 - ⌘クリックでリンクを開く。対象は `[text](url)` と、`http://`・`https://`・`mailto:` で始まる URL。Swift 側でもスキームを確かめてから開く。
@@ -167,8 +170,6 @@ CodeMirror 6 に次の拡張を入れる。
 
 ソースで次の動作を確認済み。
 
-- ⌘⌫（`deleteLineBoundaryBackward`）は、行頭にいると直前の改行を消す。押し続ければ空行を越えて削除が続く。
-- ⌘←（`cursorLineBoundaryBackward`）はインデントの末尾へ移動し、もう一度押すと行頭へ移動する。
 - `@codemirror/view` には、キーリピート（`event.repeat`）を無視する処理がない。そのため ⌘Z の長押しで Undo が繰り返される見込み。
 - 選択範囲がない状態で ⌘C・⌘X を押すと、行全体をコピー・切り取りする（VS Code と同じ）。
 
@@ -291,8 +292,8 @@ Undo・Redo はメニューに入れず、エディタでは第 1 段でも扱�
 | キー | 動作 | CodeMirror のコマンド |
 |---|---|---|
 | ⌘Z / ⇧⌘Z | Undo / Redo（長押しで連続） | `undo` / `redo` |
-| ⌘⌫ | 行頭まで削除。行頭なら直前の改行を削除 | `deleteLineBoundaryBackward` |
-| ⌘← / ⌘→ | インデント末尾（もう一度で行頭）／行末へ | `cursorLineBoundaryBackward` / `Forward` |
+| ⌘⌫ | ⌘← の行き先まで削除。行頭なら直前の改行を削除 | 独自（`deleteHome`） |
+| ⌘← / ⌘→ | 本文の先頭（記号の後。もう一度で行頭）／行末へ | 独自（`home`）/ `cursorLineBoundaryForward` |
 | ⌥← / ⌥→、⌥⌫ | 単語単位の移動、単語の削除 | `cursorGroupLeft` / `Right`、`deleteGroupBackward` |
 | ⌥↑ / ⌥↓ | 行を移動 | `moveLineUp` / `Down` |
 | ⇧⌥↑ / ⇧⌥↓ | 行を複製 | `copyLineUp` / `Down` |

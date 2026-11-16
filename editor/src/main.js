@@ -1,6 +1,6 @@
 // The editor page: CodeMirror 6 for the note, and the note switcher and its history on top of it.
 // Swift calls `receive(message)`; the page answers with `post(type, data)`.
-import {EditorState, Compartment, RangeSetBuilder} from "@codemirror/state"
+import {EditorState, EditorSelection, Compartment, RangeSetBuilder} from "@codemirror/state"
 import {
   EditorView,
   keymap,
@@ -17,13 +17,14 @@ import {
 import {defaultKeymap, historyKeymap, history, indentWithTab, selectLine} from "@codemirror/commands"
 import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
-import {syntaxHighlighting, HighlightStyle, indentUnit} from "@codemirror/language"
+import {syntaxHighlighting, HighlightStyle, indentUnit, syntaxTree} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
 import {
   rankNotes,
   urlAt,
   linkAt,
-  listIndent,
+  hangIndent,
+  textStart,
   insertLineAbove,
   toggleMark,
   insertLink,
@@ -128,14 +129,14 @@ const ideographicSpaceBoxes = ViewPlugin.define(
   {decorations: plugin => plugin.decorations},
 )
 
-// A list item's wrapped rows start under its text, not under its marker. The 12px is the line's
-// own padding.
-function listIndents(view) {
+// A list item's or quote's wrapped rows start under its text, not under its markers. The 12px is
+// the line's own padding.
+function markerIndents(view) {
   const builder = new RangeSetBuilder()
   for (const {from, to} of view.visibleRanges) {
     for (let pos = from; pos <= to; ) {
       const line = view.state.doc.lineAt(pos)
-      const n = listIndent(line.text, view.state.tabSize)
+      const n = hangIndent(view.state, line)
       if (n) {
         const style = `padding-left: calc(12px + ${n}ch); text-indent: -${n}ch`
         builder.add(line.from, line.from, Decoration.line({attributes: {style}}))
@@ -147,9 +148,11 @@ function listIndents(view) {
 }
 const hangingIndents = ViewPlugin.define(
   view => ({
-    decorations: listIndents(view),
+    decorations: markerIndents(view),
     update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = listIndents(update.view)
+      // The parser tells which lines are in a ``` block, and it may finish after the change.
+      if (update.docChanged || update.viewportChanged || syntaxTree(update.state) !== syntaxTree(update.startState))
+        this.decorations = markerIndents(update.view)
     },
   }),
   {decorations: plugin => plugin.decorations},
@@ -211,6 +214,49 @@ function linkButtons(view, url, urlFrom) {
   }
 }
 
+// Where ⌘← takes a cursor: the start of its wrapped row, then where its line's text starts (after
+// list and quote markers too, not only indentation), then the start of the line, and from there
+// back to the text.
+function home(view, range) {
+  const line = view.state.doc.lineAt(range.head)
+  const row = view.moveToLineBoundary(range, false)
+  if (row.head > line.from && row.head < range.head) return row
+  const text = line.from + textStart(view.state, line)
+  return EditorSelection.cursor(range.head === text ? line.from : text)
+}
+const moveHome = extend => view => {
+  const selection = EditorSelection.create(
+    view.state.selection.ranges.map(range => {
+      const to = home(view, range)
+      return extend ? EditorSelection.range(range.anchor, to.head, undefined, undefined, to.assoc) : to
+    }),
+    view.state.selection.mainIndex,
+  )
+  if (selection.eq(view.state.selection)) return false
+  view.dispatch({selection, scrollIntoView: true, userEvent: "select"})
+  return true
+}
+
+// ⌘⌫: deletes back to where ⌘← goes, so an item's text goes before its marker. At the start of a
+// line it deletes the line break, so holding it crosses empty lines.
+function deleteHome(view) {
+  const {state} = view
+  let userEvent = "delete.selection"
+  const spec = state.changeByRange(range => {
+    if (!range.empty)
+      return {range: EditorSelection.cursor(range.from), changes: {from: range.from, to: range.to}}
+    userEvent = "delete.backward"
+    let from = home(view, range).head
+    // In the markers ⌘← goes forward, to the text; this deletes to the line's start instead.
+    if (from > range.head) from = state.doc.lineAt(range.head).from
+    if (from === range.head) from = Math.max(0, from - 1)
+    return {range: EditorSelection.cursor(from), changes: {from, to: range.head}}
+  })
+  if (spec.changes.empty) return false
+  view.dispatch(state.update(spec, {scrollIntoView: true, userEvent}))
+  return true
+}
+
 // A key's command for an edit from logic.js, which takes the state and returns the transaction.
 const run = edit => view => (view.dispatch(edit(view.state)), true)
 const mark = text => run(state => toggleMark(state, text))
@@ -243,6 +289,10 @@ const extensions = [
     {key: "Mod-Shift-x", run: mark("~~")},
     {key: "Mod-e", run: mark("`")},
     {key: "Mod-k", run: run(insertLink)},
+    // Ahead of the defaults, which skip only indentation.
+    {mac: "Cmd-ArrowLeft", run: moveHome(false), shift: moveHome(true), preventDefault: true},
+    {key: "Home", run: moveHome(false), shift: moveHome(true), preventDefault: true},
+    {mac: "Cmd-Backspace", run: deleteHome},
     ...defaultKeymap,
     ...historyKeymap,
     ...searchKeymap,

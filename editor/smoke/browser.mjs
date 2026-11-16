@@ -62,9 +62,13 @@ await press("z", ["Meta"])
 await press("z", ["Meta"])
 assert.equal(await changedText(), "one\n\n\nfour")
 
-// Cmd-Left goes to the line start, so typing lands there; Enter continues a list.
+// Cmd-Left goes to an item's text, then to the line start; Enter continues a list.
 await receive("open", {id: "List", text: "- item"})
 await page.click(".cm-content")
+await press("ArrowLeft", ["Meta"])
+await page.keyboard.type("x")
+assert.equal(await changedText(), "- xitem")
+await press("z", ["Meta"])
 await press("ArrowLeft", ["Meta"])
 await page.keyboard.type("x")
 assert.equal(await changedText(), "x- item")
@@ -76,6 +80,47 @@ assert.equal(await changedText(), "- item\n- next")
 await press("Enter")
 await press("Enter")
 assert.equal(await changedText(), "- item\n- next\n", "an empty item ends the list")
+
+// Cmd-Left skips quote markers and a heading's #s too, but not "- " in a code block.
+const typedAtHome = async (text, line) => {
+  await receive("open", {id: "Home", text})
+  await page.click(".cm-content")
+  await press("ArrowUp", ["Meta"])
+  for (let i = 1; i < line; i++) await press("ArrowDown")
+  await press("ArrowRight", ["Meta"])
+  await press("ArrowLeft", ["Meta"])
+  await page.keyboard.type("x")
+  return (await changedText()).split("\n")[line - 1]
+}
+assert.equal(await typedAtHome("> > - quote", 1), "> > - xquote")
+assert.equal(await typedAtHome("## Heading", 1), "## xHeading")
+assert.equal(await typedAtHome("```\n- code\n```", 2), "x- code")
+
+// In a wrapped item, Cmd-Left goes to the row's start first; Shift-Cmd-Left selects the text.
+await receive("open", {id: "Home", text: `- [ ] ${"word ".repeat(30)}end`})
+await page.click(".cm-content")
+await press("ArrowDown", ["Meta"])
+await press("ArrowLeft", ["Meta"])
+await page.keyboard.type("x")
+assert.match(await changedText(), /^- \[ \] word .* x(word|end)/, "the row's start")
+await press("z", ["Meta"])
+await press("ArrowDown", ["Meta"])
+await press("ArrowLeft", ["Meta", "Shift"])
+await press("ArrowLeft", ["Meta", "Shift"])
+await page.keyboard.type("x")
+assert.equal(await changedText(), "- [ ] x")
+
+// Cmd-Backspace deletes back to where Cmd-Left goes: the item's text, then its marker, then the
+// line break.
+await receive("open", {id: "Home", text: "a\n- [ ] task"})
+await page.click(".cm-content")
+await press("ArrowDown", ["Meta"])
+await press("Backspace", ["Meta"])
+assert.equal(await changedText(), "a\n- [ ] ")
+await press("Backspace", ["Meta"])
+assert.equal(await changedText(), "a\n")
+await press("Backspace", ["Meta"])
+assert.equal(await changedText(), "a")
 
 // Shift-Cmd-Enter inserts a line above; Cmd-L selects the line; Alt-Up moves it.
 await receive("open", {id: "Lines", text: "a\n  b"})
@@ -292,8 +337,10 @@ assert.deepEqual(
 await press("Tab")
 assert.equal(await changedText(), "      a b\tc\u3000d", "4 spaces by default")
 
-// Only a list item's wrapped rows are indented, and they start under the item's text.
-await receive("open", {id: "Wrap", text: `- ${"word ".repeat(30)}\n${"word ".repeat(30)}`})
+// A list item's and a quote's wrapped rows start under their text; a paragraph's and a ``` block's
+// start at the edge.
+const words = "word ".repeat(30)
+await receive("open", {id: "Wrap", text: `- ${words}\n${words}\n> ${words}\n\`\`\`\n- ${words}\n\`\`\``})
 await pause(50)
 const rowStarts = await page.$$eval(".cm-line", lines => lines.map(line => {
   const range = document.createRange()
@@ -312,9 +359,11 @@ const itemText = await page.evaluate(() => {
   range.setEnd(node, at + 1)
   return range.getBoundingClientRect().left
 })
-assert.ok(rowStarts[0].length > 1 && rowStarts[1].length > 1, "both lines wrap")
+assert.ok([0, 1, 2, 4].every(i => rowStarts[i].length > 1), "the lines wrap")
 assert.ok(rowStarts[0].slice(1).every(x => Math.abs(x - itemText) < 1), "a list item's rows start under its text")
+assert.ok(rowStarts[2].slice(1).every(x => Math.abs(x - itemText) < 1), "a quote's rows start under its text")
 assert.ok(rowStarts[1].every(x => Math.abs(x - rowStarts[1][0]) < 1), "a paragraph's rows start at the edge")
+assert.ok(rowStarts[4].every(x => Math.abs(x - rowStarts[1][0]) < 1), "a ``` block's rows start at the edge")
 
 // The page never asks for a window height: the panel keeps the size the user gave it.
 await receive("open", {id: "Count", text: "ab\ncd"})

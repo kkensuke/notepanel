@@ -177,8 +177,8 @@ Editing:
 
 | Key | Does |
 |---|---|
-| ⌘⌫ | Delete to the line start; at the start of a line, join it with the line above |
-| ⌘← / ⌘→ | Line start (after the indentation first) / line end |
+| ⌘⌫ | Delete to where ⌘← goes (a list item keeps its "- "); at the start of a line, join it with the line above |
+| ⌘← / ⌘→ | Start of the text (after the indentation and any "- ", "> " or "#"), then the line start / line end |
 | ⌥↑ / ⌥↓, ⇧⌥↑ / ⇧⌥↓ | Move lines, copy lines |
 | ⇧⌘K, ⌘L | Delete line, select line |
 | ⌘Return / ⇧⌘Return | Insert a line below / above |
