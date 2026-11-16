@@ -110,6 +110,18 @@ await press("ArrowLeft", ["Meta", "Shift"])
 await page.keyboard.type("x")
 assert.equal(await changedText(), "- [ ] x")
 
+// Cmd-Backspace deletes back to where Cmd-Left goes: the item's text, then its marker, then the
+// line break.
+await receive("open", {id: "Home", text: "a\n- [ ] task"})
+await page.click(".cm-content")
+await press("ArrowDown", ["Meta"])
+await press("Backspace", ["Meta"])
+assert.equal(await changedText(), "a\n- [ ] ")
+await press("Backspace", ["Meta"])
+assert.equal(await changedText(), "a\n")
+await press("Backspace", ["Meta"])
+assert.equal(await changedText(), "a")
+
 // Shift-Cmd-Enter inserts a line above; Cmd-L selects the line; Alt-Up moves it.
 await receive("open", {id: "Lines", text: "a\n  b"})
 await page.click(".cm-content")
