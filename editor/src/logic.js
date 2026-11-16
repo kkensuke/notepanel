@@ -92,10 +92,11 @@ export function textStart(state, line) {
   return prefix.length + (hashes?.[0].length ?? 0)
 }
 
-// The columns before a list item's text ("- ", "  1. ", "- [ ] "), or 0 if the line isn't one.
-export function listIndent(line, tabSize) {
-  const marker = /^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?/.exec(line)
-  return marker ? countColumn(marker[0], tabSize) : 0
+// The columns a line's wrapped rows hang by: the width of its list and quote markers, with the
+// indentation and spaces around them. 0 for other lines and in a ``` block.
+export function hangIndent(state, line) {
+  const prefix = markers.exec(line.text)[0]
+  return /\S/.test(prefix) && !inCode(state, line) ? countColumn(prefix, state.tabSize) : 0
 }
 
 // VS Code's Shift-Cmd-Enter: a new line above each cursor, with the same indentation.

@@ -17,13 +17,13 @@ import {
 import {defaultKeymap, historyKeymap, history, indentWithTab, selectLine} from "@codemirror/commands"
 import {searchKeymap, highlightSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
-import {syntaxHighlighting, HighlightStyle, indentUnit} from "@codemirror/language"
+import {syntaxHighlighting, HighlightStyle, indentUnit, syntaxTree} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
 import {
   rankNotes,
   urlAt,
   linkAt,
-  listIndent,
+  hangIndent,
   textStart,
   insertLineAbove,
   toggleMark,
@@ -129,14 +129,14 @@ const ideographicSpaceBoxes = ViewPlugin.define(
   {decorations: plugin => plugin.decorations},
 )
 
-// A list item's wrapped rows start under its text, not under its marker. The 12px is the line's
-// own padding.
-function listIndents(view) {
+// A list item's or quote's wrapped rows start under its text, not under its markers. The 12px is
+// the line's own padding.
+function markerIndents(view) {
   const builder = new RangeSetBuilder()
   for (const {from, to} of view.visibleRanges) {
     for (let pos = from; pos <= to; ) {
       const line = view.state.doc.lineAt(pos)
-      const n = listIndent(line.text, view.state.tabSize)
+      const n = hangIndent(view.state, line)
       if (n) {
         const style = `padding-left: calc(12px + ${n}ch); text-indent: -${n}ch`
         builder.add(line.from, line.from, Decoration.line({attributes: {style}}))
@@ -148,9 +148,11 @@ function listIndents(view) {
 }
 const hangingIndents = ViewPlugin.define(
   view => ({
-    decorations: listIndents(view),
+    decorations: markerIndents(view),
     update(update) {
-      if (update.docChanged || update.viewportChanged) this.decorations = listIndents(update.view)
+      // The parser tells which lines are in a ``` block, and it may finish after the change.
+      if (update.docChanged || update.viewportChanged || syntaxTree(update.state) !== syntaxTree(update.startState))
+        this.decorations = markerIndents(update.view)
     },
   }),
   {decorations: plugin => plugin.decorations},

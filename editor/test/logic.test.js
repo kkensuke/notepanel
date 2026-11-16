@@ -6,7 +6,7 @@ import {
   rankNotes,
   urlAt,
   linkAt,
-  listIndent,
+  hangIndent,
   textStart,
   insertLineAbove,
   toggleMark,
@@ -72,18 +72,32 @@ test("linkAt spans the whole link and says where its URL starts", () => {
   assert.equal(linkAt(line, 1), null)
 })
 
-test("listIndent measures a list item's marker, and is 0 for other lines", () => {
-  assert.equal(listIndent("- item", 4), 2)
-  assert.equal(listIndent("  * nested", 4), 4)
-  assert.equal(listIndent("\t+ tabbed", 4), 6)
-  assert.equal(listIndent("1. first", 4), 3)
-  assert.equal(listIndent("10) tenth", 4), 4)
-  assert.equal(listIndent("- [ ] task", 4), 6)
-  assert.equal(listIndent("- [x] done", 4), 6)
-  assert.equal(listIndent("Plain text - not a list", 4), 0)
-  assert.equal(listIndent("*emphasis* only", 4), 0)
-  assert.equal(listIndent("-no space", 4), 0)
-  assert.equal(listIndent("", 4), 0)
+test("hangIndent measures list and quote markers, and is 0 for other lines and in code", () => {
+  const lines = [
+    ["- item", 2],
+    ["  * nested", 4],
+    ["\t+ tabbed", 6],
+    ["1. first", 3],
+    ["10) tenth", 4],
+    ["- [ ] task", 6],
+    ["- [x] done", 6],
+    ["> quote", 2],
+    ["> - [ ] quoted task", 8],
+    [">> nested", 3],
+    ["## Heading", 0],
+    ["Plain text - not a list", 0],
+    ["*emphasis* only", 0],
+    ["-no space", 0],
+    ["", 0],
+    ["```", 0],
+    ["- code", 0],
+    ["> code", 0],
+    ["```", 0],
+  ]
+  const doc = lines.map(([text]) => text).join("\n")
+  const state = EditorState.create({doc, extensions: markdown({base: markdownLanguage})})
+  const indents = lines.map((_, i) => hangIndent(state, state.doc.line(i + 1)))
+  assert.deepEqual(indents, lines.map(([, indent]) => indent))
 })
 
 test("insertLineAbove keeps indentation and moves the cursor up", () => {
