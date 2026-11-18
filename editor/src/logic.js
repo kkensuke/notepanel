@@ -51,15 +51,25 @@ function snippetAt(text, at) {
   return (start > lineStart ? "…" : "") + text.slice(start, lineEnd).trim().slice(0, 120)
 }
 
+// What a bare URL ends before: a space or a bracket; a quote or a backtick, which a URL can't
+// hold; and the full-width brackets and punctuation that Japanese text puts right after a URL,
+// as in "（https://example.com/a）を参照".
+const urlEnd = String.raw`\s<>()[\]"` + "`（）「」『』【】、。"
+// "(" and ")" are part of a URL only as a pair, as in ".../Fish_(food)", so the ")" that closes
+// a Markdown link or a sentence in parentheses ends it. Each pattern stops at the next bracket
+// or parenthesis, so a long line of "[" isn't read to its end once for each of them.
+const markdownLink = /\[[^[\]]*\]\(((?:[^()\s]|\([^()\s]*\))+)(?:\s[^()]*)?\)/g
+const bareURL = new RegExp(String.raw`(?:https?:\/\/|mailto:)(?:[^${urlEnd}]|\([^${urlEnd}]*\))+`, "g")
+
 // The link under `offset` in a line: a Markdown link, or a bare URL. `from` and `to` span the
 // link as written, and `urlFrom` is where its URL starts.
 export function linkAt(line, offset) {
-  for (const m of line.matchAll(/\[[^\]]*\]\(([^)\s]+)[^)]*\)/g)) {
+  for (const m of line.matchAll(markdownLink)) {
     const to = m.index + m[0].length
     if (offset >= m.index && offset <= to)
       return {url: m[1], from: m.index, to, urlFrom: m.index + m[0].indexOf("](") + 2}
   }
-  for (const m of line.matchAll(/(?:https?:\/\/|mailto:)[^\s<>()[\]]+/g)) {
+  for (const m of line.matchAll(bareURL)) {
     const to = m.index + m[0].length
     if (offset >= m.index && offset <= to)
       return {url: m[0].replace(/[.,;:!?]+$/, ""), from: m.index, to, urlFrom: m.index}

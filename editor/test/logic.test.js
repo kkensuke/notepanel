@@ -72,6 +72,26 @@ test("linkAt spans the whole link and says where its URL starts", () => {
   assert.equal(linkAt(line, 1), null)
 })
 
+test("linkAt takes paired parentheses into a URL, and ends it before what can't be in one", () => {
+  const url = "https://en.wikipedia.org/wiki/Fish_(food)"
+  assert.equal(urlAt(`[fish](${url})`, 3), url)
+  assert.equal(urlAt(`see ${url} here`, 10), url)
+  assert.equal(urlAt("(see https://example.com/a)", 10), "https://example.com/a")
+  assert.equal(urlAt('[docs](https://example.com/a "title")', 3), "https://example.com/a")
+  assert.equal(urlAt("run `curl https://example.com/a` now", 20), "https://example.com/a")
+  assert.equal(urlAt('<a href="https://example.com/a">', 15), "https://example.com/a")
+  assert.equal(urlAt("詳細は（https://example.com/a）を参照", 10), "https://example.com/a")
+  assert.equal(urlAt("「https://example.com/a」、次へ", 5), "https://example.com/a")
+  // Japanese in the URL itself is kept.
+  assert.equal(urlAt("https://ja.wikipedia.org/wiki/魚 です", 5), "https://ja.wikipedia.org/wiki/魚")
+})
+
+test("linkAt reads a long line of brackets once, not once for each bracket", () => {
+  const start = performance.now()
+  linkAt("[".repeat(50_000), 1)
+  assert.ok(performance.now() - start < 500, "took longer than half a second")
+})
+
 test("hangIndent measures list and quote markers, and is 0 for other lines and in code", () => {
   const lines = [
     ["- item", 2],
