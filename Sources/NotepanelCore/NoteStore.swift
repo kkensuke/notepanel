@@ -15,6 +15,8 @@ public struct NoteVersion: Equatable {
 public enum NoteStoreError: Error, Equatable {
     case invalidName
     case exists
+    /// The open note's text can't be saved, so the note can't be left.
+    case unsaved
 }
 
 /// Whether the open note's text is on disk, for the icon beside the title.
@@ -30,7 +32,8 @@ public enum SaveState {
 /// note's history is the folder of the same name in `history`.
 ///
 /// Losing text is the worst failure, so text only ever moves forward:
-/// - Writes are atomic, and a failed write keeps the text unsaved, to be tried again.
+/// - Writes are atomic, and a failed write keeps the text unsaved, to be tried again. Until it's
+///   saved, the note stays open: opening or creating another, or trashing it, is refused.
 /// - A file changed elsewhere since it was read is never overwritten; the text goes to a
 ///   conflict copy instead.
 /// - Before a note's file is overwritten, its current contents are kept as a version, at most
@@ -68,6 +71,8 @@ public final class NoteStore {
     private var savedText = ""
     private var pending: DispatchWorkItem?
     private var statusShown = false
+    /// Why the last save failed, for the footer.
+    private var failure = ""
 
     public init(dataFolder: URL) {
         self.dataFolder = dataFolder
@@ -103,11 +108,11 @@ public final class NoteStore {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Saves the open note, then opens `name`. Returns nil, and keeps the open note, if `name`
-    /// isn't readable UTF-8 text.
+    /// Saves the open note, then opens `name`. Returns nil, and keeps the open note, if that
+    /// can't be saved or `name` isn't readable UTF-8 text.
     @discardableResult
     public func open(_ name: String) -> String? {
-        flush()
+        guard saveToLeave() else { return nil }
         guard let content = read(name) else {
             report("Couldn’t open “\(name)”: it isn’t UTF-8 text, or it can’t be read.")
             return nil
@@ -147,7 +152,8 @@ public final class NoteStore {
         } catch {
             // Still dirty, so the next edit or flush tries again.
             saveState = .failed
-            report("Couldn’t save: \(error.localizedDescription)")
+            failure = error.localizedDescription
+            report("Couldn’t save: \(failure)")
             return
         }
         let follows = followsFirstLine(name: name, savedText: savedText)
@@ -181,9 +187,10 @@ public final class NoteStore {
         return content
     }
 
-    /// Creates an empty note named `Untitled`, `Untitled 2`, … and opens it.
+    /// Creates an empty note named `Untitled`, `Untitled 2`, … and opens it. Throws `unsaved`,
+    /// and keeps the open note, if that can't be saved.
     public func create() throws -> String {
-        flush()
+        guard saveToLeave() else { throw NoteStoreError.unsaved }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let name = makeUniqueName("Untitled") { exists($0) }
         try Data().write(to: url(name), options: .withoutOverwriting)
@@ -217,14 +224,15 @@ public final class NoteStore {
         return new
     }
 
-    /// Moves a note to the Trash after saving it, so the Trash holds the latest text.
+    /// Moves a note to the Trash after saving it, so the Trash holds the latest text: the open
+    /// note stays, and `unsaved` is thrown, if it can't be saved.
     /// Returns the name the note had, which saving may have changed. Its history stays under the
     /// same name, so a note put back from the Trash finds it again.
     @discardableResult
     public func trash(_ name: String) throws -> String {
         var name = name
         if name == current {
-            flush()
+            guard saveToLeave() else { throw NoteStoreError.unsaved }
             name = current ?? name
         }
         try FileManager.default.trashItem(at: url(name), resultingItemURL: nil)
@@ -232,11 +240,14 @@ public final class NoteStore {
         return name
     }
 
-    /// Saves the open note into the old data folder, then forgets it.
+    /// Changes the data folder. The open note is saved into the old folder, then forgotten. If
+    /// it can't be saved there, it stays open and is saved into the new folder instead, so its
+    /// text isn't dropped. A note of the same name there is another note, and isn't overwritten:
+    /// its date and size aren't the ones this store knows, so the text goes to a conflict copy.
     public func setFolder(_ newFolder: URL) {
         flush()
         dataFolder = newFolder
-        closeCurrent()
+        if dirty { flush() } else { closeCurrent() }
     }
 
     /// Shows a message in the footer until the next successful save.
@@ -356,6 +367,15 @@ public final class NoteStore {
             manager.fileExists(atPath: self.historyFolder($0).path)
         }
         _ = Darwin.rename(historyFolder(name).path, historyFolder(aside).path)
+    }
+
+    /// Saves the open note before another takes its place. False if its text can't be written:
+    /// leaving the note would drop the text, so it stays open, and the footer says so.
+    private func saveToLeave() -> Bool {
+        flush()
+        guard dirty, let name = current else { return true }
+        report("“\(name)” stays open, because it couldn’t be saved: \(failure)")
+        return false
     }
 
     private func closeCurrent() {
