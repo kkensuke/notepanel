@@ -24,14 +24,15 @@ export function fuzzyScore(query, target) {
 }
 
 // Titles match fuzzily and rank first; bodies match as a plain substring, with the matching
-// line as a snippet. With no query, notes keep their order (newest first).
+// line as a snippet. With no query, and among notes that match equally, notes keep their order
+// (pinned first, then newest first).
 export function rankNotes(notes, query, limit = 200) {
   const q = query.trim()
   if (!q) return notes.slice(0, limit).map(note => ({...note, snippet: ""}))
   const lower = q.toLowerCase()
   const ranked = []
   for (const note of notes) {
-    const score = fuzzyScore(q, note.title) ?? (note.title === note.id ? null : fuzzyScore(q, note.id))
+    const score = fuzzyScore(q, note.title)
     if (score !== null) {
       ranked.push({...note, score: 1000 + score, snippet: ""})
       continue
@@ -39,7 +40,7 @@ export function rankNotes(notes, query, limit = 200) {
     const at = note.text.toLowerCase().indexOf(lower)
     if (at >= 0) ranked.push({...note, score: 0, snippet: snippetAt(note.text, at)})
   }
-  ranked.sort((a, b) => b.score - a.score || b.modified - a.modified)
+  ranked.sort((a, b) => b.score - a.score)
   return ranked.slice(0, limit)
 }
 

@@ -45,15 +45,15 @@ test("fuzzyScore handles text outside the BMP and non-Latin scripts", () => {
 
 test("rankNotes puts title matches first and adds snippets for body matches", () => {
   const notes = [
-    {id: "Groceries", title: "Groceries", modified: 3, text: "milk\neggs"},
-    {id: "Untitled", title: "Ideas", modified: 2, text: "buy a milk frother"},
-    {id: "Milk tea", title: "Milk tea", modified: 1, text: ""},
+    {id: "Groceries", title: "Groceries", text: "milk\neggs"},
+    {id: "Ideas", title: "Ideas", text: "buy a milk frother"},
+    {id: "Milk tea", title: "Milk tea", text: ""},
   ]
   const ranked = rankNotes(notes, "milk")
-  assert.deepEqual(ranked.map(n => n.id), ["Milk tea", "Groceries", "Untitled"])
+  assert.deepEqual(ranked.map(n => n.id), ["Milk tea", "Groceries", "Ideas"])
   assert.equal(ranked[1].snippet, "milk")
   assert.equal(ranked[2].snippet, "buy a milk frother")
-  assert.deepEqual(rankNotes(notes, " ").map(n => n.id), ["Groceries", "Untitled", "Milk tea"])
+  assert.deepEqual(rankNotes(notes, " ").map(n => n.id), ["Groceries", "Ideas", "Milk tea"])
   assert.equal(rankNotes(notes, "", 2).length, 2)
 })
 
