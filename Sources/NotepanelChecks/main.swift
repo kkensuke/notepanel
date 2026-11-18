@@ -252,8 +252,8 @@ inFolder { folder in
     equal(try contents(store, line), "theirs")
 }
 
-// A name as long as a name may be, made of kana with voicing marks, still saves. The file system
-// may store "が" as "か" and a combining mark: 6 bytes, where the name counts 3.
+// A name as long as a name may be, made of kana with voicing marks, still saves. Decomposed,
+// "が" is "か" and a combining mark: 6 bytes, where the name counts 3. Saving doesn't trip on that.
 inFolder { folder in
     let store = NoteStore(dataFolder: folder)
     var status: String?

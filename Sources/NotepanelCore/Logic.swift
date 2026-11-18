@@ -50,19 +50,14 @@ public func makeUniqueName(_ base: String, exists: (String) -> Bool) -> String {
     return "\(base) \(number)"
 }
 
-/// A note's name takes at most this many bytes. A file name holds 255, and the rest is for ".md"
-/// and the number a taken name gets.
+/// A note's name takes at most this many bytes of UTF-8. A file name holds 255, and the rest is
+/// for ".md" and the number a taken name gets.
 let nameLimit = 240
-
-/// The bytes a name takes in a file name.
-func nameBytes(_ name: String) -> Int {
-    name.utf8.count
-}
 
 /// `name + suffix`, with `name` cut short if that's too long for a note's name.
 func fitted(_ name: String, suffix: String = "") -> String {
     var name = name
-    while !name.isEmpty, nameBytes(name + suffix) > nameLimit { name.removeLast() }
+    while !name.isEmpty, (name + suffix).utf8.count > nameLimit { name.removeLast() }
     return name + suffix
 }
 
@@ -70,7 +65,7 @@ func fitted(_ name: String, suffix: String = "") -> String {
 public func validNoteName(_ proposed: String) -> String? {
     let name = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty, !name.hasPrefix("."), !name.contains("/"), !name.contains(":"),
-        nameBytes(name) <= nameLimit
+        name.utf8.count <= nameLimit
     else { return nil }
     return name
 }
