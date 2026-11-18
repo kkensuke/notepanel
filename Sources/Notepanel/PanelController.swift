@@ -364,7 +364,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         } catch NoteStoreError.exists {
             store.notify("A note named “\(proposed.trimmingCharacters(in: .whitespaces))” already exists.")
         } catch NoteStoreError.invalidName {
-            store.notify("A name can’t be empty, start with a period, or contain “/” or “:”.")
+            store.notify("A name can’t be empty or longer than 240 bytes, start with a period, or contain “/” or “:”.")
         } catch {
             store.notify("Couldn’t rename “\(old)”: \(error.localizedDescription)")
         }
