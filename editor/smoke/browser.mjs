@@ -229,9 +229,9 @@ assert.equal(await page.$(".cm-linkButtons"), null, "the popup goes when the poi
 
 // The switcher: fuzzy title search, keyboard selection and trash.
 const notes = [
-  {id: "Groceries", title: "Groceries", modified: Date.now(), text: "milk", pinned: true},
-  {id: "Untitled", title: "Meeting notes", modified: Date.now() - 1000, text: "agenda", pinned: false},
-  {id: "Ideas", title: "Ideas", modified: Date.now() - 2000, text: "a milk frother", pinned: false},
+  {id: "Groceries", title: "Groceries", text: "milk", pinned: true},
+  {id: "Meeting notes", title: "Meeting notes", text: "agenda", pinned: false},
+  {id: "Ideas", title: "Ideas", text: "a milk frother", pinned: false},
 ]
 await receive("switcher", {notes, force: false})
 assert.equal(await page.evaluate(() => document.activeElement.id), "query")
@@ -266,7 +266,7 @@ assert.deepEqual(
   ["true", "false", "false"])
 await clear()
 await page.click("#results li:nth-child(2) .action.pin")
-assert.equal((await last("pin"))?.id, "Untitled")
+assert.equal((await last("pin"))?.id, "Meeting notes")
 // Trash only asks; Swift confirms before deleting.
 await page.click("#results li[aria-selected='true'] .action.trash")
 assert.equal((await last("trash"))?.id, "Groceries")
@@ -275,9 +275,9 @@ await press("Escape")
 
 // Pinned notes move with ⌥↑ and ⌥↓, or by dragging their handle, but only in the full list.
 const pinnedNotes = [
-  {id: "A", title: "A", modified: 3, text: "", pinned: true},
-  {id: "B", title: "B", modified: 2, text: "", pinned: true},
-  {id: "C", title: "C", modified: 1, text: "", pinned: false},
+  {id: "A", title: "A", text: "", pinned: true},
+  {id: "B", title: "B", text: "", pinned: true},
+  {id: "C", title: "C", text: "", pinned: false},
 ]
 const titles = () => page.$$eval("#results li .title", els => els.map(e => e.textContent))
 await receive("switcher", {notes: pinnedNotes, force: true})

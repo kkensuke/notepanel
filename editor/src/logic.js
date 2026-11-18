@@ -24,14 +24,15 @@ export function fuzzyScore(query, target) {
 }
 
 // Titles match fuzzily and rank first; bodies match as a plain substring, with the matching
-// line as a snippet. With no query, notes keep their order (newest first).
+// line as a snippet. With no query, and among notes that match equally, notes keep their order
+// (pinned first, then newest first).
 export function rankNotes(notes, query, limit = 200) {
   const q = query.trim()
   if (!q) return notes.slice(0, limit).map(note => ({...note, snippet: ""}))
   const lower = q.toLowerCase()
   const ranked = []
   for (const note of notes) {
-    const score = fuzzyScore(q, note.title) ?? (note.title === note.id ? null : fuzzyScore(q, note.id))
+    const score = fuzzyScore(q, note.title)
     if (score !== null) {
       ranked.push({...note, score: 1000 + score, snippet: ""})
       continue
@@ -39,7 +40,7 @@ export function rankNotes(notes, query, limit = 200) {
     const at = note.text.toLowerCase().indexOf(lower)
     if (at >= 0) ranked.push({...note, score: 0, snippet: snippetAt(note.text, at)})
   }
-  ranked.sort((a, b) => b.score - a.score || b.modified - a.modified)
+  ranked.sort((a, b) => b.score - a.score)
   return ranked.slice(0, limit)
 }
 
@@ -51,15 +52,25 @@ function snippetAt(text, at) {
   return (start > lineStart ? "…" : "") + text.slice(start, lineEnd).trim().slice(0, 120)
 }
 
+// What a bare URL ends before: a space or a bracket; a quote or a backtick, which a URL can't
+// hold; and the full-width brackets and punctuation that Japanese text puts right after a URL,
+// as in "（https://example.com/a）を参照".
+const urlEnd = String.raw`\s<>()[\]"` + "`（）「」『』【】、。"
+// "(" and ")" are part of a URL only as a pair, as in ".../Fish_(food)", so the ")" that closes
+// a Markdown link or a sentence in parentheses ends it. Each pattern stops at the next bracket
+// or parenthesis, so a long line of "[" isn't read to its end once for each of them.
+const markdownLink = /\[[^[\]]*\]\(((?:[^()\s]|\([^()\s]*\))+)(?:\s[^()]*)?\)/g
+const bareURL = new RegExp(String.raw`(?:https?:\/\/|mailto:)(?:[^${urlEnd}]|\([^${urlEnd}]*\))+`, "g")
+
 // The link under `offset` in a line: a Markdown link, or a bare URL. `from` and `to` span the
 // link as written, and `urlFrom` is where its URL starts.
 export function linkAt(line, offset) {
-  for (const m of line.matchAll(/\[[^\]]*\]\(([^)\s]+)[^)]*\)/g)) {
+  for (const m of line.matchAll(markdownLink)) {
     const to = m.index + m[0].length
     if (offset >= m.index && offset <= to)
       return {url: m[1], from: m.index, to, urlFrom: m.index + m[0].indexOf("](") + 2}
   }
-  for (const m of line.matchAll(/(?:https?:\/\/|mailto:)[^\s<>()[\]]+/g)) {
+  for (const m of line.matchAll(bareURL)) {
     const to = m.index + m[0].length
     if (offset >= m.index && offset <= to)
       return {url: m[0].replace(/[.,;:!?]+$/, ""), from: m.index, to, urlFrom: m.index}
