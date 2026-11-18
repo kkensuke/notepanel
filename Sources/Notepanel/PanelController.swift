@@ -346,11 +346,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
     }
 
-    /// Opens the next or previous note in the switcher's order, wrapping around.
+    /// Opens the next or previous note in the switcher's order, wrapping around. A note that
+    /// can't be read, such as one that isn't UTF-8 text, is passed over, so cycling goes on.
     private func cycle(_ step: Int) {
         let names = orderedNotes().map(\.name)
-        guard names.count > 1, let current = store.current, let index = names.firstIndex(of: current) else { return }
-        open(names[(index + step + names.count) % names.count])
+        guard let current = store.current, let index = names.firstIndex(of: current) else { return }
+        let count = names.count
+        let others = (1..<count).map { names[((index + step * $0) % count + count) % count] }
+        if let next = others.first(where: { store.read($0) != nil }) { open(next) }
     }
 
     /// Every rename comes through here, from the store: the user's, a file following its
