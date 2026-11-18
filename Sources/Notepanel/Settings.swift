@@ -108,6 +108,12 @@ final class SettingsWindow {
             window.level = .floating
             centerTitle(of: window)
             window.center()
+            // Recording a shortcut ends when another window, or another app, takes the keys.
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification, object: window, queue: .main
+            ) { [model] _ in
+                MainActor.assumeIsolated { model.stopRecording() }
+            }
             self.window = window
         }
         model.refresh()
@@ -154,7 +160,8 @@ private struct WindowTitle: View {
 @MainActor
 @Observable
 final class SettingsModel {
-    var tab = SettingsTab.general
+    /// The other tab's fields are out of sight, so a recording there ends.
+    var tab = SettingsTab.general { didSet { stopRecording() } }
     private(set) var openAtLogin = false
     private(set) var loginError: String?
     let toggleShortcut = ShortcutRecorder(name: "hotkey.toggle", title: "Show or hide notes")
@@ -195,6 +202,13 @@ final class SettingsModel {
 
     private var recorders: [ShortcutRecorder] {
         [toggleShortcut, createShortcut, searchShortcut, nextShortcut, previousShortcut, defaultFrameShortcut]
+    }
+
+    /// Ends a recording whose field is out of use. Left recording, the field would go on taking
+    /// the keys typed in the note panel, and notepanel's hot keys would stay off. A field that
+    /// isn't recording is left alone, so the reason it refused some keys stays.
+    func stopRecording() {
+        recorders.filter(\.recording).forEach { $0.stop() }
     }
 
     /// What already uses these keys, besides `recorder`: "in the panel", or "for" another shortcut.
@@ -666,7 +680,6 @@ struct ShortcutField: View {
                     .foregroundStyle(.red)
             }
         }
-        .onDisappear { recorder.stop() }
     }
 }
 
