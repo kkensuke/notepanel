@@ -379,6 +379,64 @@ inFolder { folder in
     equal(states, [.editing, .failed, .saved])
 }
 
+// A note that can't be saved stays open: another isn't opened or created, and it isn't trashed.
+inFolder { folder in
+    let manager = FileManager.default
+    let store = NoteStore(dataFolder: folder)
+    var status: String?
+    store.onStatus = { status = $0 }
+    let other = try store.create()
+    let name = try store.create()
+    let notes = store.folder.path
+    try manager.setAttributes([.posixPermissions: 0o500], ofItemAtPath: notes)
+    defer { try? manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: notes) }
+    store.edit("unsaved")
+    equal(store.open(other), nil)
+    throwsError(NoteStoreError.unsaved) { try store.create() }
+    throwsError(NoteStoreError.unsaved) { try store.trash(name) }
+    equal(store.current, name)
+    equal(store.text, "unsaved")
+    check(store.hasUnsavedChanges, "still unsaved")
+    check(status?.contains("stays open") == true, "the footer says why: \(status ?? "nothing")")
+    try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: notes)
+    equal(store.open(other), "")
+    equal(try contents(store, "unsaved"), "unsaved")
+}
+
+// A note that can't be saved in the old data folder stays open, and is saved in the new one.
+inFolder { folder in
+    let manager = FileManager.default
+    let store = NoteStore(dataFolder: folder.appendingPathComponent("old"))
+    _ = try store.create()
+    let notes = store.folder.path
+    try manager.setAttributes([.posixPermissions: 0o500], ofItemAtPath: notes)
+    defer { try? manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: notes) }
+    store.edit("mine")
+    store.setFolder(folder.appendingPathComponent("new"))
+    check(!store.hasUnsavedChanges, "saved in the new folder")
+    equal(store.current, "mine")
+    equal(try contents(store, "mine"), "mine")
+}
+
+// A note of the same name in the new folder is another note: the text goes to a conflict copy.
+inFolder { folder in
+    let manager = FileManager.default
+    let store = NoteStore(dataFolder: folder.appendingPathComponent("old"))
+    let name = try store.create()
+    let notes = store.folder.path
+    let new = folder.appendingPathComponent("new")
+    try manager.createDirectory(at: new.appendingPathComponent("Notes"), withIntermediateDirectories: true)
+    try Data("theirs".utf8).write(to: new.appendingPathComponent("Notes/\(name).md"))
+    try manager.setAttributes([.posixPermissions: 0o500], ofItemAtPath: notes)
+    defer { try? manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: notes) }
+    store.edit("mine")
+    store.setFolder(new)
+    let current = try unwrapped(store.current)
+    check(current.hasPrefix("\(name) (conflict "), "a conflict copy: \(current)")
+    equal(try contents(store, current), "mine")
+    equal(try contents(store, name), "theirs")
+}
+
 inFolder { folder in
     let store = NoteStore(dataFolder: folder)
     let first = try store.create()
