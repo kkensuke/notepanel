@@ -703,6 +703,12 @@ window.receive = ({type, data}) => {
       break
     case "status":
       statusElement.textContent = data
+      // The footer is hidden while the switcher or the history covers the note, so a message
+      // closes them: it may say why choosing a note there did nothing.
+      if (data) {
+        closeSwitcher()
+        closeHistory()
+      }
       break
   }
 }
