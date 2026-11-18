@@ -677,6 +677,9 @@ window.receive = ({type, data}) => {
         states.set(data.to, state)
       }
       if (currentId === data.from) currentId = data.to
+      // The switcher's rows are chosen by name, so a row with the old name would open nothing.
+      for (const note of notes) if (note.id === data.from) note.id = note.title = data.to
+      if (isSwitcherOpen()) render()
       break
     }
     case "trashed":

@@ -59,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Quitting never drops text silently: if the last changes can't be written, it asks.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        controller.store.flush()
+        controller.save()
         guard controller.store.hasUnsavedChanges else { return .terminateNow }
         NSApp.activate()
         let alert = NSAlert()

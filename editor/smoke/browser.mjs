@@ -428,6 +428,10 @@ assert.equal(await historyOpen(), true, "clearing the message closes nothing")
 await receive("status", "Couldn't open")
 assert.equal(await historyOpen(), false)
 await receive("switcher", {notes, force: true})
+// A note renamed while the switcher is open goes by its new name there.
+await receive("renamed", {from: "Ideas", to: "Thoughts"})
+assert.deepEqual(
+  await page.$$eval("#results li .title", els => els.map(e => e.textContent)), ["Groceries", "Meeting notes", "Thoughts"])
 await receive("status", "Couldn't open")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
 assert.equal(await page.$eval("#status", e => getComputedStyle(e.parentElement).opacity), "1", "the footer is in sight")

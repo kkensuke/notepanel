@@ -98,7 +98,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     func search() {
         show()
-        bridge.send("switcher", ["notes": notesForSwitcher(), "force": true])
+        showSwitcher(force: true)
+    }
+
+    /// Ends typing in the title, so the name goes to its note, and saves the note. The switcher
+    /// and the history show what's on disk, and quitting leaves it there.
+    func save() {
+        finishTitle()
+        store.flush()
     }
 
     /// Opens the notes folder in Finder with the open note's file selected. With no note open, or
@@ -426,12 +433,19 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     private func toggleSwitcher() {
-        bridge.send("switcher", ["notes": notesForSwitcher(), "force": false])
+        showSwitcher(force: false)
+    }
+
+    /// Saves first, so the list has the open note under the name its first line gives it.
+    private func showSwitcher(force: Bool) {
+        save()
+        bridge.send("switcher", ["notes": notesForSwitcher(), "force": force])
     }
 
     /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes
     /// the note.
     private func toggleHistory() {
+        save()
         guard let name = store.current else { return }
         let dates = ISO8601DateFormatter()
         let versions = store.versions(of: name).map { ["date": dates.string(from: $0.date), "text": $0.text] }

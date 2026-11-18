@@ -150,10 +150,12 @@ public final class NoteStore {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try Data(text.utf8).write(to: url(target), options: .atomic)
         } catch {
-            // Still dirty, so the next edit or flush tries again.
+            // Still dirty, so the next edit or flush tries again. Trying again without an edit,
+            // as before the switcher opens, has nothing new to say if it fails the same way.
+            let reason = error.localizedDescription
+            if saveState != .failed || reason != failure { report("Couldn’t save: \(reason)") }
             saveState = .failed
-            failure = error.localizedDescription
-            report("Couldn’t save: \(failure)")
+            failure = reason
             return
         }
         let follows = followsFirstLine(name: name, savedText: savedText)
