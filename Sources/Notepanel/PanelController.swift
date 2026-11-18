@@ -28,8 +28,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var previousApp: NSRunningApplication?
     private var uiFontSize: CGFloat = 15
     private var options: NSDictionary = [:]
-    /// Old names of renamed notes, so text the page sent under an old name still lands.
-    private var renamed: [String: String] = [:]
+    /// Counts the notes shown in the page, which sends the count back with the text typed. Text
+    /// typed in a note the panel has since left arrives late, and isn't taken for the open note's.
+    private var opening = 0
 
     private static let frameName = "Note Panel"
     /// The panel's size before a saved frame replaces it, which ⌃⌘M goes back to.
@@ -266,12 +267,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             bridge.send("options", options)
             if store.current == nil { openSomeNote() } else { showNote() }
         case "changed":
-            // The page sends the whole text, so text sent under a name the note just lost is
-            // still the current note's text.
-            guard let sent = body["id"] as? String, let current = store.current,
-                sent == current || renamed[sent] == current,
-                let text = body["text"] as? String
-            else { return }
+            guard body["opening"] as? Int == opening, let text = body["text"] as? String else { return }
             store.edit(text)
         case "select":
             if let id = body["id"] as? String { open(id) }
@@ -312,7 +308,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// Shows the open note in the page.
     private func showNote(keepSwitcher: Bool = false) {
         guard let name = store.current else { return }
-        bridge.send("open", ["id": name, "text": store.text, "keep": keepSwitcher])
+        opening += 1
+        bridge.send("open", ["id": name, "text": store.text, "keep": keepSwitcher, "opening": opening])
         rememberCurrent()
         updateTitle()
     }
@@ -352,8 +349,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// Every rename comes through here, from the store: the user's, a file following its
     /// first line, and a conflict copy.
     private func noteRenamed(_ old: String, _ new: String) {
-        renamed[old] = new
-        for (from, to) in renamed where to == old { renamed[from] = new }
         var pins = Prefs.pinned(in: store.folder)
         if let index = pins.firstIndex(of: old) {
             pins[index] = new

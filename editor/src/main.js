@@ -169,6 +169,9 @@ const settingsExtensions = () => [
 ]
 
 let currentId = null
+// Which showing of a note this is, by Swift's count. It goes back with the text typed, so that
+// Swift can tell text typed in a note it has since left from the open note's.
+let opening = 0
 // Each note's state, so its undo history and cursor survive switching notes.
 const states = new Map()
 
@@ -303,7 +306,7 @@ const extensions = [
   EditorView.updateListener.of(update => {
     if (update.docChanged && currentId !== null) {
       // shortcut: sends the whole text on every change; fine for notes, revisit past ~1 MB.
-      post("changed", {id: currentId, text: update.state.doc.toString()})
+      post("changed", {opening, text: update.state.doc.toString()})
       scheduleCount()
     }
   }),
@@ -662,6 +665,7 @@ historyView.addEventListener("keydown", event => {
 window.receive = ({type, data}) => {
   switch (type) {
     case "open":
+      opening = data.opening
       openNote(data.id, data.text, data.keep)
       if (jump?.id === data.id) selectMatch(jump.text)
       jump = null
