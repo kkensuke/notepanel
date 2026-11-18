@@ -421,6 +421,17 @@ await receive("history", {id: "Plan", versions: earlier})
 await receive("open", {id: "Count", text: "ab\ncd"})
 assert.equal(await historyOpen(), false)
 
+// A message in the footer closes the history and the switcher, which hide the footer.
+await receive("history", {id: "Count", versions: earlier})
+await receive("status", "")
+assert.equal(await historyOpen(), true, "clearing the message closes nothing")
+await receive("status", "Couldn't open")
+assert.equal(await historyOpen(), false)
+await receive("switcher", {notes, force: true})
+await receive("status", "Couldn't open")
+assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
+assert.equal(await page.$eval("#status", e => getComputedStyle(e.parentElement).opacity), "1", "the footer is in sight")
+
 assert.deepEqual(errors, [])
 console.log("smoke test passed")
 await browser.close()

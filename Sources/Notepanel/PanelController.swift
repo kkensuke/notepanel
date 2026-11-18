@@ -66,9 +66,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if !panel.isVisible {
             let front = NSWorkspace.shared.frontmostApplication
             previousApp = front?.processIdentifier == NSRunningApplication.current.processIdentifier ? nil : front
-            if let text = store.reloadIfChanged(), let name = store.current {
-                bridge.send("open", ["id": name, "text": text, "keep": false])
-            }
+            if store.reloadIfChanged() != nil { showNote() }
         }
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
@@ -206,7 +204,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         finishTitle()
         store.setFolder(dataFolder)
         UserDefaults.standard.removeObject(forKey: "lastNote")
-        openSomeNote()
+        // A note that couldn't be saved in the old folder is still open, and is the new folder's now.
+        if store.current == nil { openSomeNote() } else { rememberCurrent() }
     }
 
     func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int) {
@@ -262,9 +261,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func handle(_ type: String, _ body: [String: Any]) {
         switch type {
         case "ready":
-            // Also after the page reloads, so it gets its options and a note again.
+            // Also after the page reloads: it gets its options again, and the open note from the
+            // store, whose text may not be on disk.
             bridge.send("options", options)
-            openSomeNote()
+            if store.current == nil { openSomeNote() } else { showNote() }
         case "changed":
             // The page sends the whole text, so text sent under a name the note just lost is
             // still the current note's text.
@@ -304,11 +304,17 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     @discardableResult
     private func open(_ name: String, keepSwitcher: Bool = false) -> Bool {
         finishTitle()
-        guard let text = store.open(name) else { return false }
-        bridge.send("open", ["id": name, "text": text, "keep": keepSwitcher])
+        guard store.open(name) != nil else { return false }
+        showNote(keepSwitcher: keepSwitcher)
+        return true
+    }
+
+    /// Shows the open note in the page.
+    private func showNote(keepSwitcher: Bool = false) {
+        guard let name = store.current else { return }
+        bridge.send("open", ["id": name, "text": store.text, "keep": keepSwitcher])
         rememberCurrent()
         updateTitle()
-        return true
     }
 
     /// Opens the last note, else the newest readable one, else a new one, so a note is always open.
@@ -327,10 +333,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func createNote(keepSwitcher: Bool = false) {
         finishTitle()
         do {
-            let name = try store.create()
-            bridge.send("open", ["id": name, "text": "", "keep": keepSwitcher])
-            rememberCurrent()
-            updateTitle()
+            _ = try store.create()
+            showNote(keepSwitcher: keepSwitcher)
+        } catch NoteStoreError.unsaved {
+            // The footer already says that the open note stays.
         } catch {
             store.notify("Couldn’t create a note: \(error.localizedDescription)")
         }
@@ -389,6 +395,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         let trashed: String
         do {
             trashed = try store.trash(name)
+        } catch NoteStoreError.unsaved {
+            return  // The footer already says that the open note stays.
         } catch {
             store.notify("Couldn’t move “\(name)” to the Trash: \(error.localizedDescription)")
             return

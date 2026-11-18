@@ -133,6 +133,8 @@ open notepanel again from Finder or Spotlight.
   panel, switch notes or quit. The icon left of the note's name shows a dashed circle while the text
   isn't saved yet and a checked circle once it is. If a save fails, the icon turns into a red warning, the bottom
   of the panel says why, the text stays in notepanel, and quitting asks before it drops anything.
+  Until the note is saved, it stays open: notepanel won't open or create another note, or move it to
+  the Trash. If you choose another data folder, the note is saved there.
 - **Changes from other apps.** notepanel reads a note again when you show the panel or open the
   note. If the file changed on disk while you had unsaved text, your text goes to a separate copy
   named `… (conflict date time).md`, and the file on disk is left alone.
