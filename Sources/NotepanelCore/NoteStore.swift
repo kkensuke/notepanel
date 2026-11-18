@@ -243,7 +243,7 @@ public final class NoteStore {
     /// Changes the data folder. The open note is saved into the old folder, then forgotten. If
     /// it can't be saved there, it stays open and is saved into the new folder instead, so its
     /// text isn't dropped. A note of the same name there is another note, and isn't overwritten:
-    /// its date and size aren't the ones this store knows, so the text goes to a conflict copy.
+    /// it isn't the file this store read, so the text goes to a conflict copy.
     public func setFolder(_ newFolder: URL) {
         flush()
         dataFolder = newFolder
