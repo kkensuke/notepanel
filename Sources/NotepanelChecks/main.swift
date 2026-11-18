@@ -229,6 +229,22 @@ inFolder { folder in
     equal(store.current, conflict.to)
 }
 
+// A name as long as a name may be, made of kana with voicing marks, still saves. The file system
+// may store "が" as "か" and a combining mark: 6 bytes, where the name counts 3.
+inFolder { folder in
+    let store = NoteStore(dataFolder: folder)
+    var status: String?
+    store.onStatus = { status = $0 }
+    let line = String(repeating: "が", count: 80)
+    _ = try store.create()
+    store.edit(line)
+    store.flush()
+    equal(store.current, line)
+    store.edit(line + "\nmore")
+    store.flush()
+    check(!store.hasUnsavedChanges, "saved again: \(status ?? "no message")")
+}
+
 // A file deleted elsewhere is written again.
 inFolder { folder in
     let store = NoteStore(dataFolder: folder)
