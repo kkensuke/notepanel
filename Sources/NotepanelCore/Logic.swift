@@ -20,8 +20,7 @@ public func titleFromText(_ text: String) -> String? {
         var title = stripMarkdown(String(line))
             .replacingOccurrences(of: #"[/:]"#, with: "-", options: .regularExpression)
         while title.hasPrefix(".") { title.removeFirst() }
-        title = String(title.prefix(80)).trimmingCharacters(in: .whitespaces)
-        while title.utf8.count > 240 { title.removeLast() }
+        title = fitted(String(title.prefix(80)).trimmingCharacters(in: .whitespaces))
         if let name = validNoteName(title) { return name }
     }
     return nil
@@ -51,11 +50,22 @@ public func makeUniqueName(_ base: String, exists: (String) -> Bool) -> String {
     return "\(base) \(number)"
 }
 
+/// A note's name takes at most this many bytes of UTF-8. A file name holds 255, and the rest is
+/// for ".md" and the number a taken name gets.
+let nameLimit = 240
+
+/// `name + suffix`, with `name` cut short if that's too long for a note's name.
+func fitted(_ name: String, suffix: String = "") -> String {
+    var name = name
+    while !name.isEmpty, (name + suffix).utf8.count > nameLimit { name.removeLast() }
+    return name + suffix
+}
+
 /// The trimmed name, or nil if it can't be a note's file name.
 public func validNoteName(_ proposed: String) -> String? {
     let name = proposed.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty, !name.hasPrefix("."), !name.contains("/"), !name.contains(":"),
-        name.utf8.count <= 240
+        name.utf8.count <= nameLimit
     else { return nil }
     return name
 }
@@ -103,11 +113,13 @@ public func oldHistoryName(_ name: String, date: Date) -> String {
     datedName(name, "old", date)
 }
 
+/// `name (label 2026-11-07 1530)`. A long name is cut short to make room, so the result is
+/// still a note's name and fits in a file name.
 private func datedName(_ name: String, _ label: String, _ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "yyyy-MM-dd HHmm"
-    return "\(name) (\(label) \(formatter.string(from: date)))"
+    return fitted(name, suffix: " (\(label) \(formatter.string(from: date)))")
 }
 
 // MARK: - History

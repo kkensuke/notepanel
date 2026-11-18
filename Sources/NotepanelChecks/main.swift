@@ -96,6 +96,11 @@ equal(validNoteName(String(repeating: "\u{3042}", count: 81)), nil)
 let date = DateComponents(calendar: Calendar(identifier: .gregorian), year: 2026, month: 11, day: 7, hour: 15, minute: 30)
 equal(conflictName("Plan", date: date.date!), "Plan (conflict 2026-11-07 1530)")
 equal(oldHistoryName("Plan", date: date.date!), "Plan (old 2026-11-07 1530)")
+// A name as long as a name may be is cut short, so the dated name is no longer than that.
+let longest = String(repeating: "\u{3042}", count: 80)
+equal(conflictName(longest, date: date.date!).utf8.count, 240)
+check(conflictName(longest, date: date.date!).hasSuffix("\u{3042} (conflict 2026-11-07 1530)"), "the date is kept")
+check(oldHistoryName(longest, date: date.date!).utf8.count <= 240, "an old history's name fits")
 
 // MARK: - Versions
 
@@ -227,6 +232,40 @@ inFolder { folder in
     check(conflict.to.hasPrefix("mine (conflict "), "conflict copy name: \(conflict.to)")
     equal(try contents(store, conflict.to), "mine, again")
     equal(store.current, conflict.to)
+}
+
+// A note whose name is as long as a name may be still gets its conflict copy.
+inFolder { folder in
+    let store = NoteStore(dataFolder: folder)
+    let line = String(repeating: "\u{3042}", count: 80)
+    _ = try store.create()
+    store.edit(line)
+    store.flush()
+    equal(store.current, line)
+    try Data("theirs".utf8).write(to: store.url(line))
+    store.edit(line + "\nmine")
+    store.flush()
+    check(!store.hasUnsavedChanges, "saved to a conflict copy")
+    let copy = try unwrapped(store.current)
+    check(copy.contains(" (conflict "), "the conflict copy's name: \(copy)")
+    equal(try contents(store, copy), line + "\nmine")
+    equal(try contents(store, line), "theirs")
+}
+
+// A name as long as a name may be, made of kana with voicing marks, still saves. Decomposed,
+// "が" is "か" and a combining mark: 6 bytes, where the name counts 3. Saving doesn't trip on that.
+inFolder { folder in
+    let store = NoteStore(dataFolder: folder)
+    var status: String?
+    store.onStatus = { status = $0 }
+    let line = String(repeating: "が", count: 80)
+    _ = try store.create()
+    store.edit(line)
+    store.flush()
+    equal(store.current, line)
+    store.edit(line + "\nmore")
+    store.flush()
+    check(!store.hasUnsavedChanges, "saved again: \(status ?? "no message")")
 }
 
 // A file deleted elsewhere is written again.
