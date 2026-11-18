@@ -28,8 +28,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var previousApp: NSRunningApplication?
     private var uiFontSize: CGFloat = 15
     private var options: NSDictionary = [:]
-    /// Old names of renamed notes, so text the page sent under an old name still lands.
-    private var renamed: [String: String] = [:]
+    /// Counts the notes shown in the page, which sends the count back with the text typed. Text
+    /// typed in a note the panel has since left arrives late, and isn't taken for the open note's.
+    private var opening = 0
 
     private static let frameName = "Note Panel"
     /// The panel's size before a saved frame replaces it, which ⌃⌘M goes back to.
@@ -97,7 +98,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     func search() {
         show()
-        bridge.send("switcher", ["notes": notesForSwitcher(), "force": true])
+        showSwitcher(force: true)
+    }
+
+    /// Ends typing in the title, so the name goes to its note, and saves the note. The switcher
+    /// and the history show what's on disk, and quitting leaves it there.
+    func save() {
+        finishTitle()
+        store.flush()
     }
 
     /// Opens the notes folder in Finder with the open note's file selected. With no note open, or
@@ -266,12 +274,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             bridge.send("options", options)
             if store.current == nil { openSomeNote() } else { showNote() }
         case "changed":
-            // The page sends the whole text, so text sent under a name the note just lost is
-            // still the current note's text.
-            guard let sent = body["id"] as? String, let current = store.current,
-                sent == current || renamed[sent] == current,
-                let text = body["text"] as? String
-            else { return }
+            guard body["opening"] as? Int == opening, let text = body["text"] as? String else { return }
             store.edit(text)
         case "select":
             if let id = body["id"] as? String { open(id) }
@@ -312,7 +315,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// Shows the open note in the page.
     private func showNote(keepSwitcher: Bool = false) {
         guard let name = store.current else { return }
-        bridge.send("open", ["id": name, "text": store.text, "keep": keepSwitcher])
+        opening += 1
+        bridge.send("open", ["id": name, "text": store.text, "keep": keepSwitcher, "opening": opening])
         rememberCurrent()
         updateTitle()
     }
@@ -342,18 +346,19 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
     }
 
-    /// Opens the next or previous note in the switcher's order, wrapping around.
+    /// Opens the next or previous note in the switcher's order, wrapping around. A note that
+    /// can't be read, such as one that isn't UTF-8 text, is passed over, so cycling goes on.
     private func cycle(_ step: Int) {
         let names = orderedNotes().map(\.name)
-        guard names.count > 1, let current = store.current, let index = names.firstIndex(of: current) else { return }
-        open(names[(index + step + names.count) % names.count])
+        guard let current = store.current, let index = names.firstIndex(of: current) else { return }
+        let count = names.count
+        let others = (1..<count).map { names[((index + step * $0) % count + count) % count] }
+        if let next = others.first(where: { store.read($0) != nil }) { open(next) }
     }
 
     /// Every rename comes through here, from the store: the user's, a file following its
     /// first line, and a conflict copy.
     private func noteRenamed(_ old: String, _ new: String) {
-        renamed[old] = new
-        for (from, to) in renamed where to == old { renamed[from] = new }
         var pins = Prefs.pinned(in: store.folder)
         if let index = pins.firstIndex(of: old) {
             pins[index] = new
@@ -431,12 +436,19 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     private func toggleSwitcher() {
-        bridge.send("switcher", ["notes": notesForSwitcher(), "force": false])
+        showSwitcher(force: false)
+    }
+
+    /// Saves first, so the list has the open note under the name its first line gives it.
+    private func showSwitcher(force: Bool) {
+        save()
+        bridge.send("switcher", ["notes": notesForSwitcher(), "force": force])
     }
 
     /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes
     /// the note.
     private func toggleHistory() {
+        save()
         guard let name = store.current else { return }
         let dates = ISO8601DateFormatter()
         let versions = store.versions(of: name).map { ["date": dates.string(from: $0.date), "text": $0.text] }

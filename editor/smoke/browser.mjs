@@ -34,7 +34,7 @@ const press = async (key, mods = []) => {
 const pause = ms => new Promise(r => setTimeout(r, ms))
 
 // Open a note and put the cursor at the start of the last line.
-await receive("open", {id: "Untitled", text: "one\n\n\nfour"})
+await receive("open", {id: "Untitled", text: "one\n\n\nfour", opening: 1})
 await page.click(".cm-content")
 await press("ArrowDown", ["Meta"])
 await press("ArrowLeft", ["Meta"])
@@ -45,7 +45,7 @@ await press("Backspace", ["Meta"])
 await press("Backspace", ["Meta"])
 await press("Backspace", ["Meta"])
 assert.equal(await changedText(), "onefour")
-assert.equal((await last("changed")).id, "Untitled")
+assert.equal((await last("changed")).opening, 1, "text goes back with the count the note came with")
 
 // Edits within 500 ms form one undo step (CodeMirror's history grouping).
 await press("z", ["Meta"])
@@ -171,10 +171,10 @@ await (await page.$$(".cm-taskBox"))[1].click()
 assert.equal(await changedText(), "- [x] milk\n- [ ] eggs!")
 
 // Switching back to a note keeps its undo history.
-await receive("open", {id: "Untitled", text: "one\n\n\nfour"})
+await receive("open", {id: "Untitled", text: "one\n\n\nfour", opening: 7})
 await page.click(".cm-content")
 await press("z", ["Meta", "Shift"])
-assert.equal((await last("changed")).id, "Untitled")
+assert.equal((await last("changed")).opening, 7)
 assert.equal(await changedText(), "one\n\n\nafour", "redo history survived switching notes")
 
 // Escape with nothing to close asks Swift to hide the panel.
@@ -428,6 +428,10 @@ assert.equal(await historyOpen(), true, "clearing the message closes nothing")
 await receive("status", "Couldn't open")
 assert.equal(await historyOpen(), false)
 await receive("switcher", {notes, force: true})
+// A note renamed while the switcher is open goes by its new name there.
+await receive("renamed", {from: "Ideas", to: "Thoughts"})
+assert.deepEqual(
+  await page.$$eval("#results li .title", els => els.map(e => e.textContent)), ["Groceries", "Meeting notes", "Thoughts"])
 await receive("status", "Couldn't open")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
 assert.equal(await page.$eval("#status", e => getComputedStyle(e.parentElement).opacity), "1", "the footer is in sight")

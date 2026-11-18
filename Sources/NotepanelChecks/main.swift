@@ -433,6 +433,10 @@ inFolder { folder in
     store.edit("kept")
     store.flush()
     check(store.hasUnsavedChanges, "unsaved after a failed write")
+    var messages = 0
+    store.onStatus = { if $0 != nil { messages += 1 } }
+    store.flush()
+    equal(messages, 0)  // Failing again the same way isn't said again.
     try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: store.folder.path)
     store.flush()
     check(!store.hasUnsavedChanges, "saved once writing works again")
