@@ -401,6 +401,28 @@ inFolder { folder in
     equal(store.text, "unsaved")
 }
 
+// A file whose date changed but whose text didn't, as after `touch`, hasn't changed: nothing is
+// read again, and the next save overwrites it rather than making a conflict copy.
+inFolder { folder in
+    let manager = FileManager.default
+    let store = NoteStore(dataFolder: folder)
+    var renames: [String] = []
+    store.onRenamed = { renames.append("\($0) -> \($1)") }
+    _ = try store.create()
+    store.edit("Plan\nmine")
+    store.flush()
+    let path = store.url("Plan").path
+    try Data("Plan\nmine".utf8).write(to: store.url("Plan"))
+    try manager.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 60)], ofItemAtPath: path)
+    store.edit("Plan\nmine, again")
+    store.flush()
+    equal(try contents(store, "Plan"), "Plan\nmine, again")
+    try manager.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 120)], ofItemAtPath: path)
+    equal(store.reloadIfChanged(), nil)
+    equal(renames, ["Untitled -> Plan"])
+    equal(store.list().map(\.name), ["Plan"])
+}
+
 // Saving is still possible after a failed write, and the text stays unsaved until then.
 inFolder { folder in
     let store = NoteStore(dataFolder: folder)

@@ -35,7 +35,7 @@ public enum SaveState {
 /// - Writes are atomic, and a failed write keeps the text unsaved, to be tried again. Until it's
 ///   saved, the note stays open: opening or creating another, or trashing it, is refused.
 /// - A file changed elsewhere since it was read is never overwritten; the text goes to a
-///   conflict copy instead.
+///   conflict copy instead. A file has changed if its text has, not if only its date has.
 /// - Before a note's file is overwritten, its current contents are kept as a version, at most
 ///   once per `versionInterval` per note. The versions are then thinned (`versionsToKeep`).
 /// - Renames never replace another file, and deleted notes go to the Trash.
@@ -141,7 +141,7 @@ public final class NoteStore {
         pending = nil
         guard dirty, let name = current else { return }
         var target = name
-        if let known = stamp, let now = fileStamp(name), now != known {
+        if changedElsewhere(name) != nil {
             target = makeUniqueName(conflictName(name, date: Date())) { exists($0) }
         } else {
             keepVersion(name)
@@ -177,12 +177,10 @@ public final class NoteStore {
     /// Picks up edits made elsewhere, unless this note has unsaved changes.
     /// Returns the new text, or nil if nothing changed.
     public func reloadIfChanged() -> String? {
-        guard !dirty, let name = current, let now = fileStamp(name), now != stamp,
-            let content = read(name)
+        guard !dirty, let name = current, let now = changedElsewhere(name), let content = read(name)
         else { return nil }
         stamp = now
         savedText = content
-        guard content != text else { return nil }
         text = content
         return content
     }
@@ -415,6 +413,16 @@ public final class NoteStore {
             let y = try? b.resourceValues(forKeys: key).fileResourceIdentifier
         else { return false }
         return x.isEqual(y)
+    }
+
+    /// The date and size of the note's file, if another app has changed the file since this
+    /// store read or wrote it. They are a quick first test: if only they differ, as after `touch`
+    /// or a sync that wrote the same text again, the file hasn't changed, and they are remembered.
+    private func changedElsewhere(_ name: String) -> Stamp? {
+        guard let now = fileStamp(name), now != stamp else { return nil }
+        guard read(name) == savedText else { return now }
+        stamp = now
+        return nil
     }
 
     private func fileStamp(_ name: String) -> Stamp? {
