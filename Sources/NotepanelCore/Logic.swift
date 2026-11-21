@@ -52,7 +52,7 @@ public func makeUniqueName(_ base: String, exists: (String) -> Bool) -> String {
 
 /// A note's name takes at most this many bytes of UTF-8. A file name holds 255, and the rest is
 /// for ".md" and the number a taken name gets.
-let nameLimit = 240
+public let nameLimit = 240
 
 /// `name + suffix`, with `name` cut short if that's too long for a note's name.
 func fitted(_ name: String, suffix: String = "") -> String {

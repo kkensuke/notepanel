@@ -36,17 +36,10 @@ final class SwitcherWindow {
     /// page draws the switcher's corners as a row's corners and the edge around them, so the
     /// chosen row's frame fits a bottom corner whole; the glass and the window's shadow follow them.
     func configure() {
-        window.isFloatingPanel = true
-        window.level = .floating
-        window.hidesOnDeactivate = false
-        window.animationBehavior = .none
-        window.collectionBehavior = panel.collectionBehavior
-        window.isOpaque = false
-        window.backgroundColor = .clear
+        window.float()
         // As the key window, it would get a shadow drawn round its frame's square corners, not
         // the glass's round ones.
         window.hasShadow = false
-        window.isReleasedWhenClosed = false
         window.commands = panel.commands
         window.onZoom = panel.onZoom
         window.contentView = backdrop.view

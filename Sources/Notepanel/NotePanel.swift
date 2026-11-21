@@ -25,6 +25,21 @@ final class NotePanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
+    /// What the note panel and the switcher's window share: they float over other apps, in every
+    /// Space and over full-screen apps, stay up while another app is active, and come and go at
+    /// once. They draw their own background.
+    func float() {
+        isFloatingPanel = true
+        level = .floating
+        hidesOnDeactivate = false
+        // Appears and disappears at once, with no fade AppKit might add.
+        animationBehavior = .none
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        isOpaque = false
+        backgroundColor = .clear
+        isReleasedWhenClosed = false
+    }
+
     // While the app is inactive the main menu never sees key equivalents, so the panel routes them:
     // its own commands first, then cut, copy and paste to the first responder, and Select All, Undo
     // and Redo to a text field. Everything else, including Cmd-Z in the editor and its key repeats,

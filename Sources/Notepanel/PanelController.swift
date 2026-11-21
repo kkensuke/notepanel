@@ -371,7 +371,8 @@ final class PanelController: NSObject, NSWindowDelegate {
         } catch NoteStoreError.exists {
             store.notify("A note named “\(proposed.trimmingCharacters(in: .whitespaces))” already exists.")
         } catch NoteStoreError.invalidName {
-            store.notify("A name can’t be empty or longer than 240 bytes, start with a period, or contain “/” or “:”.")
+            store.notify(
+                "A name can’t be empty or longer than \(nameLimit) bytes, start with a period, or contain “/” or “:”.")
         } catch {
             store.notify("Couldn’t rename “\(old)”: \(error.localizedDescription)")
         }
@@ -512,21 +513,13 @@ final class PanelController: NSObject, NSWindowDelegate {
     // MARK: - Window
 
     private func configurePanel() {
-        panel.isFloatingPanel = true
-        panel.level = .floating
-        panel.hidesOnDeactivate = false
-        // Appears and disappears at once, with no fade AppKit might add.
-        panel.animationBehavior = .none
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.float()
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true
         panel.titlebarSeparatorStyle = .none
         // Added after creating the panel, which keeps its frame: with this in the style mask, the
         // content rect it's created with would cover the title bar too, making it shorter.
         panel.styleMask.insert(.fullSizeContentView)
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.isReleasedWhenClosed = false
         panel.minSize = NSSize(width: 320, height: 160)
         panel.standardWindowButton(.zoomButton)?.isHidden = true
         panel.delegate = self

@@ -13,15 +13,7 @@ final class SettingsWindow {
 
     func show() {
         if window == nil {
-            let host = NSHostingController(rootView: SettingsView(model: model))
-            host.sizingOptions = [.preferredContentSize]
-            let window = NSWindow(contentViewController: host)
-            window.title = "Settings"
-            window.styleMask = [.titled, .closable]
-            window.isReleasedWhenClosed = false
-            window.animationBehavior = .none
-            // Above the note panel, which floats.
-            window.level = .floating
+            let window = utilityWindow("Settings", SettingsView(model: model))
             centerTitle(of: window)
             window.center()
             // Recording a shortcut ends when another window, or another app, takes the keys.
@@ -41,6 +33,21 @@ final class SettingsWindow {
     func toggle() {
         if window?.isVisible == true { window?.close() } else { show() }
     }
+}
+
+/// A window of notepanel's own, such as Settings, as big as its view.
+@MainActor
+func utilityWindow<Content: View>(_ title: String, _ view: Content) -> NSWindow {
+    let host = NSHostingController(rootView: view)
+    host.sizingOptions = [.preferredContentSize]
+    let window = NSWindow(contentViewController: host)
+    window.title = title
+    window.styleMask = [.titled, .closable]
+    window.isReleasedWhenClosed = false
+    window.animationBehavior = .none
+    // Above the note panel, which floats.
+    window.level = .floating
+    return window
 }
 
 /// From macOS 26, a window's title sits at the leading edge of the title bar. This hides it and

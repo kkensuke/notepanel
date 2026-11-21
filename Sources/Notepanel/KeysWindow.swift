@@ -9,15 +9,7 @@ enum KeysWindow {
 
     static func show() {
         if window == nil {
-            let host = NSHostingController(rootView: KeysView())
-            host.sizingOptions = [.preferredContentSize]
-            let window = NSWindow(contentViewController: host)
-            window.title = "Keyboard Shortcuts"
-            window.styleMask = [.titled, .closable]
-            window.isReleasedWhenClosed = false
-            window.animationBehavior = .none
-            // Above the note panel, which floats.
-            window.level = .floating
+            let window = utilityWindow("Keyboard Shortcuts", KeysView())
             window.center()
             self.window = window
         }
