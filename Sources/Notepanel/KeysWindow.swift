@@ -53,8 +53,9 @@ private let panelKeys = [
 ]
 
 private let switcherKeys = [
-    ("Choose a note", "↑ / ↓"),
-    ("Bring back an earlier search", "↑ on the first row"),
+    ("Earlier and later searches", "↑ / ↓ in the search field"),
+    ("Go into the list and back", "↓ or Tab / ↑ or Tab"),
+    ("Choose a note, which shows beside the list", "↑ / ↓ in the list"),
     ("Open it", "↩"),
     ("Move it to the Trash", "⌘⌫"),
     ("Move a pinned note up / down", "⌥↑ / ⌥↓"),

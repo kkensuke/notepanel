@@ -84,7 +84,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize,
             showWhitespace: defaults.bool(forKey: "showWhitespace"),
             indentSize: defaults.object(forKey: "indentSize") as? Int ?? 4,
-            noteShare: defaults.object(forKey: "noteShare") as? Double ?? Prefs.defaultNoteShare)
+            sideWidth: defaults.object(forKey: "sideWidth") as? Double ?? Prefs.defaultSideWidth)
         controller.setPanelShortcuts(
             next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"),
             defaultFrame: Prefs.shortcut("shortcut.defaultFrame"))

@@ -26,8 +26,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// Whether the page shows the history, as it last said.
     private var historyShown = false
     private var buttons: [NSButton] = []
-    /// The buttons, as one toolbar item.
+    /// The buttons at the right, as one toolbar item.
     private let buttonsView = ButtonRow()
+    /// The switcher's button, at the left, over the switcher.
+    private let browseView = ButtonRow()
     private var previousApp: NSRunningApplication?
     private var uiFontSize: CGFloat = 15
     private var options: NSDictionary = [:]
@@ -44,6 +46,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var defaultFrame: NSRect?
 
     private enum Item {
+        static let browse = NSToolbarItem.Identifier("browse")
         static let title = NSToolbarItem.Identifier("title")
         static let buttons = NSToolbarItem.Identifier("buttons")
     }
@@ -225,11 +228,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     func setOptions(
         fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int,
-        noteShare: Double
+        sideWidth: Double
     ) {
         let new: NSDictionary = [
             "fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize,
-            "showWhitespace": showWhitespace, "indentSize": indentSize, "noteShare": noteShare,
+            "showWhitespace": showWhitespace, "indentSize": indentSize, "sideWidth": sideWidth,
         ]
         guard new != options else { return }
         options = new
@@ -296,9 +299,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             if let id = body["id"] as? String { togglePin(id) }
         case "orderPins":
             if let ids = body["ids"] as? [String] { orderPins(ids) }
-        case "noteShare":
+        case "sideWidth":
             // Kept with the settings, which send it back to the page with the other options.
-            if let share = body["share"] as? Double { UserDefaults.standard.set(share, forKey: "noteShare") }
+            if let width = body["width"] as? Double { UserDefaults.standard.set(width, forKey: "sideWidth") }
         case "openURL":
             // The page is trusted, but a link can say anything, so only web and mail links open.
             guard let string = body["url"] as? String, let url = URL(string: string),
@@ -579,14 +582,16 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             titleField.topAnchor.constraint(equalTo: titleView.topAnchor),
             titleField.bottomAnchor.constraint(equalTo: titleView.bottomAnchor),
         ])
-        buttons = [
+        let browse = toolbarButton("list.bullet", "Browse Notes (⌘P)", #selector(browseClicked))
+        let right = [
             toolbarButton("square.and.pencil", "New Note (⌘N)", #selector(newNoteClicked)),
-            toolbarButton("list.bullet", "Browse Notes (⌘P)", #selector(browseClicked)),
             toolbarButton("folder", "Open Notes Folder (⌘O)", #selector(openFolderClicked)),
         ]
+        buttons = [browse] + right
+        browseView.addArrangedSubview(browse)
         // The spacing the toolbar gave them before macOS 26, which spaces separate items for glass.
         buttonsView.spacing = 12
-        for button in buttons { buttonsView.addArrangedSubview(button) }
+        for button in right { buttonsView.addArrangedSubview(button) }
         applyUIFontSize()
 
         // A toolbar sizes the title bar to the title and buttons and keeps the traffic lights
@@ -649,7 +654,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Item.title, .flexibleSpace, Item.buttons]
+        [Item.browse, .flexibleSpace, Item.title, .flexibleSpace, Item.buttons]
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -662,6 +667,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     ) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: identifier)
         switch identifier {
+        case Item.browse: item.view = browseView
         case Item.title: item.view = titleView
         case Item.buttons: item.view = buttonsView
         default: return nil
@@ -747,7 +753,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         let gap: CGFloat = 5
         // shortcut: margins taken from one screenshot (about 20 pt for the toolbar's edge and a gap
         // before the title); measure the laid-out buttons if another macOS sets them wider.
-        let buttonsWidth = buttonsView.fittingSize.width + 20
+        // The left side has the traffic lights and the switcher's button, taken as 78 pt more than
+        // the button; the name gets what the wider side leaves.
+        let buttonsWidth = max(buttonsView.fittingSize.width + 20, browseView.fittingSize.width + 78)
         let room = (panelWidth ?? panel.frame.width) - 2 * buttonsWidth - HistoryButton.margin - saveIconWidth.constant - gap
         titleWidth.constant = max(0, min(max(width, 80), 360, room))
         // The name is centered in its field, so the icon moves in over the space left of it and
