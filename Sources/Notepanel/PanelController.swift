@@ -153,6 +153,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
                 UserDefaults.standard.set(Double(sideWidth), forKey: "sideWidth")
                 if let shift, panel.frame == shift.to { panel.setFrame(shift.from, display: true) }
                 shift = nil
+                // The note takes the typing the switcher's window had.
+                if panel.isVisible { panel.makeKey() }
                 focusEditor()
             }
         }
@@ -956,9 +958,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if titleField.currentEditor() != nil { focusEditor() }
     }
 
-    /// The note takes the typing, also when the switcher's window had it.
     private func focusEditor() {
-        if panel.isVisible { panel.makeKey() }
         panel.makeFirstResponder(bridge.webView)
         bridge.send("focus", "")
     }
