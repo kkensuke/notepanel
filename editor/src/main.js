@@ -420,6 +420,8 @@ let jump = null
 // The note and the word of the find the last search opened. That find is the search done, not
 // one to carry over.
 let landed = null
+// Whether the search hot key brought the panel up, so that Escape hides the panel too.
+let dismiss = false
 
 const isSwitcherOpen = () => !switcher.hidden
 // Swift sends the pinned notes first, in the user's order. Searching sorts by match, so pinned
@@ -461,9 +463,10 @@ function dragPinned(event, note) {
   addEventListener("mouseup", drop)
 }
 
-function openSwitcher(list) {
+function openSwitcher(list, fromHotKey) {
   closeHistory()
   notes = list
+  dismiss = fromHotKey
   // A find in the note carries over: what this note doesn't have, another may. Not the find the
   // last search opened, though, which is that search done.
   const find = searchPanelOpen(view.state) && getSearchQuery(view.state)
@@ -817,6 +820,7 @@ query.addEventListener("keydown", event => {
   } else if (event.key === "Enter") {
     if (row) choose(row)
   } else if (event.key === "Escape") {
+    if (dismiss) post("escape")
     closeSwitcher()
   } else if (command && event.key === "Backspace") {
     if (row) post("trash", {id: row.note.id})
@@ -944,7 +948,7 @@ window.receive = ({type, data}) => {
       if (currentId === data) currentId = null
       break
     case "switcher":
-      if (data.force || !isSwitcherOpen()) openSwitcher(lineFeeds(data.notes))
+      if (data.force || !isSwitcherOpen()) openSwitcher(lineFeeds(data.notes), data.dismiss === true)
       else closeSwitcher()
       break
     case "notes":

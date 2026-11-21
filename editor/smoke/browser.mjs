@@ -573,6 +573,17 @@ await press("ArrowUp")
 assert.equal(await queryValue(), "budget")
 await press("Escape")
 
+// Brought up by the search hot key, the panel goes with the switcher on Escape.
+await receive("switcher", {notes: found, force: true, dismiss: true})
+await clear()
+await press("Escape")
+assert.equal(await switcherOpen(), false)
+assert.equal((await last("escape"))?.type, "escape")
+await receive("switcher", {notes: found, force: true})
+await clear()
+await press("Escape")
+assert.equal(await last("escape"), undefined, "opened in the panel, the switcher closes alone")
+
 assert.deepEqual(errors, [])
 console.log("smoke test passed")
 await browser.close()

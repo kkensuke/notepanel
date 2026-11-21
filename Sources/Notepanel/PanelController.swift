@@ -101,9 +101,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         show()
     }
 
+    /// Escape takes the panel away again if searching is what brought it up.
     func search() {
+        let wasHidden = !panel.isVisible
         show()
-        showSwitcher(force: true)
+        showSwitcher(force: true, dismiss: wasHidden)
     }
 
     /// Ends typing in the title, so the name goes to its note, and saves the note. The switcher
@@ -456,9 +458,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     /// Saves first, so the list has the open note under the name its first line gives it.
-    private func showSwitcher(force: Bool) {
+    /// With `dismiss`, Escape in the switcher hides the panel too.
+    private func showSwitcher(force: Bool, dismiss: Bool = false) {
         save()
-        bridge.send("switcher", ["notes": notesForSwitcher(), "force": force])
+        bridge.send("switcher", ["notes": notesForSwitcher(), "force": force, "dismiss": dismiss])
     }
 
     /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes
