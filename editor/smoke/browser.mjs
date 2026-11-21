@@ -440,6 +440,150 @@ await receive("status", "Couldn't open")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
 assert.equal(await page.$eval("#status", e => getComputedStyle(e.parentElement).opacity), "1", "the footer is in sight")
 
+// A search wants every word, in a note's name or in its text. Each note found is its name over
+// the lines of its text that have a word, and the lines are the rows to choose.
+const found = [
+  {id: "Budget 2026", title: "Budget 2026", text: "# Budget 2026\n\nHardware budget was cut.\n| Q1 | budget review |", pinned: true},
+  {id: "Weekly plan", title: "Weekly plan", text: "- Send the ＢＵＤＧＥＴ draft\r\n- Plan the review", pinned: false},
+  {id: "Inbox", title: "Inbox", text: "call the dentist", pinned: false},
+]
+const groups = () => page.$$eval("#results .group", els => els.map(e =>
+  [e.querySelector(".title").textContent, ...[...e.querySelectorAll(".line")].map(line => line.textContent)]))
+const chosen = () => page.$eval("#results [aria-selected='true']", e => e.textContent)
+const queryValue = () => page.$eval("#query", e => e.value)
+const switcherOpen = () => page.evaluate(() => !document.getElementById("switcher").hidden)
+await receive("status", "")
+await receive("switcher", {notes: found, force: true})
+assert.equal(await page.$eval("#total", e => e.textContent), "3 notes")
+await page.keyboard.type("review　budget")
+assert.deepEqual(await groups(), [
+  ["Budget 2026", "Hardware budget was cut.", "Q1 | budget review |"],
+  ["Weekly plan", "Send the ＢＵＤＧＥＴ draft", "Plan the review"],
+])
+assert.equal(await page.$eval("#total", e => e.textContent), "2 notes")
+assert.deepEqual(
+  await page.$$eval("#results mark", els => els.map(e => e.textContent)),
+  ["Budget", "budget", "budget", "review", "ＢＵＤＧＥＴ", "review"])
+// The arrows go through the lines and pass the names, which aren't rows.
+assert.deepEqual(await page.$$eval("#results .name", els => els.map(e => e.getAttribute("role"))), [null, null])
+assert.equal(await chosen(), "Hardware budget was cut.")
+await press("ArrowDown")
+await press("ArrowDown")
+assert.equal(await chosen(), "Send the ＢＵＤＧＥＴ draft")
+// A press on a name opens the note at its first line.
+await clear()
+await page.click("#results .group:first-child .name")
+assert.equal((await last("select"))?.id, "Budget 2026")
+// The note opens with its find on the row's word and the match selected, so typing replaces it.
+await clear()
+await press("Enter")
+assert.equal((await last("select"))?.id, "Weekly plan")
+await receive("open", {id: "Weekly plan", text: found[1].text, keep: false})
+assert.equal(await switcherOpen(), false)
+assert.equal(await page.$eval(".cm-search [name=search]", e => e.value), "budget")
+await page.keyboard.type("plan")
+assert.equal(await changedText(), "- Send the plan draft\n- Plan the review")
+// That find is the search done, so the switcher opens on all notes again. A find the user
+// started carries over: what the note doesn't have, another may.
+await receive("switcher", {notes: found, force: true})
+assert.equal(await queryValue(), "")
+await press("Escape")
+await press("f", ["Meta"])
+await page.keyboard.type("dentist")
+await receive("switcher", {notes: found, force: true})
+assert.equal(await queryValue(), "dentist")
+assert.deepEqual(await groups(), [["Inbox", "call the dentist"]])
+// A note found by its name alone is a row itself.
+await page.keyboard.type("wkpl")
+assert.deepEqual(await groups(), [["Weekly plan"]])
+assert.equal(await chosen(), "Weekly plan")
+await page.keyboard.type("zzz")
+assert.equal(await page.$eval("#results", e => e.textContent), "No notes match")
+await press("Escape")
+// Escape in the note closes its find.
+await press("Escape")
+assert.equal(await page.$(".cm-search"), null)
+
+// Under the list is the chosen row's note, at the row's line, with every match marked as the
+// note's find will mark them.
+const previewMarks = () => page.$$eval("#preview .cm-searchMatch", els =>
+  els.map(e => [e.textContent, e.classList.contains("cm-searchMatch-selected")]))
+await receive("switcher", {notes: found, force: true})
+assert.match(await page.$eval("#preview .cm-content", e => e.innerText), /^# Budget 2026/)
+assert.deepEqual(await previewMarks(), [])
+await page.keyboard.type("budget review")
+assert.deepEqual(await previewMarks(), [["Budget", false], ["budget", true], ["budget", false], ["review", false]])
+await press("ArrowDown")
+await press("ArrowDown")
+assert.match(await page.$eval("#preview .cm-content", e => e.innerText), /^- Send the ＢＵＤＧＥＴ draft/)
+assert.deepEqual(await previewMarks(), [["ＢＵＤＧＥＴ", true], ["review", false]])
+// A press in the note's text opens the note there.
+await clear()
+await page.click("#preview .cm-line:last-child")
+assert.equal((await last("select"))?.id, "Weekly plan")
+await press("a", ["Meta"])
+await press("Backspace")
+// The bar under the list sets how much of the switcher the text takes: from none, as far as
+// leaving the search field and the pinned notes' rows, two rows at the least. Swift keeps it.
+const previewHeight = () => page.$eval("#preview", e => e.offsetHeight)
+const dragBar = async y => {
+  const bar = await (await page.$("#split")).boundingBox()
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(bar.x + bar.width / 2, y, {steps: 3})
+  await page.mouse.up()
+}
+assert.equal(await previewHeight(), 160)
+await receive("options", {fontSize: 14, uiFontSize: 15, noteShare: 0.25})
+assert.equal(await previewHeight(), 100)
+await clear()
+await dragBar(390)
+assert.equal(await previewHeight(), 0)
+assert.equal((await last("noteShare"))?.share, 0)
+await dragBar(0)
+assert.equal((await last("noteShare"))?.share, 1)
+assert.equal(
+  await page.$eval("#results", e => e.clientHeight), 2 * (await page.$eval("#results li", e => e.offsetHeight)))
+assert.equal(await page.evaluate(() => document.activeElement.id), "query", "the search field keeps the focus")
+await receive("options", {fontSize: 14, uiFontSize: 15})
+assert.equal(await previewHeight(), 160)
+await press("Escape")
+
+// ↑ on the first row goes back through what was searched for; ↓ goes down the rows as ever.
+for (const text of ["review", "budget"]) {
+  await receive("switcher", {notes: found, force: true})
+  await page.keyboard.type(text)
+  await press("Escape")
+}
+await receive("switcher", {notes: found, force: true})
+assert.equal(await queryValue(), "")
+await press("ArrowUp")
+assert.equal(await queryValue(), "budget")
+assert.equal(await chosen(), "Hardware budget was cut.")
+await press("ArrowDown")
+assert.equal(await chosen(), "Q1 | budget review |")
+await press("ArrowUp")
+assert.deepEqual([await queryValue(), await chosen()], ["budget", "Hardware budget was cut."])
+await press("ArrowUp")
+assert.equal(await queryValue(), "review")
+// The search brought back is selected, so typing replaces it, and ↑ starts from the last again.
+await page.keyboard.type("x")
+assert.equal(await queryValue(), "x")
+await press("ArrowUp")
+assert.equal(await queryValue(), "budget")
+await press("Escape")
+
+// Brought up by the search hot key, the panel goes with the switcher on Escape.
+await receive("switcher", {notes: found, force: true, dismiss: true})
+await clear()
+await press("Escape")
+assert.equal(await switcherOpen(), false)
+assert.equal((await last("escape"))?.type, "escape")
+await receive("switcher", {notes: found, force: true})
+await clear()
+await press("Escape")
+assert.equal(await last("escape"), undefined, "opened in the panel, the switcher closes alone")
+
 assert.deepEqual(errors, [])
 console.log("smoke test passed")
 await browser.close()

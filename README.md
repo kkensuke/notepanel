@@ -24,9 +24,9 @@ other editor, sync them or back them up as you like.
 - **Plain files.** Each note is a `.md` file named after its first line.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
   keeps earlier versions of each note, which `Cmd+Y` shows.
-- **Quick to switch notes.** `Cmd+P` searches the names and text of your notes, and
-  `Ctrl+Tab` goes to the next one. Pinned notes come first, in the order you give them, and
-  `Cmd+1` to `Cmd+9` open them.
+- **Quick to switch notes.** `Cmd+P` searches the names and text of your notes, and lists each
+  line that matches, with the note's text under the list. `Ctrl+Tab` goes to the next note.
+  Pinned notes come first, in the order you give them, and `Cmd+1` to `Cmd+9` open them.
 
 ## Install
 
@@ -65,9 +65,15 @@ panel), copy the new app to `/Applications`, and open it.
 
 - **Show and hide.** Press `Ctrl+Cmd+N`, or click the menu bar icon. `Esc` or
   `Cmd+W` hides the panel.
-- **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher: type to search,
-  then press `Return` to open the note. A note found by its text opens with the match selected.
-  Each row has a pin button and a trash button.
+- **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher, which lists your notes; press
+  `Return` to open the chosen one. Each row has a pin button and a trash button.
+- **Search.** Type in the switcher to search. A note is found if it has every word you type, in
+  its name or in its text; capitals and full-width letters match plain ones. Each note found is
+  listed by name, over the lines of its text that have a word. The chosen row's note shows under
+  the list: drag the bar between them to give it more room, or none. `Return` opens the note at
+  the row's line with Find open on the word, so `Cmd+G` goes to the next match. `Up` on the first
+  row brings back your earlier searches. If the search shortcut brought the panel up, `Esc` in
+  the switcher hides it again.
 - **Earlier versions.** `Cmd+Y`, or a click on the icon left of the note's name, lists the note's
   earlier versions, newest first, with the chosen one's text below. `Return` or a row's button
   copies a whole version; to copy part of one, select it and press `Cmd+C`. Nothing there changes
@@ -172,6 +178,7 @@ In the panel:
 | ⌃⌘M | Panel to its default place and size on the pointer's display; again, back to where it was (change it in Settings) |
 | ⌘W, Esc | Hide (Esc first closes search, extra cursors, the switcher or earlier versions) |
 | In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
+| In the switcher: ↑ on the first row | Bring back an earlier search |
 | In the switcher: ⌥↑ / ⌥↓ | Move a pinned note up / down (with the search field empty) |
 | In earlier versions: ↑↓, Return, ⌘A, ⌘C | Choose, copy all of it, select all of it, copy the selection |
 
@@ -220,6 +227,7 @@ Editing:
 | `icon/` | The app icon: `AppIcon.svg` and the `AppIcon.icns` made from it |
 | `docs/design.md` | The design and the feature list (in Japanese) |
 | `docs/history.md` | The design of note history (in Japanese) |
+| `docs/switcher.md` | The design of the switcher (in Japanese) |
 | `docs/releasing.md` | How to publish a release |
 
 Node is needed only to change the editor page. `web/editor.js` and `web/THIRD_PARTY_LICENSES.txt`,

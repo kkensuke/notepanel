@@ -101,9 +101,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         show()
     }
 
+    /// Escape takes the panel away again if searching is what brought it up.
     func search() {
+        let wasHidden = !panel.isVisible
         show()
-        showSwitcher(force: true)
+        showSwitcher(force: true, dismiss: wasHidden)
     }
 
     /// Ends typing in the title, so the name goes to its note, and saves the note. The switcher
@@ -221,10 +223,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if store.current == nil { openSomeNote() } else { rememberCurrent() }
     }
 
-    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int) {
+    func setOptions(
+        fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int,
+        noteShare: Double
+    ) {
         let new: NSDictionary = [
             "fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize,
-            "showWhitespace": showWhitespace, "indentSize": indentSize,
+            "showWhitespace": showWhitespace, "indentSize": indentSize, "noteShare": noteShare,
         ]
         guard new != options else { return }
         options = new
@@ -291,6 +296,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             if let id = body["id"] as? String { togglePin(id) }
         case "orderPins":
             if let ids = body["ids"] as? [String] { orderPins(ids) }
+        case "noteShare":
+            // Kept with the settings, which send it back to the page with the other options.
+            if let share = body["share"] as? Double { UserDefaults.standard.set(share, forKey: "noteShare") }
         case "openURL":
             // The page is trusted, but a link can say anything, so only web and mail links open.
             guard let string = body["url"] as? String, let url = URL(string: string),
@@ -450,9 +458,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     /// Saves first, so the list has the open note under the name its first line gives it.
-    private func showSwitcher(force: Bool) {
+    /// With `dismiss`, Escape in the switcher hides the panel too.
+    private func showSwitcher(force: Bool, dismiss: Bool = false) {
         save()
-        bridge.send("switcher", ["notes": notesForSwitcher(), "force": force])
+        bridge.send("switcher", ["notes": notesForSwitcher(), "force": force, "dismiss": dismiss])
     }
 
     /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes

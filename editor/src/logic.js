@@ -2,54 +2,160 @@
 import {EditorSelection, countColumn} from "@codemirror/state"
 import {syntaxTree} from "@codemirror/language"
 
-// A case-insensitive subsequence match: every query character must appear in order.
-// Returns a score (higher is better) or null. Runs and word starts score more,
-// and shorter targets win ties.
-export function fuzzyScore(query, target) {
-  const q = query.toLowerCase()
-  const t = target.toLowerCase()
-  let score = 0
-  let from = 0
-  let previousEnd = -1
-  for (const ch of q) {
-    const i = t.indexOf(ch, from)
-    if (i < 0) return null
-    if (i === previousEnd) score += 5
-    else if (i === 0 || /[\s\-_./]/.test(t[i - 1])) score += 3
-    else score += 1
-    previousEnd = i + ch.length
-    from = previousEnd
-  }
-  return score - t.length * 0.01
+// What a search doesn't tell apart: letter case, full-width letters, digits and signs ("ＡＰＩ" is
+// "api"), and the full-width space a Japanese input method types. Each character stays one
+// character, so a position in the folded text is the same position in the original.
+export function fold(text) {
+  return text
+    .replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/　/g, " ")
+    // The one letter whose lower case is two characters long.
+    .replace(/İ/g, "i")
+    .toLowerCase()
 }
 
-// Titles match fuzzily and rank first; bodies match as a plain substring, with the matching
-// line as a snippet. With no query, and among notes that match equally, notes keep their order
-// (pinned first, then newest first).
+// The words of a search, folded. A note matches when it has every one of them.
+export const searchTerms = query => fold(query).split(/\s+/).filter(Boolean)
+
+const wordStart = (text, at) => at === 0 || /[\s\-_./]/.test(text[at - 1])
+
+// Where `query` is in `target`: as a run if it has one (the first at a word start, else the
+// first), else its characters one by one in order. Returns the score (higher is better) and the
+// ranges matched, or null. Runs and word starts score more, and shorter targets win ties.
+export function fuzzyMatch(query, target) {
+  const q = fold(query)
+  const t = fold(target)
+  // Where the run starts; 0 with no run, to look for the characters from the start.
+  let from = 0
+  for (let at = t.indexOf(q); at >= 0; at = t.indexOf(q, at + 1)) {
+    if (!from) from = at
+    if (wordStart(t, at)) {
+      from = at
+      break
+    }
+  }
+  let score = 0
+  let end = -1
+  const ranges = []
+  for (const ch of q) {
+    const at = t.indexOf(ch, from)
+    if (at < 0) return null
+    if (at === end) {
+      score += 5
+      ranges.at(-1)[1] = at + ch.length
+    } else {
+      score += wordStart(t, at) ? 3 : 1
+      ranges.push([at, at + ch.length])
+    }
+    end = from = at + ch.length
+  }
+  return {score: score - t.length * 0.01, ranges}
+}
+
+// Ranges in order, with those that touch or overlap made one.
+function mergeRanges(ranges) {
+  const merged = []
+  for (const [from, to] of ranges.sort((a, b) => a[0] - b[0])) {
+    const last = merged.at(-1)
+    if (last && from <= last[1]) last[1] = Math.max(last[1], to)
+    else merged.push([from, to])
+  }
+  return merged
+}
+
+// Every place a term is in a note's folded text, in order, as {from, to, term}.
+function textMatches(text, terms) {
+  const matches = []
+  terms.forEach((term, index) => {
+    for (let at = text.indexOf(term); at >= 0; at = text.indexOf(term, at + term.length))
+      matches.push({from: at, to: at + term.length, term: index})
+  })
+  return matches.sort((a, b) => a.from - b.from)
+}
+
+// Where the first line of a note's folded text ends, if that line is the note's name, markers
+// apart; else 0. The name comes from such a line, so the line isn't listed under it again.
+function nameLineEnd(text, title) {
+  const first = /^\s*.*/.exec(text)[0]
+  const line = first.trim()
+  return line.slice(leadLength(line)).trim() === fold(title) ? first.length : 0
+}
+
+// The first match on each line that has one, as its place in `matches`.
+function firstOnLines(text, matches) {
+  const firsts = []
+  let lineEnd = -1
+  matches.forEach((match, index) => {
+    if (match.from < lineEnd) return
+    firsts.push(index)
+    lineEnd = text.indexOf("\n", match.from)
+    if (lineEnd < 0) lineEnd = text.length
+  })
+  return firsts
+}
+
+// The notes that have every word of the query, in their name or their text. Names match fuzzily,
+// text as plain substrings. Notes whose name has every word rank first, by how well it matches;
+// then those whose name has more of the words. Notes that match equally keep their order, as all
+// notes do with no query (pinned first, then newest first).
+// Each note comes with `titleRanges`, the parts of its name to mark; `matches`, the places in its
+// text; and `lines`, the lines to list under its name: the first match on each line that has
+// one, as its place in `matches`, but for a first line that is the name itself.
+// shortcut: folds every note's text on each keystroke (about 8 ms for 500 notes of 4 kB each);
+// keep the folded texts if typing lags.
 export function rankNotes(notes, query, limit = 200) {
-  const q = query.trim()
-  if (!q) return notes.slice(0, limit).map(note => ({...note, snippet: ""}))
-  const lower = q.toLowerCase()
+  const terms = searchTerms(query)
+  if (!terms.length)
+    return notes.slice(0, limit).map(note => ({...note, titleRanges: [], matches: [], lines: []}))
   const ranked = []
   for (const note of notes) {
-    const score = fuzzyScore(q, note.title)
-    if (score !== null) {
-      ranked.push({...note, score: 1000 + score, snippet: ""})
-      continue
-    }
-    const at = note.text.toLowerCase().indexOf(lower)
-    if (at >= 0) ranked.push({...note, score: 0, snippet: snippetAt(note.text, at)})
+    const inTitle = terms.map(term => fuzzyMatch(term, note.title))
+    const text = fold(note.text)
+    const matches = textMatches(text, terms)
+    const nameEnd = nameLineEnd(text, note.title)
+    const inText = new Set(matches.map(match => match.term))
+    if (!terms.every((_, index) => inTitle[index] || inText.has(index))) continue
+    const named = inTitle.every(Boolean)
+    // Letters scattered over a name are marked only where the name is what matched.
+    const marked = inTitle.filter(match => match && (named || match.ranges.length === 1))
+    ranked.push({
+      ...note,
+      score: named ? 1000 + inTitle.reduce((sum, match) => sum + match.score, 0) : marked.length,
+      titleRanges: mergeRanges(marked.flatMap(match => match.ranges)),
+      matches,
+      lines: firstOnLines(note.text, matches).filter(at => matches[at].from >= nameEnd),
+    })
   }
   ranked.sort((a, b) => b.score - a.score)
   return ranked.slice(0, limit)
 }
 
-function snippetAt(text, at) {
-  const lineStart = text.lastIndexOf("\n", at) + 1
-  let lineEnd = text.indexOf("\n", at)
+// About how wide a text is, in Latin letters: a character of Japanese and the like counts as two.
+const width = text => text.length + (text.match(/[\u2E80-\uFFEF]/g)?.length ?? 0)
+
+// The line a match is on, for a row of the switcher: its text without its markers, up to 120
+// long, with the ranges of the matches in it. A row has room for about 48 letters in a panel of
+// the default width, so if the match ends further on than that, the text is cut to start at the
+// word within 8 characters before the match.
+export function snippetAt(text, matches, at) {
+  const {from, to} = matches[at]
+  const lineStart = text.lastIndexOf("\n", from - 1) + 1
+  let lineEnd = text.indexOf("\n", from)
   if (lineEnd < 0) lineEnd = text.length
-  const start = Math.max(lineStart, at - 40)
-  return (start > lineStart ? "…" : "") + text.slice(start, lineEnd).trim().slice(0, 120)
+  // Markers are left out only before the match, which may be in them. So is the bar a table's
+  // row starts with, which would stand right behind the row's rule.
+  let textFrom = lineStart + Math.min(leadLength(text.slice(lineStart, lineEnd)), from - lineStart)
+  textFrom += /^(\|\s*)?/.exec(text.slice(textFrom, from))[0].length
+  const cut = width(text.slice(textFrom, to)) > 48
+  let start = cut ? from - 8 : textFrom
+  if (cut) start += text.slice(start, from).search(/\s/) + 1
+  const end = Math.min(lineEnd, start + 120)
+  const shift = (cut ? 1 : 0) - start
+  return {
+    text: (cut ? "…" : "") + text.slice(start, end),
+    ranges: mergeRanges(
+      matches.filter(match => match.from >= start && match.to <= end).map(match => [match.from + shift, match.to + shift])),
+  }
 }
 
 // What a bare URL ends before: a space or a bracket; a quote or a backtick, which a URL can't
@@ -94,13 +200,17 @@ function inCode(state, line) {
   return false
 }
 
+// How long a line's indentation, list and quote markers and a heading's #s are.
+function leadLength(text) {
+  const prefix = markers.exec(text)[0]
+  const hashes = /^#{1,6}(?=\s|$)\s*/.exec(text.slice(prefix.length))
+  return prefix.length + (hashes?.[0].length ?? 0)
+}
+
 // Where a line's text starts: after its indentation, list and quote markers and a heading's #s.
 // In a ``` block, after its indentation.
 export function textStart(state, line) {
-  if (inCode(state, line)) return /^\s*/.exec(line.text)[0].length
-  const prefix = markers.exec(line.text)[0]
-  const hashes = /^#{1,6}(?=\s|$)\s*/.exec(line.text.slice(prefix.length))
-  return prefix.length + (hashes?.[0].length ?? 0)
+  return inCode(state, line) ? /^\s*/.exec(line.text)[0].length : leadLength(line.text)
 }
 
 // The columns a line's wrapped rows hang by: the width of its list and quote markers, with the
