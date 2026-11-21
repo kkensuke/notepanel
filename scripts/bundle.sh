@@ -20,12 +20,14 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 lipo -create "$@" -output "$app/Contents/MacOS/notepanel"
 cp -R web "$app/Contents/Resources/web"
+cp icon/AppIcon.icns "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>notepanel</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleIdentifier</key><string>io.github.kkensuke.notepanel</string>
   <key>CFBundleName</key><string>notepanel</string>
   <key>CFBundlePackageType</key><string>APPL</string>
