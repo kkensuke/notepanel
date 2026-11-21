@@ -104,16 +104,6 @@ const theme = EditorView.theme({
   ".cm-taskBox:hover": {backgroundColor: "var(--selection)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
-  ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
-  ".cm-panels.cm-panels-top": {borderBottom: "1px solid var(--border)"},
-  ".cm-panels.cm-panels-bottom": {borderTop: "1px solid var(--border)", marginBottom: "var(--footer-height, 0px)"},
-  ".cm-textfield, .cm-button": {
-    backgroundColor: "var(--bg)",
-    backgroundImage: "none",
-    color: "var(--fg)",
-    border: "1px solid var(--border)",
-    borderRadius: "4px",
-  },
 })
 
 // ---- Editor
@@ -434,6 +424,8 @@ let shown = null
 let jump = null
 // The note that was open when the switcher opened. A search lists it first.
 let origin = null
+// The selection the search last put in the note, which isn't the user's own.
+let landed = null
 // Whether the search hot key brought the panel up, so that Escape hides the panel too.
 let dismiss = false
 // The page, and the two parts of it that keep the note's width while the switcher is open.
@@ -591,9 +583,6 @@ function show(index) {
   shown = row
   choose(row, true)
 }
-
-// The selection the search last put in the note, which isn't the user's own.
-let landed = null
 
 // Once the note is open, the cursor goes on the place it was chosen for, in the middle of the
 // note, and the search's matches are marked.

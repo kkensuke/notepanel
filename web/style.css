@@ -71,10 +71,6 @@ body {
   flex-direction: column;
 }
 
-footer {
-  left: var(--side);
-}
-
 /* While the switcher is open, Swift widens the panel to the left for it, and the note keeps the
    width it had, at the right: --note-width, which main.js sets. The note is held there until the
    panel is narrow again. */
@@ -145,6 +141,7 @@ footer {
    note. */
 #switcher {
   right: var(--note-width);
+  border-right: 1px solid var(--border);
 }
 
 .sheet {
@@ -212,7 +209,7 @@ footer {
   list-style: none;
 }
 
-/* With nothing typed, a row is a note: its handle, its name and its buttons. A row's height is
+/* With nothing typed, a row is a note: its name, its key and its buttons. A row's height is
    a whole number of pixels at any text size, so that the list can end at a row's edge. */
 #results li {
   --row: calc(var(--ui-size) * 2);
@@ -228,7 +225,7 @@ footer {
 
 /* While searching, the list is the notes found: each a name with, under it, the lines of its
    text that matched. The lines are the rows to choose. A name stands where it does with nothing
-   typed, under the search field's text, and its lines start at a rule under its first letter. */
+   typed, under the search field's icon, and its lines start at a rule under its first letter. */
 #results .group {
   display: block;
   min-height: 0;

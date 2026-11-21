@@ -289,7 +289,7 @@ assert.equal((await last("trash"))?.id, "Groceries")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false)
 await press("Escape")
 
-// Pinned notes move with ⌥↑ and ⌥↓, or by dragging their handle, but only in the full list.
+// Pinned notes move with ⌥↑ and ⌥↓, or by dragging their key, but only in the full list.
 const pinnedNotes = [
   {id: "A", title: "A", text: "", pinned: true},
   {id: "B", title: "B", text: "", pinned: true},
