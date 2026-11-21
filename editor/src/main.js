@@ -471,15 +471,45 @@ function openSwitcher(list) {
   query.value = own ? find.search : ""
   switcher.hidden = false
   selected = 0
+  back = 0
   update()
   query.focus()
   query.select()
 }
 
+// Every way out of the switcher comes through here, so here is where a search is remembered.
 function closeSwitcher() {
   if (!isSwitcherOpen()) return
+  remember()
   switcher.hidden = true
   view.focus()
+}
+
+// What was searched for before, oldest first. ↑ on the first row brings the last of them back
+// into the search field, and then the ones before it; `back` is how many back the field is.
+// shortcut: lasts until the app quits; send it to Swift to keep it.
+const searches = []
+let back = 0
+
+function remember() {
+  const text = query.value.trim()
+  if (!text) return
+  const at = searches.indexOf(text)
+  if (at >= 0) searches.splice(at, 1)
+  searches.push(text)
+  if (searches.length > 50) searches.shift()
+}
+
+function recall() {
+  // What the field already has is passed over, such as a find carried over from the note.
+  let at = searches.length - back - 1
+  while (at >= 0 && searches[at] === query.value.trim()) at--
+  if (at < 0) return
+  back = searches.length - at
+  query.value = searches[at]
+  query.select()
+  selected = 0
+  update()
 }
 
 // Opens a row's note: at the row's line, or where a click in the preview says.
@@ -766,6 +796,7 @@ function group(note) {
 
 query.addEventListener("input", () => {
   selected = 0
+  back = 0
   update()
 })
 
@@ -780,7 +811,9 @@ query.addEventListener("keydown", event => {
   } else if (event.key === "ArrowDown") {
     select(selected + 1)
   } else if (event.key === "ArrowUp") {
-    select(selected - 1)
+    // Over the first row are the searches made before.
+    if (selected > 0) select(selected - 1)
+    else recall()
   } else if (event.key === "Enter") {
     if (row) choose(row)
   } else if (event.key === "Escape") {

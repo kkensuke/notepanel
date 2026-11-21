@@ -549,6 +549,30 @@ await receive("options", {fontSize: 14, uiFontSize: 15})
 assert.equal(await previewHeight(), 160)
 await press("Escape")
 
+// ↑ on the first row goes back through what was searched for; ↓ goes down the rows as ever.
+for (const text of ["review", "budget"]) {
+  await receive("switcher", {notes: found, force: true})
+  await page.keyboard.type(text)
+  await press("Escape")
+}
+await receive("switcher", {notes: found, force: true})
+assert.equal(await queryValue(), "")
+await press("ArrowUp")
+assert.equal(await queryValue(), "budget")
+assert.equal(await chosen(), "Hardware budget was cut.")
+await press("ArrowDown")
+assert.equal(await chosen(), "Q1 | budget review |")
+await press("ArrowUp")
+assert.deepEqual([await queryValue(), await chosen()], ["budget", "Hardware budget was cut."])
+await press("ArrowUp")
+assert.equal(await queryValue(), "review")
+// The search brought back is selected, so typing replaces it, and ↑ starts from the last again.
+await page.keyboard.type("x")
+assert.equal(await queryValue(), "x")
+await press("ArrowUp")
+assert.equal(await queryValue(), "budget")
+await press("Escape")
+
 assert.deepEqual(errors, [])
 console.log("smoke test passed")
 await browser.close()
