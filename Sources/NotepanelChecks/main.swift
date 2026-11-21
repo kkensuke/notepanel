@@ -174,6 +174,18 @@ let modifiers: [ShortcutModifiers] = [
 equal(modifiers.map { allowsShortcut($0, global: false) }, [false, false, false, false, true, true, true, true])
 equal(modifiers.map { allowsShortcut($0, global: true) }, [false, false, true, true, false, true, true, true])
 
+// MARK: - Pins
+
+equal(pinsRenaming(["A", "B"], "B", to: "C"), ["A", "C"])
+equal(pinsRenaming(["A"], "B", to: "C"), ["A"])
+equal(pinsToggling(["A"], "B"), ["A", "B"])
+equal(pinsToggling(["A", "B"], "A"), ["B"])
+// C's file is missing, so the switcher doesn't show it, and it stays after the others.
+equal(pinsReordered(["A", "B", "C"], shown: ["B", "A"]), ["B", "A", "C"])
+equal(pinsReordered(["A", "B"], shown: ["A", "A"]), nil)
+equal(pinsReordered(["A", "B"], shown: ["A", "X"]), nil)
+equal(pinnedFirst(["new", "B", "old", "A"], pins: ["A", "gone", "B"]), ["A", "B", "new", "old"])
+
 // MARK: - NoteStore
 
 inFolder { folder in

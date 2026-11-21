@@ -1,0 +1,92 @@
+import AppKit
+import NotepanelCore
+
+/// Where ⌃⌘M puts the panel, and the default place for each display, which Settings shows and sets.
+@MainActor
+final class PanelPlacement {
+    private let panel: NSWindow
+    /// The panel's size before a saved frame replaces it, which ⌃⌘M goes back to.
+    var defaultSize = NSSize.zero
+    /// Where ⌃⌘M found the panel and where it put it, so a second press, before the panel moves
+    /// or changes size, takes it back.
+    private var frameBeforeDefault: NSRect?
+    private var defaultFrame: NSRect?
+
+    init(panel: NSWindow) {
+        self.panel = panel
+    }
+
+    /// ⌃⌘M: the default frame set in Settings for the display with the pointer, or else the panel's
+    /// first size, centered there. Using the pointer's display brings the panel to the display in
+    /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
+    func toggleDefaultFrame() {
+        if let previous = frameBeforeDefault, panel.frame == defaultFrame {
+            panel.setFrame(previous, display: true)
+            frameBeforeDefault = nil
+            return
+        }
+        let pointer = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) ?? NSScreen.main
+        else { return }
+        frameBeforeDefault = panel.frame
+        let saved = screen.displayKey.flatMap { Prefs.defaultFrame(for: $0) }
+        panel.setFrame(
+            placeOnDisplay(saved: saved, size: defaultSize, display: screen.frame, visible: screen.visibleFrame),
+            display: true)
+        defaultFrame = panel.frame
+    }
+
+    /// The display the panel is on, as Settings shows it, and its default for ⌃⌘M.
+    func defaultPlace() -> DefaultPlace? {
+        guard let screen = panelScreen, let key = screen.displayKey else { return nil }
+        let saved = Prefs.defaultFrame(for: key)
+        let builtIn = screen.displayID.map { CGDisplayIsBuiltin($0) != 0 } ?? false
+        let display = screen.frame
+        let frame = placeOnDisplay(saved: saved, size: defaultSize, display: display, visible: screen.visibleFrame)
+        return DefaultPlace(
+            display: screen.localizedName, builtIn: builtIn, displaySize: display.size,
+            menuBar: display.maxY - screen.visibleFrame.maxY,
+            // AppKit's y goes up from the bottom; screen positions are usually shown from the top-left.
+            frame: NSRect(
+                x: frame.minX - display.minX, y: display.maxY - frame.maxY, width: frame.width, height: frame.height),
+            custom: saved != nil)
+    }
+
+    /// Settings' Use Current: on the panel's display, ⌃⌘M will put the panel where it is now.
+    func useCurrentFrameAsDefault() {
+        guard let screen = panelScreen, let key = screen.displayKey else { return }
+        Prefs.setDefaultFrame(panel.frame.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), for: key)
+    }
+
+    /// Settings' Reset: on the panel's display, ⌃⌘M will use the first size, centered.
+    func useStandardFrame() {
+        guard let key = panelScreen?.displayKey else { return }
+        Prefs.setDefaultFrame(nil, for: key)
+    }
+
+    /// The display most of the panel is on. Worked out from the frame, as `NSWindow.screen` may be
+    /// nil while the panel is hidden.
+    private var panelScreen: NSScreen? {
+        func overlap(_ screen: NSScreen) -> CGFloat {
+            let shared = screen.frame.intersection(panel.frame)
+            return shared.width * shared.height
+        }
+        return NSScreen.screens.filter { overlap($0) > 0 }.max { overlap($0) < overlap($1) }
+    }
+}
+
+extension NSScreen {
+    var displayID: CGDirectDisplayID? {
+        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+    }
+
+    /// The display's UUID, which lasts across restarts and reconnections, unlike its ID. Mirrored
+    /// displays all go by the one they mirror, whichever of them this screen stands for.
+    var displayKey: String? {
+        guard let id = displayID else { return nil }
+        let mirrored = CGDisplayMirrorsDisplay(id)
+        guard let uuid = CGDisplayCreateUUIDFromDisplayID(mirrored == kCGNullDirectDisplay ? id : mirrored)
+        else { return nil }
+        return CFUUIDCreateString(nil, uuid.takeRetainedValue()) as String
+    }
+}

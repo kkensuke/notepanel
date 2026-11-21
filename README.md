@@ -253,6 +253,8 @@ cd editor && npm test       # editor helpers: search ranking, links, line insert
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
 
+CI runs all three, and fails if `web/editor.js` isn't what `npm run build` makes from `editor/src`.
+
 `NotepanelChecks` is a plain executable of assertions rather than an XCTest target, because XCTest
 comes only with Xcode. The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't
 in `/Applications`. To inspect the editor page in the running app, enable Safari's Develop menu;

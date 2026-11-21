@@ -164,6 +164,8 @@ cd editor && npm test       # エディタの補助関数：検索の順位、�
 cd editor && npm run smoke  # エディタのページを、Mac に見せかけたヘッドレス Chrome で動かす
 ```
 
+CI は 3 つとも実行し、`web/editor.js` が `editor/src` から `npm run build` で作ったものと違えば失敗する。
+
 `NotepanelChecks` は、XCTest のターゲットではなく、アサーションを並べた普通の実行ファイルにしている。XCTest は Xcode にしか含まれないため。スモークテストには Google Chrome が必要で、`/Applications` にないときは、環境変数 `CHROME` にその実行ファイルのパスを指定する。動いているアプリでエディタのページを調べるには、Safari の「開発」メニューを有効にする。notepanel のページがそこに出る。
 
 ## クレジット
