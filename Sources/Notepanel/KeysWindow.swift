@@ -53,10 +53,13 @@ private let panelKeys = [
 ]
 
 private let switcherKeys = [
-    ("Choose a note", "↑ / ↓"),
-    ("Bring back an earlier search", "↑ on the first row"),
-    ("Open it", "↩"),
-    ("Move it to the Trash", "⌘⌫"),
+    ("Go from note to note", "⌘P, then ↑ / ↓"),
+    ("Find in this note and the others", "⌘F, then type"),
+    ("To the first match, then on through them", "↩ in the search field, then ↑ / ↓"),
+    ("Earlier / later searches", "↑ / ↓ in the search field"),
+    ("From the search field to the list and back", "Tab"),
+    ("Close the switcher on the chosen note", "↩ in the list"),
+    ("Move the chosen note to the Trash", "⌘⌫"),
     ("Move a pinned note up / down", "⌥↑ / ⌥↓"),
 ]
 
@@ -81,8 +84,6 @@ private let editingKeys = [
     ("Add a cursor above / below", "⌥⌘↑ / ⌥⌘↓"),
     ("Add a cursor", "⌥-click"),
     ("Rectangular selection", "⇧⌥-drag"),
-    ("Find and replace", "⌘F"),
-    ("Next / previous match", "⌘G / ⇧⌘G"),
     ("Bold / italic", "⌘B / ⌘I"),
     ("Strikethrough / code", "⇧⌘X / ⌘E"),
     ("Make a link", "⌘K"),

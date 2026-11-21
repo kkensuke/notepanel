@@ -33,9 +33,10 @@ enum Prefs {
     /// settings window. The toolbar's symbols follow it.
     static let defaultUIFontSize = 15.0
     static let uiFontSizes: [Double] = [12, 13, 14, 15, 16, 17, 18, 20]
-    /// How much of the switcher's height the chosen note's text takes, from 0 to 1. Dragging the
-    /// bar under the switcher's list sets it.
-    static let defaultNoteShare = 0.4
+    /// How wide the switcher is, in its window at the panel's left, in points. Dragging the
+    /// switcher's left edge changes it.
+    static let defaultSideWidth = 220.0
+    static let minSideWidth = 140.0
     /// The note panel's background, not its text: 0 is clear, 1 is solid, and the default in
     /// between is tinycast's glass and scrim.
     static let defaultBackgroundOpacity = 0.5

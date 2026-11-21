@@ -83,8 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fontSize: defaults.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize,
             uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize,
             showWhitespace: defaults.bool(forKey: "showWhitespace"),
-            indentSize: defaults.object(forKey: "indentSize") as? Int ?? 4,
-            noteShare: defaults.object(forKey: "noteShare") as? Double ?? Prefs.defaultNoteShare)
+            indentSize: defaults.object(forKey: "indentSize") as? Int ?? 4)
         controller.setPanelShortcuts(
             next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"),
             defaultFrame: Prefs.shortcut("shortcut.defaultFrame"))
@@ -162,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Each item shows the key that does the same in the panel.
         let menu = NSMenu()
         menu.addItem(menuItem("New Note", #selector(newNote), "n"))
-        menu.addItem(menuItem("Search Notes", #selector(searchNotes), "p"))
+        menu.addItem(menuItem("Search Notes", #selector(searchNotes), "f"))
         menu.addItem(.separator())
         menu.addItem(menuItem("Settings…", #selector(openSettings), ","))
         // Shown as ⇧⌘/, as the docs write it. This menu only shows the key; the panel handles it.

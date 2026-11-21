@@ -51,9 +51,8 @@
   box-shadow: inset 0 0 0 1px var(--whitespace);
 }
 
-/* The switcher and the history don't hide the note by covering it, since their background is
-   see-through. */
-body:has(#switcher:not([hidden]), #history:not([hidden])) > :not(#switcher, #history) {
+/* The history doesn't hide the note by covering it, since its background is see-through. */
+body:has(#history:not([hidden])) > :not(#history) {
   opacity: 0;
 }
 
@@ -70,6 +69,12 @@ body {
 body {
   display: flex;
   flex-direction: column;
+}
+
+/* The switcher's own page, in a window at the panel's left, is the switcher and nothing else. */
+.side #editor,
+.side footer {
+  display: none;
 }
 
 /* The note runs on under the footer and is hidden only behind the footer's texts, whose boxes
@@ -126,50 +131,47 @@ footer {
   display: none;
 }
 
-/* The switcher is a sheet, with the search field and the list, and under it the chosen note's
-   text, across the panel as the note's own text is once it opens. Dragging the bar between them
-   sets how much of the switcher the text takes: --note-share, from none, as far as leaving the
-   search field and the pinned notes' rows, which is --sheet-least. main.js sets both. */
+/* The switcher fills its window: a sheet, with the search field and the list. Its corners are a
+   row's corners and the edge around them, so the chosen row's frame fits a bottom corner whole;
+   Swift rounds the window's glass to match. */
+#switcher {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+/* Dragging the left edge changes the switcher's width. */
+#edge {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  cursor: ew-resize;
+}
+
+body.resizing,
+body.resizing * {
+  cursor: ew-resize;
+}
+
 .sheet {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--panel);
 }
 
-#preview {
-  flex: none;
-  height: calc(var(--note-share, 0.4) * 100%);
-  max-height: calc(100% - var(--sheet-least, 0px));
+/* The list has the focus while the arrows go through its rows; the chosen row says so. */
+#results:focus {
+  outline: none;
 }
 
-/* The bar keeps its place at the panel's bottom when the text takes no room. */
-#split {
-  flex: none;
-  display: grid;
-  place-items: center;
-  height: 9px;
-  border-top: 1px solid var(--border);
-  cursor: row-resize;
-}
-
-#split::after {
-  content: "";
-  width: 32px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--border);
-}
-
-#split:hover::after,
-body.splitting #split::after {
-  background: var(--muted);
-}
-
-body.splitting,
-body.splitting * {
-  cursor: row-resize;
+#results:focus [aria-selected="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 
 #history:focus {
@@ -184,13 +186,13 @@ body.splitting * {
   padding: 4px 8px 8px;
 }
 
-/* The field's icon stands over the rows' handles, and its text over their names. */
+/* The field's icon stands over the rows' names. */
 .field {
   flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-size: calc(var(--ui-size) * 0.8);
@@ -208,23 +210,23 @@ body.splitting * {
   outline: none;
 }
 
-/* The room above the list is outside it: what scrolls is rows and nothing else, so a list as
-   tall as some rows shows whole rows wherever it's scrolled to. */
+/* The rows run from edge to edge, and from the field down to the bottom: the chosen row's frame
+   has no room around it. */
 #results {
   flex: 1;
   min-height: 0;
-  margin: 4px 0 0;
-  padding: 0 8px;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
   list-style: none;
 }
 
-/* With nothing typed, a row is a note: its handle, its name and its buttons. A row's height is
+/* With nothing typed, a row is a note: its name, its key and its buttons. A row's height is
    a whole number of pixels at any text size, so that the list can end at a row's edge. */
 #results li {
   --row: calc(var(--ui-size) * 2);
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   column-gap: 8px;
   min-height: var(--row);
@@ -235,7 +237,7 @@ body.splitting * {
 
 /* While searching, the list is the notes found: each a name with, under it, the lines of its
    text that matched. The lines are the rows to choose. A name stands where it does with nothing
-   typed, under the search field's text, and its lines start at a rule under its first letter. */
+   typed, under the search field's icon, and its lines start at a rule under its first letter. */
 #results .group {
   display: block;
   min-height: 0;
@@ -245,7 +247,7 @@ body.splitting * {
 .name,
 .line {
   --row: calc(var(--ui-size) * 2 - 4px);
-  padding: 0 8px 0 calc(var(--ui-size) + 16px);
+  padding: 0 8px;
   border-radius: 6px;
 }
 
@@ -330,8 +332,7 @@ body.splitting * {
   font-size: calc(var(--ui-size) * 0.87);
 }
 
-/* What matched the search, in a name or a line of text. The preview marks its matches as the
-   note's find does. */
+/* What matched the search, in a name or a line of text. */
 #results mark {
   background: none;
   color: var(--fg);
@@ -339,17 +340,6 @@ body.splitting * {
   text-decoration-color: var(--search-current);
   text-decoration-thickness: 2px;
   text-underline-offset: 0.15em;
-}
-
-.grip {
-  display: grid;
-  color: var(--muted);
-  cursor: grab;
-}
-
-/* Every row keeps the handle's space, so the names line up. */
-#results li:not(.movable) .grip {
-  visibility: hidden;
 }
 
 body.dragging,
@@ -366,6 +356,11 @@ body.dragging * {
 .key {
   color: var(--muted);
   font-size: calc(var(--ui-size) * 0.8);
+}
+
+/* A pinned note is dragged by its key. */
+.movable .key {
+  cursor: grab;
 }
 
 .action {
@@ -397,7 +392,6 @@ body.dragging * {
 }
 
 .action svg,
-.grip svg,
 .field svg {
   flex: none;
   width: var(--ui-size);

@@ -1,6 +1,7 @@
-// The editor page: CodeMirror 6 for the note, and the note switcher and its history on top of it.
+// The editor page: CodeMirror 6 for the note, with the note's history over it. The same page,
+// told it's the switcher's, is the note switcher, in a window of its own at the panel's left.
 // Swift calls `receive(message)`; the page answers with `post(type, data)`.
-import {EditorState, EditorSelection, Compartment, RangeSetBuilder} from "@codemirror/state"
+import {EditorState, EditorSelection, Compartment, RangeSetBuilder, StateField, StateEffect} from "@codemirror/state"
 import {
   EditorView,
   keymap,
@@ -15,16 +16,7 @@ import {
   hoverTooltip,
 } from "@codemirror/view"
 import {defaultKeymap, historyKeymap, history, indentWithTab, selectLine} from "@codemirror/commands"
-import {
-  search,
-  searchKeymap,
-  highlightSelectionMatches,
-  SearchQuery,
-  setSearchQuery,
-  getSearchQuery,
-  searchPanelOpen,
-  openSearchPanel,
-} from "@codemirror/search"
+import {highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches} from "@codemirror/search"
 import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 import {syntaxHighlighting, HighlightStyle, indentUnit, syntaxTree} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
@@ -59,8 +51,6 @@ const switcher = $("switcher")
 const query = $("query")
 const results = $("results")
 const total = $("total")
-const split = $("split")
-const preview = $("preview")
 const historyView = $("history")
 const versionList = $("versions")
 const versionText = $("version")
@@ -115,16 +105,6 @@ const theme = EditorView.theme({
   ".cm-taskBox:hover": {backgroundColor: "var(--selection)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
   ".cm-searchMatch.cm-searchMatch-selected": {backgroundColor: "var(--search-current)"},
-  ".cm-panels": {backgroundColor: "var(--panel)", color: "var(--fg)", fontSize: "calc(var(--ui-size) * 0.9)"},
-  ".cm-panels.cm-panels-top": {borderBottom: "1px solid var(--border)"},
-  ".cm-panels.cm-panels-bottom": {borderTop: "1px solid var(--border)", marginBottom: "var(--footer-height, 0px)"},
-  ".cm-textfield, .cm-button": {
-    backgroundColor: "var(--bg)",
-    backgroundImage: "none",
-    color: "var(--fg)",
-    border: "1px solid var(--border)",
-    borderRadius: "4px",
-  },
 })
 
 // ---- Editor
@@ -175,6 +155,26 @@ const hangingIndents = ViewPlugin.define(
 
 // From Settings. Each note keeps its own state, so these are applied again when a note opens.
 const settings = new Compartment()
+
+// A search's matches in the note in sight, with the one the list last went to as the current
+// one. They go when the note is written in, when a note opens, and when the switcher closes.
+const setMarks = StateEffect.define()
+const marks = StateField.define({
+  create: () => Decoration.none,
+  update(value, transaction) {
+    for (const effect of transaction.effects) if (effect.is(setMarks)) return effect.value
+    return transaction.docChanged ? Decoration.none : value
+  },
+  provide: field => EditorView.decorations.from(field),
+})
+const matchMark = Decoration.mark({class: "cm-searchMatch"})
+const shownMatchMark = Decoration.mark({class: "cm-searchMatch cm-searchMatch-selected"})
+
+function markSet(matches, shown) {
+  const builder = new RangeSetBuilder()
+  for (const match of matches) builder.add(match.from, match.to, match === shown ? shownMatchMark : matchMark)
+  return builder.finish()
+}
 let showWhitespace = false
 let indentSize = 4
 const settingsExtensions = () => [
@@ -289,8 +289,7 @@ const extensions = [
   EditorView.clickAddsSelectionRange.of(event => event.altKey && !event.shiftKey),
   rectangularSelection({eventFilter: event => event.altKey && event.shiftKey && event.button === 0}),
   highlightSelectionMatches(),
-  // The search state from the start, so the switcher can open a note's find on a word.
-  search(),
+  marks,
   EditorView.lineWrapping,
   // The cursor's line stays clear of the footer.
   EditorView.scrollMargins.of(() => ({bottom: footerHeight})),
@@ -315,9 +314,12 @@ const extensions = [
     {mac: "Cmd-Backspace", run: deleteHome},
     ...defaultKeymap,
     ...historyKeymap,
-    ...searchKeymap,
+    // Finding is the switcher's, which ⌘F opens; these two are the rest of the search keys.
+    {key: "Mod-d", run: selectNextOccurrence, preventDefault: true},
+    {key: "Mod-Shift-l", run: selectSelectionMatches},
     indentWithTab,
-    // Last, so it only runs when nothing above wanted Escape.
+    // Last, so it only runs when nothing above wanted Escape. Swift closes the switcher first,
+    // if it's up beside the note, and else hides the panel.
     {key: "Escape", run: () => (post("escape"), true)},
   ]),
   EditorView.updateListener.of(update => {
@@ -354,21 +356,58 @@ const extensions = [
 
 const view = new EditorView({parent: editorElement, state: EditorState.create({extensions})})
 
-function openNote(id, text, keepSwitcher) {
+function openNote(id, text) {
   if (currentId !== null) states.set(currentId, view.state)
   const saved = states.get(id)
   view.setState(saved && saved.doc.toString() === text ? saved : EditorState.create({doc: text, extensions}))
-  view.dispatch({effects: settings.reconfigure(settingsExtensions())})
+  view.dispatch({effects: [settings.reconfigure(settingsExtensions()), setMarks.of(Decoration.none)]})
   currentId = id
-  if (!keepSwitcher) closeSwitcher()
   // Its versions are another note's.
   closeHistory()
   updateCount()
 }
 
+// The selection a search last put in the note, which isn't the user's own.
+let landed = null
+
+// Once a note the switcher asked for is open, the cursor goes on the match its row is for, in the
+// middle of the note, and the search's matches are marked.
+function land({query, place}) {
+  const term = place ? searchTerms(query)[place.term] : ""
+  let {from = -1, to = -1} = place ?? {}
+  // A match's place is from the text the list had. If the file has changed since, the first
+  // match will do.
+  if (to > from && fold(view.state.sliceDoc(from, to)) !== term) {
+    from = fold(view.state.doc.toString()).indexOf(term)
+    to = from + term.length
+  }
+  const selection = from < 0 || to > view.state.doc.length ? undefined : {anchor: from, head: to}
+  view.dispatch({selection, effects: selection ? EditorView.scrollIntoView(from, {y: "center"}) : []})
+  if (selection) landed = view.state.selection
+  markMatches(query, selection && {from, to})
+}
+
+// Marks what the switcher's search finds in the note, so the switcher is the find for one note
+// too. `current` is the match the list went to, marked as the current one. The note's own text
+// is searched, so the marks are right even if the file has changed since the list was made.
+function markMatches(query, current) {
+  const [note] = rankNotes([{id: currentId, title: currentId ?? "", text: view.state.doc.toString()}], query)
+  const matches = note?.matches ?? []
+  const shown = matches.find(match => match.from === current?.from && match.to === current?.to)
+  view.dispatch({effects: setMarks.of(markSet(matches, shown))})
+}
+
+// What ⌘F searches for, which Swift asks for: some of a line selected in the note, as if typed
+// and Return pressed. What the search itself left selected isn't asked for.
+window.findText = () => {
+  const {from, to} = view.state.selection.main
+  const text = view.hasFocus && view.state.selection !== landed ? view.state.sliceDoc(from, to) : ""
+  return text.trim() && !text.includes("\n") ? text : ""
+}
+
 const defaultFont = `"SF Mono", ui-monospace, Menlo, monospace`
 
-function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, indentSize: indent, noteShare: share}) {
+function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, indentSize: indent}) {
   const family = String(fontFamily ?? "").replace(/["\\;{}]/g, "").trim()
   const root = document.documentElement.style
   root.setProperty("--font", family ? `"${family}", ${defaultFont}` : defaultFont)
@@ -376,7 +415,6 @@ function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, i
   root.setProperty("--ui-size", `${Number(uiFontSize) || 15}px`)
   showWhitespace = show === true
   indentSize = indent === 2 ? 2 : 4
-  setNoteShare(Number.isFinite(share) ? Math.min(1, Math.max(0, share)) : 0.4)
   view.dispatch({effects: settings.reconfigure(settingsExtensions())})
   view.requestMeasure()
 }
@@ -409,17 +447,19 @@ function updateCount() {
 
 // ---- Switcher
 
+// The switcher is this page in a window of its own, beside the panel. It asks Swift to show a
+// row's note, and the note's page puts the cursor there and marks what the search found.
+
 let notes = []
 // The list's rows, which the arrows go through: a note, or a line of a note's text that has
 // what's typed. `at` is the match the row opens the note at, as its place in the note's matches:
 // the line's first, or -1 on a note with none. `item` is the row's element.
 let rows = []
 let selected = 0
-// A note chosen in the list, and where to put its cursor and its text once it opens.
-let jump = null
-// The note and the word of the find the last search opened. That find is the search done, not
-// one to carry over.
-let landed = null
+// The row whose note the list last showed beside itself, while the list is the same.
+let shown = null
+// The note that was open when the switcher opened. A search lists it first.
+let origin = null
 // Whether the search hot key brought the panel up, so that Escape hides the panel too.
 let dismiss = false
 
@@ -441,7 +481,7 @@ function movePinned(from, to, save = true) {
   if (save) savePinOrder()
 }
 
-// Dragging a pinned note's handle moves it among the pinned notes; the order is saved on release.
+// Dragging a pinned note by its key moves it among the pinned notes; the order is saved on release.
 function dragPinned(event, note) {
   event.preventDefault()
   event.stopPropagation()
@@ -463,36 +503,80 @@ function dragPinned(event, note) {
   addEventListener("mouseup", drop)
 }
 
-function openSwitcher(list, fromHotKey) {
-  closeHistory()
+// ⌘P brings the switcher up with the focus in the list, on the open note (`current`), so the
+// arrows go from note to note at once. ⌘F brings it up with the focus in the search field, and
+// with some of a line selected in the note (`picked`) finds that, as typing it and Return would.
+// Each is a toggle: pressed with the focus already where it puts it, it closes the switcher, and
+// otherwise takes the focus there. `key` says whether this window has the focus at all. The list
+// button closes the switcher wherever the focus is (`toggle`), and the search hot key never does
+// (`force`).
+function showSwitcher(
+  list,
+  {find = false, force = false, toggle = false, dismiss: fromHotKey = false, current = null, key = false, picked = ""},
+) {
   notes = list
-  dismiss = fromHotKey
-  // A find in the note carries over: what this note doesn't have, another may. Not the find the
-  // last search opened, though, which is that search done.
-  const find = searchPanelOpen(view.state) && getSearchQuery(view.state)
-  const own = find && !find.regexp && !(landed?.id === currentId && landed.term === find.search)
-  query.value = own ? find.search : ""
-  switcher.hidden = false
-  selected = 0
-  back = 0
+  const target = find ? query : results
+  if (isSwitcherOpen() && !force && (toggle || (key && document.activeElement === target))) return closeSwitcher()
+  if (!isSwitcherOpen() || picked) {
+    origin = current
+    query.value = picked
+    back = 0
+  }
+  if (!isSwitcherOpen()) {
+    dismiss = fromHotKey
+    switcher.hidden = false
+    selected = Math.max(0, notes.findIndex(note => note.id === current))
+  }
   update()
-  query.focus()
-  query.select()
+  target.focus()
+  if (find) query.select()
+  // Swift brings the window up, if it isn't, and gives it the focus.
+  post("switcherShown", {shown: true})
+  if (picked) toFirstRow()
 }
 
-// Every way out of the switcher comes through here, so here is where a search is remembered.
+// From the search field to the top of the list, whose note shows.
+function toFirstRow() {
+  if (!rows.length) return
+  results.focus()
+  show(0)
+}
+
+// The note in sight stays the open one. A search not used yet is remembered here. Swift takes
+// the window away, the marks in the note with it, and gives the note the focus.
 function closeSwitcher() {
   if (!isSwitcherOpen()) return
   remember()
   switcher.hidden = true
-  view.focus()
+  post("switcherShown", {shown: false})
 }
 
-// What was searched for before, oldest first. ↑ on the first row brings the last of them back
-// into the search field, and then the ones before it; `back` is how many back the field is.
+// Dragging the switcher's left edge changes its width. Swift moves the window's left edge, so the
+// width goes by how far the pointer has moved on the screen.
+$("edge").addEventListener("mousedown", event => {
+  event.preventDefault()
+  if (event.button !== 0) return
+  const start = event.screenX
+  const width = innerWidth
+  document.body.classList.add("resizing")
+  const move = ({screenX}) => post("sideWidth", {width: width + start - screenX})
+  const drop = () => {
+    removeEventListener("mousemove", move)
+    removeEventListener("mouseup", drop)
+    document.body.classList.remove("resizing")
+  }
+  addEventListener("mousemove", move)
+  addEventListener("mouseup", drop)
+})
+
+// What was searched for before, oldest first. A search is remembered once it's used, to go to a
+// row, or as the switcher closes. In the search field ↑ goes back through them and ↓ comes
+// forward again, as in VS Code, as far as what was typed before going back. `back` is how many
+// back the field is.
 // shortcut: lasts until the app quits; send it to Swift to keep it.
 const searches = []
 let back = 0
+let typed = ""
 
 function remember() {
   const text = query.value.trim()
@@ -501,102 +585,70 @@ function remember() {
   if (at >= 0) searches.splice(at, 1)
   searches.push(text)
   if (searches.length > 50) searches.shift()
+  back = 0
 }
 
-function recall() {
-  // What the field already has is passed over, such as a find carried over from the note.
-  let at = searches.length - back - 1
-  while (at >= 0 && searches[at] === query.value.trim()) at--
-  if (at < 0) return
-  back = searches.length - at
-  query.value = searches[at]
-  query.select()
+function recall(step) {
+  let to = back + step
+  // A search the field already has is no step.
+  while (to > 0 && searches[searches.length - to] === query.value.trim()) to += step
+  if (to < 0 || to > searches.length) return
+  if (!back) typed = query.value
+  back = to
+  query.value = back ? searches[searches.length - back] : typed
+  if (back) query.select()
   selected = 0
   update()
 }
 
-// Opens a row's note: at the row's line, or where a click in the preview says.
-function choose({note, at}, place = note.matches[at]) {
-  // The word for the note's find: the line's, or for a click in a line's preview the first typed.
-  const term = at < 0 ? undefined : searchTerms(query.value)[place.term ?? 0]
-  jump = {id: note.id, place, term, top: note === rows[selected]?.note ? previewTop(place) : null}
-  post("select", {id: note.id})
-}
-
-// Where the preview has the note's text, so that the text is in the same place as the note
-// opens: a position in the first line that shows and how far under the page's top it is, and how
-// far under it `place` ends, if that shows.
-function previewTop(place) {
-  if (!preview.offsetHeight) return null
-  const top = switcher.getBoundingClientRect().top
-  const pos = previewView.lineBlockAtHeight(preview.getBoundingClientRect().top - previewView.documentTop).from
-  const coords = previewView.coordsAtPos(pos)
-  const end = place && previewView.coordsAtPos(place.to)
-  return coords && {pos, y: coords.top - top, end: end ? end.bottom - top : 0}
-}
-
-// Once the note is open, the cursor goes on the place it was chosen for, and the note's find
-// opens on the word found there: the matches are marked as the preview had them, and ⌘G and ⇧⌘G
-// go on through them. The text stays where the preview had it, or goes up by as much as the find
-// would cover of the place.
-function land({id, place, term, top}) {
-  const effects = []
-  if (term) {
-    openSearchPanel(view)
-    effects.push(setSearchQuery.of(new SearchQuery({search: term, literal: true})))
-    landed = {id, term}
-  }
-  let {from = -1, to = -1} = place ?? {}
-  // A match's place is from the text the list had. If the file has changed since, the first
-  // match will do. A click's place is empty, and is good wherever it's in the text.
-  if (to > from && fold(view.state.sliceDoc(from, to)) !== term) {
-    from = fold(view.state.doc.toString()).indexOf(term)
-    to = from + term.length
-  }
-  const selection = from < 0 || to > view.state.doc.length ? undefined : {anchor: from, head: to}
-  if (top && top.pos <= view.state.doc.length && (!selection || top.end)) {
-    const covered = selection ? Math.max(0, top.end - view.scrollDOM.getBoundingClientRect().height) : 0
-    effects.push(EditorView.scrollIntoView(top.pos, {y: "start", yMargin: top.y - covered}))
-  } else if (selection) {
-    effects.push(EditorView.scrollIntoView(from, {y: "center"}))
-  }
-  view.dispatch({selection, effects})
-  // The find took the focus as it opened.
-  view.focus()
+// Shows a row's note beside the switcher: Swift opens it in the note's page, which puts the
+// cursor on the row's match.
+function show(index) {
+  select(index)
+  const row = rows[selected]
+  if (!row || row === shown) return
+  remember()
+  shown = row
+  post("select", {id: row.note.id, land: {query: query.value, place: row.note.matches[row.at] ?? null}})
 }
 
 // Ranks the notes for what's typed, and lists them: with nothing typed as rows, and while
 // searching each as its name over the lines of its text that match. What draws a note adds the
-// note's rows to `rows`.
+// note's rows to `rows`. As the search field changes, the note's page marks the matches in the
+// note in sight.
 // shortcut: stops after the note that takes the list past 500 rows; the notes after it show
 // once more is typed.
 function update() {
-  const ranked = rankNotes(notes, query.value)
-  const draw = query.value.trim() ? group : noteRow
+  const searching = Boolean(query.value.trim())
+  const found = rankNotes(notes, query.value)
+  // A search lists the note it started from first, over the others.
+  const mine = searching ? found.findIndex(note => note.id === origin) : -1
+  if (mine > 0) found.unshift(...found.splice(mine, 1))
+  const draw = searching ? group : noteRow
   rows = []
+  shown = null
   const items = []
-  for (const note of ranked) {
+  for (const note of found) {
     if (rows.length >= 500) break
     items.push(draw(note))
   }
-  total.textContent = `${ranked.length} ${ranked.length === 1 ? "note" : "notes"}`
+  total.textContent = `${found.length} ${found.length === 1 ? "note" : "notes"}`
   results.replaceChildren(...(items.length ? items : [element("li", "empty", "No notes match")]))
-  sizeSheet()
   select(selected)
+  post("marks", {query: query.value})
 }
 
 function select(index) {
   rows[selected]?.item.setAttribute("aria-selected", "false")
   selected = Math.max(0, Math.min(index, rows.length - 1))
   const active = rows[selected]?.item
-  if (active) {
-    active.setAttribute("aria-selected", "true")
-    query.setAttribute("aria-activedescendant", active.id)
-    active.scrollIntoView({block: "nearest"})
-  } else {
-    query.removeAttribute("aria-activedescendant")
+  for (const owner of [query, results]) {
+    if (active) owner.setAttribute("aria-activedescendant", active.id)
+    else owner.removeAttribute("aria-activedescendant")
   }
-  showPreview()
+  if (!active) return
+  active.setAttribute("aria-selected", "true")
+  active.scrollIntoView({block: "nearest"})
 }
 
 function element(tag, className, text) {
@@ -618,93 +670,8 @@ function marked(tag, className, text, ranges) {
   return node
 }
 
-// Under the sheet is the chosen row's note, laid out as the note itself is, so the switcher
-// shows what Return opens: the note from its top, or at the row's line, with the matches marked
-// as the note's find will have them. A click opens the note at the place clicked.
-const matchMark = Decoration.mark({class: "cm-searchMatch"})
-const shownMatchMark = Decoration.mark({class: "cm-searchMatch cm-searchMatch-selected"})
-const previewExtensions = [
-  EditorState.readOnly.of(true),
-  EditorView.editable.of(false),
-  EditorView.lineWrapping,
-  hangingIndents,
-  markdown({base: markdownLanguage}),
-  syntaxHighlighting(highlight),
-  theme,
-  EditorView.domEventHandlers({
-    mousedown(event, preview) {
-      const row = rows[selected]
-      const at = preview.posAtCoords({x: event.clientX, y: event.clientY})
-      // Focus stays in the search field.
-      event.preventDefault()
-      if (row && at !== null && event.button === 0) choose(row, {from: at, to: at})
-      return true
-    },
-  }),
-]
-const previewView = new EditorView({parent: preview, state: EditorState.create({extensions: previewExtensions})})
-
-function showPreview() {
-  if (!preview.offsetHeight) return
-  const row = rows[selected]
-  const match = row?.note.matches[row.at]
-  const marks = new RangeSetBuilder()
-  if (match)
-    row.note.matches.forEach((other, index) => marks.add(other.from, other.to, index === row.at ? shownMatchMark : matchMark))
-  // With no note to choose, the open note stays in sight.
-  const doc = row ? row.note.text : view.state.doc
-  previewView.setState(EditorState.create({doc, extensions: [previewExtensions, EditorView.decorations.of(marks.finish())]}))
-  // The view keeps the last note's scroll position. A note shows from its top; a line comes one
-  // line under the preview's top, where the note's find, once open at the panel's bottom, doesn't
-  // cover it.
-  previewView.scrollDOM.scrollTop = 0
-  if (match)
-    previewView.dispatch({effects: EditorView.scrollIntoView(match.from, {y: "start", yMargin: previewView.defaultLineHeight})})
-}
-
-// How much of the switcher's height the chosen note's text takes. Dragging the bar under the
-// list sets it: from none, which leaves the list alone, as far as leaving the search field and
-// the pinned notes' rows. Swift keeps it, and sends it with the options.
-let noteShare = 0.4
-
-function setNoteShare(share) {
-  noteShare = share
-  switcher.style.setProperty("--note-share", share)
-}
-
-// The room the sheet keeps: the search field and the pinned notes' rows, two rows at the least.
-function sizeSheet() {
-  const top = results.firstElementChild?.offsetTop ?? results.offsetTop
-  const least = top + Math.max(pinnedCount(), 2) * (rows[0]?.item.offsetHeight ?? 0)
-  switcher.style.setProperty("--sheet-least", `${least + split.offsetHeight}px`)
-}
-
-split.addEventListener("mousedown", event => {
-  // Focus stays in the search field.
-  event.preventDefault()
-  if (event.button !== 0) return
-  document.body.classList.add("splitting")
-  const move = ({clientY}) => {
-    const box = switcher.getBoundingClientRect()
-    const height = box.bottom - clientY
-    // Under 24 px is none: a strip that thin shows no line whole.
-    setNoteShare(height < 24 ? 0 : Math.min(1, height / box.height))
-  }
-  const drop = () => {
-    removeEventListener("mousemove", move)
-    removeEventListener("mouseup", drop)
-    document.body.classList.remove("splitting")
-    // The chosen row stays in sight in a list that got shorter, and its note in a preview that grew.
-    select(selected)
-    post("noteShare", {share: noteShare})
-  }
-  addEventListener("mousemove", move)
-  addEventListener("mouseup", drop)
-})
-
 // Line icons drawn with the text color; a pinned note's pin is filled.
 const icons = {
-  grip: '<path d="M5 7h14M5 12h14M5 17h14"/>',
   pin: '<path d="M9 3.5h6M10 3.5v5.2l-3.2 3.1c-.4.4-.1 1.2.5 1.2h9.4c.6 0 .9-.8.5-1.2L14 8.7V3.5Z"/><path d="M12 13v8"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
   open: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13M17.5 13.5v4a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h4"/>',
@@ -733,7 +700,8 @@ function actionButton(name, label, onClick, pressed) {
   return button
 }
 
-// A row to choose, added to `rows`: an option of the list, which a press of the mouse opens.
+// A row to choose, added to `rows`: an option of the list. A press of the mouse shows its note
+// beside the switcher, and a double click closes the switcher on it, as Return does in the list.
 function option(tag, className, note, at) {
   const row = {note, at, item: element(tag, className, "")}
   row.item.id = `note-${rows.length}`
@@ -741,8 +709,10 @@ function option(tag, className, note, at) {
   row.item.setAttribute("aria-selected", "false")
   row.item.addEventListener("mousedown", event => {
     event.preventDefault()
-    choose(row)
+    results.focus()
+    show(rows.indexOf(row))
   })
+  row.item.addEventListener("dblclick", closeSwitcher)
   rows.push(row)
   return row.item
 }
@@ -752,26 +722,28 @@ function option(tag, className, note, at) {
 function noteRow(note) {
   const item = option("li", "", note, -1)
   item.classList.toggle("movable", canMove(note))
-  // Mouse only: ⌥↑ and ⌥↓ do the same from the keyboard.
-  const grip = element("span", "grip", "")
-  grip.title = "Drag to reorder (⌥↑ ⌥↓)"
-  grip.setAttribute("aria-hidden", "true")
-  grip.innerHTML = `<svg viewBox="0 0 24 24">${icons.grip}</svg>`
-  grip.addEventListener("mousedown", event => dragPinned(event, note))
-  const actions = element("span", "actions", "")
-  // ⌘1 to ⌘9 open the first nine pinned notes, which Swift lists first.
+  // ⌘1 to ⌘9 open the first nine pinned notes, which Swift lists first. The key is also what a
+  // pinned note is dragged by, which leaves the row's width to the name; ⌥↑ and ⌥↓ do the same
+  // from the keyboard.
+  // shortcut: a pinned note past the ninth has no key, so only ⌥↑ and ⌥↓ move it.
   const number = note.pinned ? notes.findIndex(({id}) => id === note.id) + 1 : 0
+  const key = element("span", "key", number >= 1 && number <= 9 ? `⌘${number}` : "")
+  if (canMove(note)) {
+    key.title = "Drag to reorder (⌥↑ ⌥↓)"
+    key.addEventListener("mousedown", event => dragPinned(event, note))
+  }
+  const actions = element("span", "actions", "")
   actions.append(
-    element("span", "key", number >= 1 && number <= 9 ? `⌘${number}` : ""),
+    key,
     actionButton("pin", note.pinned ? "Unpin" : "Pin", () => post("pin", {id: note.id}), Boolean(note.pinned)),
     actionButton("trash", "Move to Trash (⌘⌫)", () => post("trash", {id: note.id})),
   )
-  item.append(grip, element("span", "title", note.title), actions)
+  item.append(element("span", "title", note.title), actions)
   return item
 }
 
 // While searching, a note is its name over the lines of its text that matched. The lines are the
-// rows to choose. The name isn't one: the arrows pass it, and a press on it opens the first
+// rows to choose. The name isn't one: the arrows pass it, and a press on it shows the first
 // line. A note with no line to list is a row itself, and opens at the match in its first line,
 // which its name is, if that's where the word was found.
 function group(note) {
@@ -789,11 +761,14 @@ function group(note) {
     line.append(marked("span", "snippet", snippet.text, snippet.ranges))
     item.append(line)
   }
-  if (note.lines.length)
+  if (note.lines.length) {
     name.addEventListener("mousedown", event => {
       event.preventDefault()
-      choose(rows[first])
+      results.focus()
+      show(first)
     })
+    name.addEventListener("dblclick", closeSwitcher)
+  }
   return item
 }
 
@@ -803,34 +778,51 @@ query.addEventListener("input", () => {
   update()
 })
 
-query.addEventListener("keydown", event => {
+// Keys in the search field and in the list, which don't pass the focus to each other with the
+// arrows. In the field ↑ and ↓ go through the searches made before, and Return takes the focus
+// to the top of the list. In the list ↑ and ↓ go through the rows, each row's note showing
+// beside the list, and Return closes the switcher on the chosen row's note. Tab goes from one
+// to the other.
+function onKey(event) {
   // Keys that confirm or cancel an input method's composition belong to it.
   if (event.isComposing || event.keyCode === 229) return
+  const inList = event.currentTarget === results
   const row = rows[selected]
   const command = event.metaKey && !event.ctrlKey && !event.altKey
   let handled = true
   if (event.altKey && !event.metaKey && !event.ctrlKey && /^Arrow(Up|Down)$/.test(event.key)) {
     if (row && canMove(row.note)) movePinned(selected, selected + (event.key === "ArrowUp" ? -1 : 1))
   } else if (event.key === "ArrowDown") {
-    select(selected + 1)
+    if (inList) show(selected + 1)
+    else recall(-1)
   } else if (event.key === "ArrowUp") {
-    // Over the first row are the searches made before.
-    if (selected > 0) select(selected - 1)
-    else recall()
+    if (inList) show(selected - 1)
+    else recall(1)
+  } else if (event.key === "Tab") {
+    if (inList) query.focus()
+    else results.focus()
   } else if (event.key === "Enter") {
-    if (row) choose(row)
+    if (!inList) toFirstRow()
+    else {
+      // The chosen row's note stays open as the switcher closes.
+      show(selected)
+      closeSwitcher()
+    }
   } else if (event.key === "Escape") {
     if (dismiss) post("escape")
     closeSwitcher()
   } else if (command && event.key === "Backspace") {
     if (row) post("trash", {id: row.note.id})
-  } else if (command && event.key.toLowerCase() === "a") {
+  } else if (command && event.key.toLowerCase() === "a" && !inList) {
     query.select()
   } else {
     handled = false
   }
   if (handled) event.preventDefault()
-})
+}
+
+query.addEventListener("keydown", onKey)
+results.addEventListener("keydown", onKey)
 
 // ---- History
 
@@ -841,7 +833,6 @@ let chosen = 0
 const isHistoryOpen = () => !historyView.hidden
 
 function openHistory(list) {
-  closeSwitcher()
   versions = list
   chosen = 0
   historyView.hidden = false
@@ -926,9 +917,26 @@ window.receive = ({type, data}) => {
   switch (type) {
     case "open":
       opening = data.opening
-      openNote(data.id, data.text, data.keep)
-      if (jump?.id === data.id) land(jump)
-      jump = null
+      openNote(data.id, data.text)
+      // A note the switcher asked for opens at the match its row is for.
+      if (data.land) land(data.land)
+      break
+    case "marks":
+      // What's typed in the switcher, found in this note as it's typed.
+      markMatches(data)
+      break
+    case "switcherShown":
+      // The switcher has come up beside the note, and the history would hide what it marks; or it
+      // has closed, and its marks go with it.
+      if (data) closeHistory()
+      else markMatches("")
+      break
+    case "side":
+      // This page is the switcher's, in its own window.
+      document.body.classList.add("side")
+      break
+    case "close":
+      closeSwitcher()
       break
     case "renamed": {
       const state = states.get(data.from)
@@ -937,7 +945,7 @@ window.receive = ({type, data}) => {
         states.set(data.to, state)
       }
       if (currentId === data.from) currentId = data.to
-      if (landed?.id === data.from) landed.id = data.to
+      if (origin === data.from) origin = data.to
       // The switcher's rows are chosen by name, so a row with the old name would open nothing.
       for (const note of notes) if (note.id === data.from) note.id = note.title = data.to
       if (isSwitcherOpen()) update()
@@ -948,8 +956,7 @@ window.receive = ({type, data}) => {
       if (currentId === data) currentId = null
       break
     case "switcher":
-      if (data.force || !isSwitcherOpen()) openSwitcher(lineFeeds(data.notes), data.dismiss === true)
-      else closeSwitcher()
+      showSwitcher(lineFeeds(data.notes), data)
       break
     case "notes":
       if (isSwitcherOpen()) {
@@ -962,7 +969,9 @@ window.receive = ({type, data}) => {
       else openHistory(data.versions)
       break
     case "focus":
-      if (isSwitcherOpen()) query.focus()
+      // Back where it was: in the switcher, the list or the search field, and in the note's page,
+      // the history if it's open, or else the note.
+      if (isSwitcherOpen()) (document.activeElement === results ? results : query).focus()
       else if (isHistoryOpen()) historyView.focus()
       else view.focus()
       break
@@ -971,12 +980,9 @@ window.receive = ({type, data}) => {
       break
     case "status":
       statusElement.textContent = data
-      // The footer is hidden while the switcher or the history covers the note, so a message
-      // closes them: it may say why choosing a note there did nothing.
-      if (data) {
-        closeSwitcher()
-        closeHistory()
-      }
+      // The footer is hidden while the history covers the note, so a message closes it: it may
+      // say why what was done there did nothing.
+      if (data) closeHistory()
       break
   }
 }

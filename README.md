@@ -18,15 +18,16 @@ other editor, sync them or back them up as you like.
   back when you hide the panel.
 - **Small and light.** The app is about 2 MB.
 - **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
-  rectangular selection, moving and copying lines, and find and replace. It also highlights
-  Markdown, continues lists when you press `Return`, and adds or removes bold, italic and other
-  marks with `Cmd+B`, `Cmd+I` and the like.
+  rectangular selection, and moving and copying lines. It also highlights Markdown, continues
+  lists when you press `Return`, and adds or removes bold, italic and other marks with `Cmd+B`,
+  `Cmd+I` and the like.
 - **Plain files.** Each note is a `.md` file named after its first line.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
   keeps earlier versions of each note, which `Cmd+Y` shows.
-- **Quick to switch notes.** `Cmd+P` searches the names and text of your notes, and lists each
-  line that matches, with the note's text under the list. `Ctrl+Tab` goes to the next note.
-  Pinned notes come first, in the order you give them, and `Cmd+1` to `Cmd+9` open them.
+- **Quick to switch notes.** `Cmd+P` lists your notes at the panel's left and shows each one
+  beside the list as you go through them. `Cmd+F` searches the names and text of your notes
+  there, and lists each line that matches. `Ctrl+Tab` goes to the next note. Pinned notes come
+  first, in the order you give them, and `Cmd+1` to `Cmd+9` open them.
 
 ## Install
 
@@ -65,23 +66,27 @@ panel), copy the new app to `/Applications`, and open it.
 
 - **Show and hide.** Press `Ctrl+Cmd+N`, or click the menu bar icon. `Esc` or
   `Cmd+W` hides the panel.
-- **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher, which lists your notes; press
-  `Return` to open the chosen one. Each row has a pin button and a trash button.
-- **Search.** Type in the switcher to search. A note is found if it has every word you type, in
-  its name or in its text; capitals and full-width letters match plain ones. Each note found is
-  listed by name, over the lines of its text that have a word. The chosen row's note shows under
-  the list: drag the bar between them to give it more room, or none. `Return` opens the note at
-  the row's line with Find open on the word, so `Cmd+G` goes to the next match. `Up` on the first
-  row brings back your earlier searches. If the search shortcut brought the panel up, `Esc` in
-  the switcher hides it again.
+- **Notes.** `Cmd+N` starts a new note. `Cmd+P`, or the list button at the left of the title
+  bar, opens the switcher at the panel's left: a list of your notes, with the open one chosen.
+  `Up` and `Down` show each note beside the list, and `Return` or `Esc` closes the switcher on
+  the note in sight. Each row has a pin button and a trash button. Drag the switcher's left
+  edge to change its width.
+- **Search.** `Cmd+F` opens the switcher with the cursor in its search field. A note is found if
+  it has every word you type, in its name or in its text; capitals and full-width letters match
+  plain ones. Each note found is listed by name, over the lines of its text that have a word.
+  The open note comes first, and its matches are marked in it as you type, so this is also how
+  you find in one note. `Return` goes to the first line in the list, and `Up` and `Down` go on
+  from there, each line shown in its note. With text selected in the note, `Cmd+F` searches for
+  it at once. In the search field, `Up` and `Down` bring back your earlier searches. If the
+  search shortcut brought the panel up, `Esc` in the switcher hides it again.
 - **Earlier versions.** `Cmd+Y`, or a click on the icon left of the note's name, lists the note's
   earlier versions, newest first, with the chosen one's text below. `Return` or a row's button
   copies a whole version; to copy part of one, select it and press `Cmd+C`. Nothing there changes
   the note: to go back to a version, copy it, press `Esc`, and paste it over the note.
 - **Pinned notes.** Pinned notes come first in the switcher and when you go through notes with
-  `Ctrl+Tab`. To change their order, drag the handle at the left of a row, or press `Option+Up`
-  and `Option+Down`, while the search field is empty. `Cmd+1` to `Cmd+9` open the first to ninth
-  pinned note; the switcher shows each one's key next to its pin.
+  `Ctrl+Tab`. `Cmd+1` to `Cmd+9` open the first to ninth pinned note; the switcher shows each
+  one's key next to its pin. To change their order, drag a row by that key, or press `Option+Up`
+  and `Option+Down`, while the search field is empty.
 - **Names.** A note is named after its first line: `# Shopping list` is saved as
   `Shopping list.md`. If another note has that name, a number is added. To choose a name yourself,
   click the name in the title bar; from then on the name stays as you set it.
@@ -171,14 +176,16 @@ In the panel:
 | Key | Does |
 |---|---|
 | ⌘N / ⌘P / ⌘O | New note / switch notes / open the notes folder with this note selected |
+| ⌘F | Find in this note and the others |
 | ⌘Y | Earlier versions of this note |
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
 | ⌃⌘M | Panel to its default place and size on the pointer's display; again, back to where it was (change it in Settings) |
-| ⌘W, Esc | Hide (Esc first closes search, extra cursors, the switcher or earlier versions) |
-| In the switcher: ↑↓, Return, ⌘⌫ | Choose, open, move to the Trash |
-| In the switcher: ↑ on the first row | Bring back an earlier search |
+| ⌘W, Esc | Hide (Esc first closes extra cursors, the switcher or earlier versions) |
+| In the switcher's list: ↑↓, Return | Show the note beside the list, close the switcher on it |
+| In the switcher's search field: Return, ↑↓ | Go to the first row of the list, bring back earlier / later searches |
+| In the switcher: Tab, ⌘⌫ | From the search field to the list and back, move the chosen note to the Trash |
 | In the switcher: ⌥↑ / ⌥↓ | Move a pinned note up / down (with the search field empty) |
 | In earlier versions: ↑↓, Return, ⌘A, ⌘C | Choose, copy all of it, select all of it, copy the selection |
 
@@ -193,7 +200,6 @@ Editing:
 | ⌘Return / ⇧⌘Return | Insert a line below / above |
 | ⌘D, ⇧⌘L, ⌥⌘↑ / ⌥⌘↓, ⌥-click | Multiple cursors |
 | ⇧⌥-drag | Rectangular selection |
-| ⌘F, ⌘G / ⇧⌘G | Find and replace, next / previous |
 | ⌘B / ⌘I / ⇧⌘X / ⌘E | Bold / italic / strikethrough / code: puts `**`, `*`, `~~` or `` ` `` around the selection, or takes them away |
 | ⌘K | Make the selection a link's text (a selected URL becomes its target) |
 | ⌘-click | Open a link |
