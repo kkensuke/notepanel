@@ -2,12 +2,24 @@
 import {EditorSelection, countColumn} from "@codemirror/state"
 import {syntaxTree} from "@codemirror/language"
 
-// A case-insensitive subsequence match: every query character must appear in order.
+// What a search doesn't tell apart: letter case, full-width letters, digits and signs ("ＡＰＩ" is
+// "api"), and the full-width space a Japanese input method types. Each character stays one
+// character, so a position in the folded text is the same position in the original.
+export function fold(text) {
+  return text
+    .replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+    .replace(/　/g, " ")
+    // The one letter whose lower case is two characters long.
+    .replace(/İ/g, "i")
+    .toLowerCase()
+}
+
+// A subsequence match on folded text: every query character must appear in order.
 // Returns a score (higher is better) or null. Runs and word starts score more,
 // and shorter targets win ties.
 export function fuzzyScore(query, target) {
-  const q = query.toLowerCase()
-  const t = target.toLowerCase()
+  const q = fold(query)
+  const t = fold(target)
   let score = 0
   let from = 0
   let previousEnd = -1
@@ -29,7 +41,7 @@ export function fuzzyScore(query, target) {
 export function rankNotes(notes, query, limit = 200) {
   const q = query.trim()
   if (!q) return notes.slice(0, limit).map(note => ({...note, snippet: ""}))
-  const lower = q.toLowerCase()
+  const folded = fold(q)
   const ranked = []
   for (const note of notes) {
     const score = fuzzyScore(q, note.title)
@@ -37,7 +49,7 @@ export function rankNotes(notes, query, limit = 200) {
       ranked.push({...note, score: 1000 + score, snippet: ""})
       continue
     }
-    const at = note.text.toLowerCase().indexOf(lower)
+    const at = fold(note.text).indexOf(folded)
     if (at >= 0) ranked.push({...note, score: 0, snippet: snippetAt(note.text, at)})
   }
   ranked.sort((a, b) => b.score - a.score)

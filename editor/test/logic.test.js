@@ -2,6 +2,7 @@ import {test} from "node:test"
 import assert from "node:assert/strict"
 import {EditorState, EditorSelection} from "@codemirror/state"
 import {
+  fold,
   fuzzyScore,
   rankNotes,
   urlAt,
@@ -41,6 +42,15 @@ test("fuzzyScore handles text outside the BMP and non-Latin scripts", () => {
   // "あい" is two Japanese kana; "\u{1F600}" is an emoji made of two UTF-16 units.
   assert.ok(fuzzyScore("あい", "あxい") !== null)
   assert.ok(fuzzyScore("\u{1F600}a", "\u{1F600}abc") !== null)
+})
+
+test("fold makes full-width letters and spaces plain, and keeps every position", () => {
+  const text = "ＡＰＩ　Ｋｅｙ İstanbul ÀB"
+  assert.equal(fold(text), "api key istanbul àb")
+  assert.equal(fold(text).length, text.length)
+  const notes = [{id: "Keys", title: "Keys", text: "the API key"}]
+  assert.equal(rankNotes(notes, "ａｐｉ　ｋｅｙ")[0].snippet, "the API key")
+  assert.ok(fuzzyScore("ＫＥＹ", "Keys") !== null)
 })
 
 test("rankNotes puts title matches first and adds snippets for body matches", () => {

@@ -20,6 +20,7 @@ import {markdown, markdownLanguage} from "@codemirror/lang-markdown"
 import {syntaxHighlighting, HighlightStyle, indentUnit, syntaxTree} from "@codemirror/language"
 import {tags} from "@lezer/highlight"
 import {
+  fold,
   rankNotes,
   urlAt,
   linkAt,
@@ -456,7 +457,7 @@ function choose(note) {
 }
 
 function selectMatch(text) {
-  const at = view.state.doc.toString().toLowerCase().indexOf(text.toLowerCase())
+  const at = fold(view.state.doc.toString()).indexOf(fold(text))
   if (at < 0) return
   view.dispatch({
     selection: {anchor: at, head: at + text.length},
