@@ -58,8 +58,8 @@ private let switcherKeys = [
     ("To the first match, then on through them", "↩ in the search field, then ↑ / ↓"),
     ("Earlier / later searches", "↑ / ↓ in the search field"),
     ("From the search field to the list and back", "Tab"),
-    ("Open it", "↩"),
-    ("Move it to the Trash", "⌘⌫"),
+    ("Close the switcher on the chosen note", "↩ in the list"),
+    ("Move the chosen note to the Trash", "⌘⌫"),
     ("Move a pinned note up / down", "⌥↑ / ⌥↓"),
 ]
 
