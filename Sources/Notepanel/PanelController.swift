@@ -137,12 +137,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func setSwitcherShown(_ shown: Bool) {
         if shown != switcherShown {
             switcherShown = shown
-            bridge.send("switcherShown", shown)
             if shown {
                 // Where the display has no room at the panel's left, the panel moves right while
                 // the switcher is up, and back when it closes, unless it was moved meanwhile.
                 // shortcut: checked only as the switcher opens; a panel moved to the display's
-                // left edge while it's up takes the switcher off the display.
+                // left edge while it's up, by hand or by ⌃⌘M, takes the switcher off the display.
                 let room = panel.frame.minX - (panel.screen?.visibleFrame.minX ?? panel.frame.minX - sideWidth)
                 if room < sideWidth {
                     let from = panel.frame
@@ -152,6 +151,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             } else {
                 panel.removeChildWindow(side)
                 side.orderOut(nil)
+                bridge.send("marks", "")
                 UserDefaults.standard.set(Double(sideWidth), forKey: "sideWidth")
                 if let shift, panel.frame == shift.to { panel.setFrame(shift.from, display: true) }
                 shift = nil
@@ -215,9 +215,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// first size, centered there. Using the pointer's display brings the panel to the display in
     /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
     private func toggleDefaultFrame() {
-        // shortcut: the switcher gets room at the panel's left only as it opens, so ⌃⌘M waits until
-        // it closes.
-        guard !switcherShown else { return }
         if let previous = frameBeforeDefault, panel.frame == defaultFrame {
             panel.setFrame(previous, display: true)
             frameBeforeDefault = nil
@@ -442,16 +439,20 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return true
     }
 
-    /// Shows the open note in the page. A note opened some other way than from the switcher's list
-    /// closes the switcher. `land` is where the switcher's row puts the cursor, which the page
-    /// works out.
+    /// Shows the open note in the page. `land` is where the switcher's row puts the cursor, which
+    /// the page works out. A note opened some other way than from the switcher's list closes the
+    /// switcher, or with `keepSwitcher` is chosen in its list.
     private func showNote(keepSwitcher: Bool = false, land: Any? = nil) {
         guard let name = store.current else { return }
         opening += 1
         var message: [String: Any] = ["id": name, "text": store.text, "opening": opening]
         message["land"] = land
         bridge.send("open", message)
-        if !keepSwitcher { closeSwitcher() }
+        if !keepSwitcher {
+            closeSwitcher()
+        } else if land == nil, switcherShown {
+            sideBridge.send("current", name)
+        }
         rememberCurrent()
         updateTitle()
     }
@@ -488,7 +489,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         guard let current = store.current, let index = names.firstIndex(of: current) else { return }
         let count = names.count
         let others = (1..<count).map { names[((index + step * $0) % count + count) % count] }
-        if let next = others.first(where: { store.read($0) != nil }) { open(next) }
+        if let next = others.first(where: { store.read($0) != nil }) { open(next, keepSwitcher: true) }
     }
 
     /// Every rename comes through here, from the store: the user's, a file following its
@@ -550,8 +551,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
         Prefs.setPinned(Prefs.pinned(in: store.folder).filter { $0 != trashed }, in: store.folder)
         bridge.send("trashed", trashed)
-        if store.current == nil { openSomeNote(keepSwitcher: true) }
         sideBridge.send("notes", notesForSwitcher())
+        if store.current == nil { openSomeNote(keepSwitcher: true) }
     }
 
     private func togglePin(_ name: String) {
@@ -621,11 +622,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func toggleHistory() {
         save()
         guard let name = store.current else { return }
-        // The history would cover the note the switcher shows.
-        closeSwitcher()
         let dates = ISO8601DateFormatter()
         let versions = store.versions(of: name).map { ["date": dates.string(from: $0.date), "text": $0.text] }
         bridge.send("history", ["id": name, "versions": versions])
+        // It takes the keys, also from the switcher, which stays beside it.
+        panel.makeKey()
+        focusEditor()
     }
 
     /// Pinned notes first, in the order the user gave them, then the rest, newest first. The
