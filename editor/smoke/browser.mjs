@@ -623,6 +623,27 @@ await receive("switcher", {notes: found, toggle: true})
 await press("Tab")
 await receive("switcher", {notes: found, toggle: true})
 assert.equal(await switcherOpen(), false)
+// ⌘F with some of a line selected in the note is that text typed and Return: the focus is at the
+// top of the list, on the note's first match. The match the search leaves selected isn't asked
+// for, so the next ⌘F is a new search.
+await receive("open", {id: "Weekly plan", text: weekly})
+await page.click(".cm-content")
+await press("ArrowDown", ["Meta"])
+await press("ArrowLeft", ["Shift", "Alt"])
+await clear()
+await receive("switcher", {notes: found, find: true})
+assert.deepEqual([await queryValue(), await focused(), (await last("select"))?.id], ["review", "results", "Weekly plan"])
+await receive("open", {id: "Weekly plan", text: weekly, keep: false})
+assert.equal(await chosen(), "Plan the review")
+await press("Escape")
+await receive("switcher", {notes: found, find: true})
+assert.deepEqual([await queryValue(), await focused()], ["", "query"])
+await press("Escape")
+// More than a line selected is no search.
+await press("a", ["Meta"])
+await receive("switcher", {notes: found, find: true})
+assert.deepEqual([await queryValue(), await focused()], ["", "query"])
+await press("Escape")
 
 assert.deepEqual(errors, [])
 console.log("smoke test passed")

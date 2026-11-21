@@ -489,6 +489,11 @@ function showSwitcher(list, {find = false, force = false, toggle = false, dismis
   notes = list
   const target = find ? query : results
   if (isSwitcherOpen() && !force && (toggle || document.activeElement === target)) return closeSwitcher()
+  // ⌘F with some of a line selected in the note finds that, as typing it and Return would. What
+  // the search itself left selected isn't asked for.
+  const {from, to} = view.state.selection.main
+  const picked = find && !force && view.hasFocus && view.state.selection !== landed ? view.state.sliceDoc(from, to) : ""
+  const asked = Boolean(picked.trim()) && !picked.includes("\n")
   if (!isSwitcherOpen()) {
     closeHistory()
     dismiss = fromHotKey
@@ -503,9 +508,22 @@ function showSwitcher(list, {find = false, force = false, toggle = false, dismis
     post("switcherShown", {shown: true})
     selected = Math.max(0, notes.findIndex(note => note.id === currentId))
   }
+  if (asked) {
+    origin = currentId
+    query.value = picked
+    back = 0
+  }
   update()
   target.focus()
   if (find) query.select()
+  if (asked) toFirstRow()
+}
+
+// From the search field to the top of the list, whose note shows.
+function toFirstRow() {
+  if (!rows.length) return
+  results.focus()
+  show(0)
 }
 
 // The note in sight stays the open one. A search not used yet is remembered here.
@@ -574,6 +592,9 @@ function show(index) {
   choose(row, true)
 }
 
+// The selection the search last put in the note, which isn't the user's own.
+let landed = null
+
 // Once the note is open, the cursor goes on the place it was chosen for, in the middle of the
 // note, and the search's matches are marked.
 function land({place, term}) {
@@ -586,6 +607,7 @@ function land({place, term}) {
   }
   const selection = from < 0 || to > view.state.doc.length ? undefined : {anchor: from, head: to}
   view.dispatch({selection, effects: selection ? EditorView.scrollIntoView(from, {y: "center"}) : []})
+  if (selection) landed = view.state.selection
   if (isSwitcherOpen()) markMatches(place)
 }
 
@@ -786,12 +808,8 @@ function onKey(event) {
     if (inList) query.focus()
     else results.focus()
   } else if (event.key === "Enter") {
-    if (!inList) {
-      if (rows.length) {
-        results.focus()
-        show(0)
-      }
-    } else if (!row || row === shown) closeSwitcher()
+    if (!inList) toFirstRow()
+    else if (!row || row === shown) closeSwitcher()
     else choose(row)
   } else if (event.key === "Escape") {
     if (dismiss) post("escape")
