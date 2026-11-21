@@ -530,8 +530,11 @@ function showSwitcher(
   update()
   target.focus()
   if (find) query.select()
-  // Swift brings the window up, if it isn't, and gives it the focus.
-  post("switcherShown", {shown: true})
+  // Swift brings the window up, if it isn't, and gives it the focus. The window is at most as tall
+  // as the search field and ten notes' rows, each twice the text size as style.css makes them,
+  // with the edge above and below.
+  const row = 2 * parseFloat(getComputedStyle(document.body).fontSize)
+  post("switcherShown", {shown: true, height: query.parentElement.offsetHeight + 10 * row + 2})
   if (picked) toFirstRow()
 }
 

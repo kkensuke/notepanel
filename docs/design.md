@@ -287,7 +287,7 @@ Undo・Redo はメニューに入れず、エディタでは第 1 段でも扱�
 | JS→Swift | `select` | `{id, land}`：切替画面の行のノートを開く。Swift は `land` を `open` に入れる |
 | JS→Swift | `trash` | `{id}`：切替画面の操作 |
 | JS→Swift | `marks` | `{query}`：切替画面の検索欄の入力。Swift がノートのページに渡す |
-| JS→Swift | `switcherShown` | `{shown}`：切替画面を開いたか、フォーカスを置いたか、閉じたか。Swift は、開いている間、切替画面のウインドウをパネルの左に出す（§5.4） |
+| JS→Swift | `switcherShown` | `{shown, height}`：切替画面を開いたか、フォーカスを置いたか、閉じたか。Swift は、開いている間、切替画面のウインドウをパネルの左に出す（§5.4）。`height` は、そのウインドウの高さの上限（ノート行 10 行分） |
 | JS→Swift | `sideWidth` | `{width}`：切替画面の左端のドラッグで求めた幅 |
 | JS→Swift | `orderPins` | `{ids}`：並べ替えた後のピン留めの順 |
 | JS→Swift | `pin` | `{id}`：ピン留めの切り替え |

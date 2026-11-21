@@ -253,6 +253,13 @@ assert.deepEqual(
     document.getElementById("switcher").offsetWidth, innerWidth]),
   ["none", 220, 220])
 assert.equal((await last("switcherShown", side))?.shown, true, "Swift hears that the switcher wants its window")
+// The window is at most as tall as ten notes' rows show whole under the search field.
+const twelve = Array.from({length: 12}, (_, i) => ({id: `N${i}`, title: `N${i}`, text: "", pinned: false}))
+await receive("switcher", {notes: twelve}, side)
+assert.equal(
+  (await last("switcherShown", side))?.height,
+  await side.$eval("#results li:nth-child(10)", e => e.getBoundingClientRect().bottom + 1))
+await receive("switcher", {notes, find: true}, side)
 
 // Fuzzy title search, keyboard selection and trash.
 assert.equal(await focused(), "query")

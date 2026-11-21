@@ -35,6 +35,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// kept when the switcher closes.
     private var sideWidth = CGFloat(
         max(Prefs.minSideWidth, UserDefaults.standard.object(forKey: "sideWidth") as? Double ?? Prefs.defaultSideWidth))
+    /// How tall the switcher's window may be, as its page says: ten rows under the search field.
+    private var sideHeight = CGFloat.greatestFiniteMagnitude
     /// Where the panel was and where it went, when it moved right to make room for the switcher.
     private var shift: (from: NSRect, to: NSRect)?
     private var buttons: [NSButton] = []
@@ -164,11 +166,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         focusSwitcher()
     }
 
-    /// The switcher's window goes at the panel's left, flush with it, from under the title bar to
-    /// the bottom: beside the note's page.
+    /// The switcher's window goes at the panel's left, flush with it, from under the title bar down
+    /// to the panel's bottom, or as far as its page asks.
     private func placeSide() {
         let page = panel.convertToScreen(bridge.webView.convert(bridge.webView.bounds, to: nil))
-        side.setFrame(NSRect(x: page.minX - sideWidth, y: page.minY, width: sideWidth, height: page.height), display: true)
+        let height = min(page.height, sideHeight)
+        side.setFrame(
+            NSRect(x: page.minX - sideWidth, y: page.maxY - height, width: sideWidth, height: height), display: true)
     }
 
     private func attachSide() {
@@ -406,6 +410,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         case "marks":
             bridge.send("marks", body["query"] as? String ?? "")
         case "switcherShown":
+            if let height = body["height"] as? Double { sideHeight = CGFloat(height) }
             setSwitcherShown(body["shown"] as? Bool ?? false)
         case "sideWidth":
             // As far as the display goes to the left.
