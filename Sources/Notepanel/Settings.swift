@@ -33,8 +33,8 @@ enum Prefs {
     /// settings window. The toolbar's symbols follow it.
     static let defaultUIFontSize = 15.0
     static let uiFontSizes: [Double] = [12, 13, 14, 15, 16, 17, 18, 20]
-    /// How wide the switcher is, at the note's left, in points. The panel is that much wider
-    /// while the switcher is up, and dragging the panel's left edge then changes it.
+    /// How wide the switcher is, in its window at the panel's left, in points. Dragging the
+    /// switcher's left edge changes it.
     static let defaultSideWidth = 220.0
     static let minSideWidth = 140.0
     /// The note panel's background, not its text: 0 is clear, 1 is solid, and the default in

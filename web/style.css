@@ -71,15 +71,10 @@ body {
   flex-direction: column;
 }
 
-/* While the switcher is open, Swift widens the panel to the left for it, and the note keeps the
-   width it had, at the right: --note-width, which main.js sets. The note is held there until the
-   panel is narrow again. */
-#editor.beside {
-  margin-left: calc(100% - var(--note-width));
-}
-
-footer.beside {
-  left: calc(100% - var(--note-width));
+/* The switcher's own page, in a window at the panel's left, is the switcher and nothing else. */
+.side #editor,
+.side footer {
+  display: none;
 }
 
 /* The note runs on under the footer and is hidden only behind the footer's texts, whose boxes
@@ -136,12 +131,29 @@ footer {
   display: none;
 }
 
-/* The switcher is a panel at the note's left, in the room the wider panel adds: a sheet, with
-   the search field and the list. The note stays in sight beside it and shows the chosen row's
-   note. */
+/* The switcher fills its window: a sheet, with the search field and the list. Its corners are a
+   row's corners and the edge around them, so the chosen row's frame fits a bottom corner whole;
+   Swift rounds the window's glass to match. */
 #switcher {
-  right: var(--note-width);
-  border-right: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+/* Dragging the left edge changes the switcher's width. */
+#edge {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  cursor: ew-resize;
+}
+
+body.resizing,
+body.resizing * {
+  cursor: ew-resize;
 }
 
 .sheet {
