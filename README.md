@@ -217,6 +217,7 @@ Editing:
 | `Sources/NotepanelCore` | Reading and saving notes, with no UI |
 | `editor/` | The editor page (CodeMirror 6), built into `web/editor.js` |
 | `web/` | The page the panel shows in a web view |
+| `icon/` | The app icon: `AppIcon.svg` and the `AppIcon.icns` made from it |
 | `docs/design.md` | The design and the feature list (in Japanese) |
 | `docs/history.md` | The design of note history (in Japanese) |
 | `docs/releasing.md` | How to publish a release |

@@ -139,6 +139,7 @@ open /Applications/notepanel.app
 | `Sources/NotepanelCore` | ノートの読み込みと保存（UI を含まない） |
 | `editor/` | エディタのページ（CodeMirror 6）。`web/editor.js` にビルドする |
 | `web/` | パネルが Web ビューで表示するページ |
+| `icon/` | アプリのアイコン。`AppIcon.svg` と、それから作った `AppIcon.icns` |
 | `docs/design.md` | 設計と機能一覧 |
 | `docs/history.md` | ノートの履歴の設計 |
 | `docs/releasing.ja.md` | リリースの手順 |

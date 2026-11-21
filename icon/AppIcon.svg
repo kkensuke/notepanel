@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<!-- notepanel's app icon, on Apple's macOS icon grid: an 824 px squircle centered on a 1024 px
+     canvas. The squircle stays opaque, or macOS 26 shows the icon shrunk on a gray tile.
+     AppIcon.icns is made from this file on a Mac (brew install librsvg):
+       mkdir AppIcon.iconset
+       for s in 16 32 128 256 512; do
+         rsvg-convert -w $s AppIcon.svg -o AppIcon.iconset/icon_${s}x$s.png
+         rsvg-convert -w $((s * 2)) AppIcon.svg -o AppIcon.iconset/icon_${s}x$s@2x.png
+       done
+       iconutil -c icns AppIcon.iconset && rm -r AppIcon.iconset -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8EC5FF"/>
+      <stop offset="1" stop-color="#3F7FE6"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="10"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <path d="M383.41,100.00 L640.59,100.00 C722.19,100.00 763.00,100.00 799.79,112.14 L806.92,113.89 C854.88,131.34 892.66,169.12 910.11,217.08 C924.00,261.00 924.00,301.81 924.00,383.41 L924.00,640.59 C924.00,722.19 924.00,763.00 911.86,799.79 L910.11,806.92 C892.66,854.88 854.88,892.66 806.92,910.11 C763.00,924.00 722.19,924.00 640.59,924.00 L383.41,924.00 C301.81,924.00 261.00,924.00 224.21,911.86 L217.08,910.11 C169.12,892.66 131.34,854.88 113.89,806.92 C100.00,763.00 100.00,722.19 100.00,640.59 L100.00,383.41 C100.00,301.81 100.00,261.00 112.14,224.21 L113.89,217.08 C131.34,169.12 169.12,131.34 217.08,113.89 C261.00,100.00 301.81,100.00 383.41,100.00 Z" fill="url(#bg)" filter="url(#shadow)"/>
+  <rect x="222" y="282" width="580" height="460" rx="64" fill="#000" opacity="0.18" transform="translate(0 14)"/>
+  <rect x="222" y="282" width="580" height="460" rx="64" fill="#283244"/>
+  <circle cx="290" cy="350" r="20" fill="#FF5F57"/>
+  <circle cx="350" cy="350" r="20" fill="#5D6779"/>
+  <rect x="290" y="422.0" width="250" height="36" rx="18.0" fill="#F2F4F7"/>
+  <rect x="290" y="505.0" width="440" height="30" rx="15.0" fill="#A9B2C1"/>
+  <rect x="290" y="575.0" width="380" height="30" rx="15.0" fill="#A9B2C1"/>
+  <rect x="290" y="645.0" width="300" height="30" rx="15.0" fill="#A9B2C1"/>
+</svg>
