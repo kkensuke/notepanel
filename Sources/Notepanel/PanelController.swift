@@ -26,9 +26,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// Whether the page shows the history, as it last said.
     private var historyShown = false
     /// Whether the page shows the switcher, as it last said. While it does, the panel is wider to
-    /// the left by the switcher's width, and `noteWidth` is the width the panel had before.
+    /// the left by the switcher's width: `noteFrame` is the frame the panel had before, and
+    /// `wideFrame` the one it was given.
     private var switcherShown = false
-    private var noteWidth: CGFloat = 0
+    private var noteFrame = NSRect.zero
+    private var wideFrame = NSRect.zero
     private var buttons: [NSButton] = []
     /// The buttons at the right, as one toolbar item.
     private let buttonsView = ButtonRow()
@@ -126,23 +128,30 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if shown {
             // The wider frame isn't the one to come back to after a restart.
             panel.setFrameAutosaveName("")
-            noteWidth = frame.width
+            noteFrame = frame
             let stored = UserDefaults.standard.object(forKey: "sideWidth") as? Double ?? Prefs.defaultSideWidth
             let side = CGFloat(max(Prefs.minSideWidth, stored))
             frame.size.width += side
             // To the left, as far as the display has room; the rest goes to the right.
             let least = panel.screen?.visibleFrame.minX ?? frame.minX - side
-            frame.origin.x = max(least, frame.minX - side)
-            panel.minSize = NSSize(width: noteWidth + CGFloat(Prefs.minSideWidth), height: 160)
+            frame.origin.x = min(frame.minX, max(least, frame.minX - side))
+            panel.minSize = NSSize(width: noteFrame.width + CGFloat(Prefs.minSideWidth), height: 160)
             panel.setFrame(frame, display: true)
+            wideFrame = panel.frame
         } else {
-            UserDefaults.standard.set(Double(frame.width - noteWidth), forKey: "sideWidth")
-            frame.origin.x = frame.maxX - noteWidth
-            frame.size.width = noteWidth
+            UserDefaults.standard.set(Double(frame.width - noteFrame.width), forKey: "sideWidth")
+            // Back to the frame it had. If the panel was moved or resized meanwhile, the note
+            // stays where it is now instead, at the right, as wide as it was.
+            if frame != wideFrame {
+                noteFrame = NSRect(
+                    x: frame.maxX - noteFrame.width, y: frame.minY, width: noteFrame.width, height: frame.height)
+            }
             panel.minSize = NSSize(width: 320, height: 160)
-            panel.setFrame(frame, display: true)
-            panel.setFrameAutosaveName(Self.frameName)
+            panel.setFrame(noteFrame, display: true)
+            // Saved before the name is set again, in case setting it brings back what was saved
+            // under it.
             panel.saveFrame(usingName: Self.frameName)
+            panel.setFrameAutosaveName(Self.frameName)
         }
     }
 
