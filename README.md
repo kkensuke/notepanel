@@ -68,10 +68,10 @@ panel), copy the new app to `/Applications`, and open it.
 - **Notes.** `Cmd+N` starts a new note. `Cmd+P` opens the switcher: type to search,
   then press `Return` to open the note. A note found by its text opens with the match selected.
   Each row has a pin button and a trash button.
-- **Earlier versions.** `Cmd+Y` lists the note's earlier versions, newest first, with the chosen
-  one's text below. `Return` or a row's button copies a whole version; to copy part of one, select
-  it and press `Cmd+C`. Nothing there changes the note: to go back to a version, copy it, press
-  `Esc`, and paste it over the note.
+- **Earlier versions.** `Cmd+Y`, or a click on the icon left of the note's name, lists the note's
+  earlier versions, newest first, with the chosen one's text below. `Return` or a row's button
+  copies a whole version; to copy part of one, select it and press `Cmd+C`. Nothing there changes
+  the note: to go back to a version, copy it, press `Esc`, and paste it over the note.
 - **Pinned notes.** Pinned notes come first in the switcher and when you go through notes with
   `Ctrl+Tab`. To change their order, drag the handle at the left of a row, or press `Option+Up`
   and `Option+Down`, while the search field is empty. `Cmd+1` to `Cmd+9` open the first to ninth
@@ -199,9 +199,9 @@ Editing:
 - **Pressing the keys while recording a shortcut does nothing.** Another app uses those keys as
   its own shortcut, even if that feature is turned off in the app. Remove the shortcut in that app,
   or, for a default such as `Ctrl+Cmd+N`, press the ↺ button next to the field.
-- **I need an earlier version of a note.** Press `Cmd+Y` in the note. For a note that's gone, or
-  one renamed in Finder, right-click the menu bar icon and choose Open History Folder: each
-  note's versions are in a folder named after it.
+- **I need an earlier version of a note.** Press `Cmd+Y` in the note, or click the icon left of its
+  name. For a note that's gone, or one renamed in Finder, right-click the menu bar icon and choose
+  Open History Folder: each note's versions are in a folder named after it.
 - **Uninstalling.** Turn off Open at login, then run `brew uninstall notepanel`, which also quits
   notepanel. If you built the app yourself, quit notepanel and delete `/Applications/notepanel.app`.
   Its settings are removed with `defaults delete io.github.kkensuke.notepanel`. Unless you chose

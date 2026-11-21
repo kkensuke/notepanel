@@ -19,9 +19,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var titleWidth: NSLayoutConstraint!
     /// The save icon and the name, as one toolbar item.
     private let titleView = NSView()
-    private let saveIcon = NSImageView()
+    /// Also the history button.
+    private let saveIcon = HistoryButton()
     private var saveIconWidth: NSLayoutConstraint!
     private var saveIconGap: NSLayoutConstraint!
+    /// Whether the page shows the history, as it last said.
+    private var historyShown = false
     private var buttons: [NSButton] = []
     /// The buttons, as one toolbar item.
     private let buttonsView = ButtonRow()
@@ -55,7 +58,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         configurePanel()
         store.onStatus = { [weak self] message in self?.bridge.send("status", message ?? "") }
         store.onRenamed = { [weak self] from, to in self?.noteRenamed(from, to) }
-        store.onSaveState = { [weak self] state in self?.showSaveState(state) }
+        store.onSaveState = { [weak self] _ in self?.showSaveState() }
         bridge.onMessage = { [weak self] type, body in self?.handle(type, body) }
     }
 
@@ -81,6 +84,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
             let movedOn = front != NSRunningApplication.current.processIdentifier && front != previousApp?.processIdentifier
             panel.orderOut(nil)
+            // The pointer leaves the icon with the panel, and no exit says so.
+            saveIcon.pointing = false
             if !movedOn { _ = previousApp?.activate(options: []) }
         }
         store.flush()
@@ -272,6 +277,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             // Also after the page reloads: it gets its options again, and the open note from the
             // store, whose text may not be on disk.
             bridge.send("options", options)
+            historyShown = false
+            showSaveState()
             if store.current == nil { openSomeNote() } else { showNote() }
         case "changed":
             guard body["opening"] as? Int == opening, let text = body["text"] as? String else { return }
@@ -297,6 +304,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             NSPasteboard.general.setString(text, forType: .string)
         case "escape":
             hide()
+        case "historyShown":
+            historyShown = body["shown"] as? Bool ?? false
+            showSaveState()
         default:
             break
         }
@@ -535,10 +545,17 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         titleField.setAccessibilityLabel("Note name")
         // An editable field has no width of its own, so it's sized to its name.
         titleWidth = titleField.widthAnchor.constraint(equalToConstant: 120)
-        // Left of the name, whether its text is saved. The icon keeps one width for every
-        // symbol, so the name doesn't move when the symbol changes.
+        // Left of the name, whether its text is saved; clicking it opens the history. The icon
+        // keeps one width for every symbol, so the name doesn't move when the symbol changes.
+        saveIcon.title = ""
+        saveIcon.isBordered = false
+        saveIcon.imagePosition = .imageOnly
         saveIcon.imageScaling = .scaleNone
-        for view in [saveIcon, titleField] {
+        saveIcon.target = self
+        saveIcon.action = #selector(historyClicked)
+        saveIcon.onPointing = { [weak self] in self?.showSaveState() }
+        // The icon goes over the name's field, which reaches under it when the name is short.
+        for view in [titleField, saveIcon] {
             view.translatesAutoresizingMaskIntoConstraints = false
             titleView.addSubview(view)
         }
@@ -546,7 +563,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         saveIconGap = titleField.leadingAnchor.constraint(equalTo: saveIcon.trailingAnchor)
         NSLayoutConstraint.activate([
             titleWidth, saveIconWidth, saveIconGap,
-            saveIcon.leadingAnchor.constraint(equalTo: titleView.leadingAnchor),
+            // The icon's frame reaches past the symbol, and stays in the item.
+            saveIcon.leadingAnchor.constraint(equalTo: titleView.leadingAnchor, constant: HistoryButton.margin),
             saveIcon.centerYAnchor.constraint(equalTo: titleField.centerYAnchor),
             titleField.trailingAnchor.constraint(equalTo: titleView.trailingAnchor),
             titleField.topAnchor.constraint(equalTo: titleView.topAnchor),
@@ -665,25 +683,39 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
                 .withSymbolConfiguration(configuration)
         }
         saveIconWidth.constant = uiFontSize
-        showSaveState(store.saveState)
+        showSaveState()
         sizeTitle()
     }
 
     /// A dashed circle while the text isn't saved yet, a checked circle once it is, and a red
-    /// warning if saving failed (the footer says why).
-    private func showSaveState(_ state: SaveState) {
+    /// warning if saving failed (the footer says why). As the history button, it shows a clock
+    /// when pointed at, but not over a failed save, whose warning stays in sight. While the
+    /// history is open, the clock is in the accent color.
+    private func showSaveState() {
+        let state = store.saveState
         let (symbol, label): (String, String) =
             switch state {
             case .saved: ("checkmark.circle", "Saved")
             case .editing: ("circle.dashed", "Not saved yet")
             case .failed: ("exclamationmark.triangle", "Couldn’t save")
             }
-        saveIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)?
+        let pointing = saveIcon.pointing
+        let clock = historyShown || (pointing && state != .failed)
+        saveIcon.image = NSImage(systemSymbolName: clock ? "clock.arrow.circlepath" : symbol, accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: uiFontSize, weight: .regular, scale: .small))
-        saveIcon.contentTintColor = state == .failed ? .systemRed : .secondaryLabelColor
-        saveIcon.toolTip = label
+        saveIcon.contentTintColor =
+            historyShown ? .controlAccentColor
+            : state == .failed ? .systemRed
+            : pointing ? .labelColor : .secondaryLabelColor
+        saveIcon.backdrop =
+            historyShown ? NSColor.controlAccentColor.withAlphaComponent(0.2)
+            : pointing ? .quaternaryLabelColor : nil
+        saveIcon.toolTip = historyShown ? "Close History (⌘Y)" : "\(label) · Show History (⌘Y)"
+        saveIcon.setAccessibilityLabel(historyShown ? "Close History" : "Show History")
+        saveIcon.setAccessibilityValue(label)
     }
 
+    @objc private func historyClicked() { toggleHistory() }
     @objc private func newNoteClicked() { newNote() }
     @objc private func browseClicked() { toggleSwitcher() }
     @objc private func openFolderClicked() { openFolder() }
@@ -707,7 +739,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         // shortcut: margins taken from one screenshot (about 20 pt for the toolbar's edge and a gap
         // before the title); measure the laid-out buttons if another macOS sets them wider.
         let buttonsWidth = buttonsView.fittingSize.width + 20
-        let room = (panelWidth ?? panel.frame.width) - 2 * buttonsWidth - saveIconWidth.constant - gap
+        let room = (panelWidth ?? panel.frame.width) - 2 * buttonsWidth - HistoryButton.margin - saveIconWidth.constant - gap
         titleWidth.constant = max(0, min(max(width, 80), 360, room))
         // The name is centered in its field, so the icon moves in over the space left of it and
         // stays `gap` from the text, also when a short name leaves the field wider than the text.
@@ -760,6 +792,56 @@ private final class ToolbarButton: NSButton {
     override var alignmentRectInsets: NSEdgeInsets { NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6) }
     // The symbol's size, as before the insets, whatever AppKit makes of them.
     override var intrinsicContentSize: NSSize { cell?.cellSize ?? super.intrinsicContentSize }
+}
+
+/// The save icon, which is also the history button. Like a toolbar button, it takes clicks a little
+/// around its symbol; `margin` is less than the 5 pt gap to the name, so clicking the name still
+/// renames the note.
+private final class HistoryButton: NSButton {
+    static let margin: CGFloat = 4
+    var onPointing: () -> Void = {}
+    var pointing = false {
+        didSet { if pointing != oldValue { onPointing() } }
+    }
+    /// Drawn behind the symbol.
+    var backdrop: NSColor? {
+        didSet { needsDisplay = true }
+    }
+    private lazy var area = NSTrackingArea(
+        rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
+
+    override var alignmentRectInsets: NSEdgeInsets {
+        NSEdgeInsets(top: Self.margin, left: Self.margin, bottom: Self.margin, right: Self.margin)
+    }
+    override var intrinsicContentSize: NSSize { cell?.cellSize ?? super.intrinsicContentSize }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if !trackingAreas.contains(area) { addTrackingArea(area) }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        pointing = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        pointing = false
+    }
+
+    /// A rounded square 2 pt wider than the symbol on each side, which keeps within the name's height.
+    override func draw(_ dirtyRect: NSRect) {
+        if let backdrop {
+            let side = bounds.width - Self.margin
+            backdrop.setFill()
+            NSBezierPath(
+                roundedRect: NSRect(x: bounds.midX - side / 2, y: bounds.midY - side / 2, width: side, height: side),
+                xRadius: 5, yRadius: 5
+            ).fill()
+        }
+        super.draw(dirtyRect)
+    }
 }
 
 /// Passes on clicks on the parts of the buttons' frames that reach outside the row.

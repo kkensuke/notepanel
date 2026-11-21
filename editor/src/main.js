@@ -590,12 +590,15 @@ function openHistory(list) {
   historyView.hidden = false
   renderHistory()
   historyView.focus()
+  post("historyShown", {shown: true})
 }
 
+// Swift colors the history button while the history is open, and Escape closes it here alone.
 function closeHistory() {
   if (!isHistoryOpen()) return
   historyView.hidden = true
   view.focus()
+  post("historyShown", {shown: false})
 }
 
 function renderHistory() {
