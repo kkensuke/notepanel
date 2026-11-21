@@ -52,12 +52,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var opening = 0
 
     private static let frameName = "Note Panel"
-    /// The panel's size before a saved frame replaces it, which ⌃⌘M goes back to.
-    private var defaultSize = NSSize.zero
-    /// Where ⌃⌘M found the panel and where it put it, so a second press, before the panel moves
-    /// or changes size, takes it back.
-    private var frameBeforeDefault: NSRect?
-    private var defaultFrame: NSRect?
+    /// ⌃⌘M, and the default place for each display that Settings shows and sets.
+    let placement: PanelPlacement
 
     private enum Item {
         static let browse = NSToolbarItem.Identifier("browse")
@@ -71,6 +67,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered, defer: false)
+        placement = PanelPlacement(panel: panel)
         super.init()
         configurePanel()
         configureSide()
@@ -211,67 +208,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return false
     }
 
-    /// ⌃⌘M: the default frame set in Settings for the display with the pointer, or else the panel's
-    /// first size, centered there. Using the pointer's display brings the panel to the display in
-    /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
-    private func toggleDefaultFrame() {
-        if let previous = frameBeforeDefault, panel.frame == defaultFrame {
-            panel.setFrame(previous, display: true)
-            frameBeforeDefault = nil
-            return
-        }
-        let pointer = NSEvent.mouseLocation
-        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) ?? NSScreen.main
-        else { return }
-        frameBeforeDefault = panel.frame
-        let saved = screen.displayKey.flatMap { Prefs.defaultFrame(for: $0) }
-        panel.setFrame(
-            placeOnDisplay(saved: saved, size: defaultSize, display: screen.frame, visible: screen.visibleFrame),
-            display: true)
-        defaultFrame = panel.frame
-    }
-
-    /// The display the panel is on, as Settings shows it, and its default for ⌃⌘M.
-    func defaultPlace() -> DefaultPlace? {
-        guard let screen = panelScreen, let key = screen.displayKey else { return nil }
-        let saved = Prefs.defaultFrame(for: key)
-        let builtIn = screen.displayID.map { CGDisplayIsBuiltin($0) != 0 } ?? false
-        let display = screen.frame
-        let frame = placeOnDisplay(saved: saved, size: defaultSize, display: display, visible: screen.visibleFrame)
-        return DefaultPlace(
-            display: screen.localizedName, builtIn: builtIn, displaySize: display.size,
-            menuBar: display.maxY - screen.visibleFrame.maxY,
-            // AppKit's y goes up from the bottom; screen positions are usually shown from the top-left.
-            frame: NSRect(
-                x: frame.minX - display.minX, y: display.maxY - frame.maxY, width: frame.width, height: frame.height),
-            custom: saved != nil)
-    }
-
     /// Whether the panel's own commands use this key, which Settings won't give a shortcut.
     func panelTakes(_ event: NSEvent) -> Bool {
         panel.takes(event)
-    }
-
-    /// Settings' Use Current: on the panel's display, ⌃⌘M will put the panel where it is now.
-    func useCurrentFrameAsDefault() {
-        guard let screen = panelScreen, let key = screen.displayKey else { return }
-        Prefs.setDefaultFrame(panel.frame.offsetBy(dx: -screen.frame.minX, dy: -screen.frame.minY), for: key)
-    }
-
-    /// Settings' Reset: on the panel's display, ⌃⌘M will use the first size, centered.
-    func useStandardFrame() {
-        guard let key = panelScreen?.displayKey else { return }
-        Prefs.setDefaultFrame(nil, for: key)
-    }
-
-    /// The display most of the panel is on. Worked out from the frame, as `NSWindow.screen` may be
-    /// nil while the panel is hidden.
-    private var panelScreen: NSScreen? {
-        func overlap(_ screen: NSScreen) -> CGFloat {
-            let shared = screen.frame.intersection(panel.frame)
-            return shared.width * shared.height
-        }
-        return NSScreen.screens.filter { overlap($0) > 0 }.max { overlap($0) < overlap($1) }
     }
 
     /// Narrows the name before the toolbar lays out the new width: narrowed only afterwards, a long
@@ -322,7 +261,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         var shortcuts: [(shortcut: Shortcut, repeats: Bool, action: () -> Void)] = []
         if let next { shortcuts.append((next, true, { [weak self] in self?.cycle(1) })) }
         if let previous { shortcuts.append((previous, true, { [weak self] in self?.cycle(-1) })) }
-        if let defaultFrame { shortcuts.append((defaultFrame, false, { [weak self] in self?.toggleDefaultFrame() })) }
+        if let defaultFrame { shortcuts.append((defaultFrame, false, { [weak self] in self?.placement.toggleDefaultFrame() })) }
         panel.shortcuts = shortcuts
         side.shortcuts = shortcuts
     }
@@ -760,7 +699,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.toolbarStyle = .unifiedCompact
 
         // The panel keeps the size the user gives it; nothing resizes it to fit a note.
-        defaultSize = panel.frame.size
+        placement.defaultSize = panel.frame.size
         if !panel.setFrameUsingName(Self.frameName) { panel.center() }
         panel.setFrameAutosaveName(Self.frameName)
     }
@@ -991,21 +930,5 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         // Set directly: the field may still count as editing here. A refused name reverts.
         titleField.stringValue = store.current ?? ""
         sizeTitle()
-    }
-}
-
-extension NSScreen {
-    var displayID: CGDirectDisplayID? {
-        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
-    }
-
-    /// The display's UUID, which lasts across restarts and reconnections, unlike its ID. Mirrored
-    /// displays all go by the one they mirror, whichever of them this screen stands for.
-    var displayKey: String? {
-        guard let id = displayID else { return nil }
-        let mirrored = CGDisplayMirrorsDisplay(id)
-        guard let uuid = CGDisplayCreateUUIDFromDisplayID(mirrored == kCGNullDirectDisplay ? id : mirrored)
-        else { return nil }
-        return CFUUIDCreateString(nil, uuid.takeRetainedValue()) as String
     }
 }

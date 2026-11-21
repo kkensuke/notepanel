@@ -28,9 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.toggleSettings = { [weak self] in self?.settingsWindow.toggle() }
         controller.onScreenChange = { [weak self] in self?.settingsWindow.model.refreshPlace() }
         let model = settingsWindow.model
-        model.describePlace = { [weak self] in self?.controller.defaultPlace() }
-        model.useCurrentFrame = { [weak self] in self?.controller.useCurrentFrameAsDefault() }
-        model.useStandardFrame = { [weak self] in self?.controller.useStandardFrame() }
+        model.describePlace = { [weak self] in self?.controller.placement.defaultPlace() }
+        model.useCurrentFrame = { [weak self] in self?.controller.placement.useCurrentFrameAsDefault() }
+        model.useStandardFrame = { [weak self] in self?.controller.placement.useStandardFrame() }
         model.panelTakes = { [weak self] in self?.controller.panelTakes($0) ?? false }
         model.readKeepHistory = { [weak self] in self?.controller.store.keepHistory ?? .forever }
         model.writeKeepHistory = { [weak self] in try self?.controller.store.setKeepHistory($0) }
