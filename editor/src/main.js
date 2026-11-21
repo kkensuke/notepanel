@@ -530,8 +530,11 @@ function showSwitcher(
   update()
   target.focus()
   if (find) query.select()
-  // Swift brings the window up, if it isn't, and gives it the focus.
-  post("switcherShown", {shown: true})
+  // Swift brings the window up, if it isn't, and gives it the focus. The window is at most as tall
+  // as the search field and ten notes' rows, each twice the text size as style.css makes them,
+  // with the edge above and below.
+  const row = 2 * parseFloat(getComputedStyle(document.body).fontSize)
+  post("switcherShown", {shown: true, height: query.parentElement.offsetHeight + 10 * row + 2})
   if (picked) toFirstRow()
 }
 
@@ -922,14 +925,9 @@ window.receive = ({type, data}) => {
       if (data.land) land(data.land)
       break
     case "marks":
-      // What's typed in the switcher, found in this note as it's typed.
+      // What's typed in the switcher, found in this note as it's typed. Nothing, as the switcher
+      // closes.
       markMatches(data)
-      break
-    case "switcherShown":
-      // The switcher has come up beside the note, and the history would hide what it marks; or it
-      // has closed, and its marks go with it.
-      if (data) closeHistory()
-      else markMatches("")
       break
     case "side":
       // This page is the switcher's, in its own window.
@@ -938,6 +936,17 @@ window.receive = ({type, data}) => {
     case "close":
       closeSwitcher()
       break
+    case "current": {
+      // A note opened some other way than from the list, by ⌃Tab or in place of one moved to the
+      // Trash, is chosen in the list, and what's typed is marked in it.
+      const at = rows.findIndex(row => row.note.id === data)
+      if (at >= 0) {
+        select(at)
+        shown = rows[at]
+      }
+      post("marks", {query: query.value})
+      break
+    }
     case "renamed": {
       const state = states.get(data.from)
       if (state) {

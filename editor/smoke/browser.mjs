@@ -253,6 +253,13 @@ assert.deepEqual(
     document.getElementById("switcher").offsetWidth, innerWidth]),
   ["none", 220, 220])
 assert.equal((await last("switcherShown", side))?.shown, true, "Swift hears that the switcher wants its window")
+// The window is at most as tall as ten notes' rows show whole under the search field.
+const twelve = Array.from({length: 12}, (_, i) => ({id: `N${i}`, title: `N${i}`, text: "", pinned: false}))
+await receive("switcher", {notes: twelve}, side)
+assert.equal(
+  (await last("switcherShown", side))?.height,
+  await side.$eval("#results li:nth-child(10)", e => e.getBoundingClientRect().bottom + 1))
+await receive("switcher", {notes, find: true}, side)
 
 // Fuzzy title search, keyboard selection and trash.
 assert.equal(await focused(), "query")
@@ -450,17 +457,15 @@ assert.equal(await historyOpen(), false)
 assert.equal(await historyShown(), false, "and that Escape closed it")
 assert.equal(await doc(), "now")
 assert.equal(await last("changed"), undefined, "the note never changed")
-// Cmd-Y again closes it, and the switcher or another note takes its place.
+// Cmd-Y again closes it, and another note takes its place. The switcher, in a window of its own,
+// leaves it open.
 await receive("history", {id: "Plan", versions: []})
 assert.equal(await page.$eval("#versions", e => e.textContent), "No earlier versions")
 await receive("history", {id: "Plan", versions: []})
 assert.equal(await historyOpen(), false)
 await receive("history", {id: "Plan", versions: earlier})
-await receive("switcherShown", true)
-assert.equal(await historyOpen(), false)
-assert.equal(await historyShown(), false)
-await receive("switcherShown", false)
-await receive("history", {id: "Plan", versions: earlier})
+await receive("marks", "now")
+assert.equal(await historyOpen(), true)
 await receive("open", {id: "Count", text: "ab\ncd"})
 assert.equal(await historyOpen(), false)
 
@@ -511,6 +516,14 @@ await clear(side)
 await press("Enter", [], side)
 assert.equal(await switcherOpen(), false)
 assert.equal(await last("select", side), undefined)
+// A note opened some other way with the switcher up, by ⌃Tab or in place of one moved to the
+// Trash, is chosen in the list, and what's typed is marked in it. Return closes on it.
+await receive("switcher", {notes: found, current: "Inbox"}, side)
+await clear(side)
+await receive("current", "Budget 2026", side)
+assert.deepEqual([await chosen(), (await last("marks", side))?.query], ["Budget 2026⌘1", ""])
+await press("Enter", [], side)
+assert.deepEqual([await switcherOpen(), await last("select", side)], [false, undefined])
 
 // ⌘F brings it up with the focus in the search field. A search wants every word, in a note's
 // name or in its text. The note in sight is listed first, and the note's page marks its matches as
@@ -554,7 +567,7 @@ assert.equal(await focused(), "results")
 // cursor on the match, so typing replaces it.
 await press("Escape", [], side)
 assert.equal(await switcherOpen(), false)
-await receive("switcherShown", false)
+await receive("marks", "")
 await receive("focus", "")
 assert.deepEqual(await noteMarks(), [])
 await page.keyboard.type("plan")
@@ -572,6 +585,9 @@ await clear(side)
 await side.click("#results .group:nth-child(2) .name")
 assert.equal((await last("select", side))?.id, "Weekly plan")
 assert.deepEqual([await focused(), await chosen()], ["results", "Send the ＢＵＤＧＥＴ draft"])
+// While searching, the note opened some other way is chosen at its first line.
+await receive("current", "Budget 2026", side)
+assert.equal(await chosen(), "Hardware budget was cut.")
 await press("Tab", [], side)
 await press("a", ["Meta"], side)
 await side.keyboard.type("wkpl")

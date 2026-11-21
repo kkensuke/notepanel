@@ -35,6 +35,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// kept when the switcher closes.
     private var sideWidth = CGFloat(
         max(Prefs.minSideWidth, UserDefaults.standard.object(forKey: "sideWidth") as? Double ?? Prefs.defaultSideWidth))
+    /// How tall the switcher's window may be, as its page says: ten rows under the search field.
+    private var sideHeight = CGFloat.greatestFiniteMagnitude
     /// Where the panel was and where it went, when it moved right to make room for the switcher.
     private var shift: (from: NSRect, to: NSRect)?
     private var buttons: [NSButton] = []
@@ -135,12 +137,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func setSwitcherShown(_ shown: Bool) {
         if shown != switcherShown {
             switcherShown = shown
-            bridge.send("switcherShown", shown)
             if shown {
                 // Where the display has no room at the panel's left, the panel moves right while
                 // the switcher is up, and back when it closes, unless it was moved meanwhile.
                 // shortcut: checked only as the switcher opens; a panel moved to the display's
-                // left edge while it's up takes the switcher off the display.
+                // left edge while it's up, by hand or by ⌃⌘M, takes the switcher off the display.
                 let room = panel.frame.minX - (panel.screen?.visibleFrame.minX ?? panel.frame.minX - sideWidth)
                 if room < sideWidth {
                     let from = panel.frame
@@ -150,6 +151,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             } else {
                 panel.removeChildWindow(side)
                 side.orderOut(nil)
+                bridge.send("marks", "")
                 UserDefaults.standard.set(Double(sideWidth), forKey: "sideWidth")
                 if let shift, panel.frame == shift.to { panel.setFrame(shift.from, display: true) }
                 shift = nil
@@ -164,12 +166,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         focusSwitcher()
     }
 
-    /// The switcher's window goes at the panel's left, flush with it, from under the title bar to
-    /// the bottom: beside the note's page.
+    /// The switcher's window goes at the panel's left, flush with it, from under the title bar down
+    /// to the panel's bottom, or as far as its page asks.
     private func placeSide() {
         let page = panel.convertToScreen(bridge.webView.convert(bridge.webView.bounds, to: nil))
-        side.setFrame(NSRect(x: page.minX - sideWidth, y: page.minY, width: sideWidth, height: page.height), display: true)
-        side.invalidateShadow()
+        let height = min(page.height, sideHeight)
+        side.setFrame(
+            NSRect(x: page.minX - sideWidth, y: page.maxY - height, width: sideWidth, height: height), display: true)
     }
 
     private func attachSide() {
@@ -212,9 +215,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// first size, centered there. Using the pointer's display brings the panel to the display in
     /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
     private func toggleDefaultFrame() {
-        // shortcut: the switcher gets room at the panel's left only as it opens, so ⌃⌘M waits until
-        // it closes.
-        guard !switcherShown else { return }
         if let previous = frameBeforeDefault, panel.frame == defaultFrame {
             panel.setFrame(previous, display: true)
             frameBeforeDefault = nil
@@ -343,10 +343,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             scrim.fillColor = color
         }
         // With nothing behind the text, the shadow would outline the letters.
-        for window in [panel, side] {
-            window.hasShadow = fade > 0
-            window.invalidateShadow()
-        }
+        panel.hasShadow = fade > 0
+        panel.invalidateShadow()
     }
 
     /// Cmd-plus and Cmd-minus step the note's text size; Cmd-0 sets it back to the default.
@@ -409,6 +407,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         case "marks":
             bridge.send("marks", body["query"] as? String ?? "")
         case "switcherShown":
+            if let height = body["height"] as? Double { sideHeight = CGFloat(height) }
             setSwitcherShown(body["shown"] as? Bool ?? false)
         case "sideWidth":
             // As far as the display goes to the left.
@@ -440,16 +439,20 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         return true
     }
 
-    /// Shows the open note in the page. A note opened some other way than from the switcher's list
-    /// closes the switcher. `land` is where the switcher's row puts the cursor, which the page
-    /// works out.
+    /// Shows the open note in the page. `land` is where the switcher's row puts the cursor, which
+    /// the page works out. A note opened some other way than from the switcher's list closes the
+    /// switcher, or with `keepSwitcher` is chosen in its list.
     private func showNote(keepSwitcher: Bool = false, land: Any? = nil) {
         guard let name = store.current else { return }
         opening += 1
         var message: [String: Any] = ["id": name, "text": store.text, "opening": opening]
         message["land"] = land
         bridge.send("open", message)
-        if !keepSwitcher { closeSwitcher() }
+        if !keepSwitcher {
+            closeSwitcher()
+        } else if land == nil, switcherShown {
+            sideBridge.send("current", name)
+        }
         rememberCurrent()
         updateTitle()
     }
@@ -486,7 +489,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         guard let current = store.current, let index = names.firstIndex(of: current) else { return }
         let count = names.count
         let others = (1..<count).map { names[((index + step * $0) % count + count) % count] }
-        if let next = others.first(where: { store.read($0) != nil }) { open(next) }
+        if let next = others.first(where: { store.read($0) != nil }) { open(next, keepSwitcher: true) }
     }
 
     /// Every rename comes through here, from the store: the user's, a file following its
@@ -548,8 +551,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
         Prefs.setPinned(Prefs.pinned(in: store.folder).filter { $0 != trashed }, in: store.folder)
         bridge.send("trashed", trashed)
-        if store.current == nil { openSomeNote(keepSwitcher: true) }
         sideBridge.send("notes", notesForSwitcher())
+        if store.current == nil { openSomeNote(keepSwitcher: true) }
     }
 
     private func togglePin(_ name: String) {
@@ -619,11 +622,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func toggleHistory() {
         save()
         guard let name = store.current else { return }
-        // The history would cover the note the switcher shows.
-        closeSwitcher()
         let dates = ISO8601DateFormatter()
         let versions = store.versions(of: name).map { ["date": dates.string(from: $0.date), "text": $0.text] }
         bridge.send("history", ["id": name, "versions": versions])
+        // It takes the keys, also from the switcher, which stays beside it.
+        panel.makeKey()
+        focusEditor()
     }
 
     /// Pinned notes first, in the order the user gave them, then the rest, newest first. The
@@ -772,7 +776,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         side.collectionBehavior = panel.collectionBehavior
         side.isOpaque = false
         side.backgroundColor = .clear
-        side.hasShadow = true
+        // As the key window, it would get a shadow drawn round its frame's square corners, not
+        // the glass's round ones.
+        side.hasShadow = false
         side.isReleasedWhenClosed = false
         side.commands = panel.commands
         side.onZoom = panel.onZoom
