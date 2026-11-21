@@ -135,6 +135,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             // To the left, as far as the display has room; the rest goes to the right.
             let least = panel.screen?.visibleFrame.minX ?? frame.minX - side
             frame.origin.x = min(frame.minX, max(least, frame.minX - side))
+            // shortcut: any change of the panel's width now is the switcher's, so the note's own
+            // width can't be changed until the switcher closes.
             panel.minSize = NSSize(width: noteFrame.width + CGFloat(Prefs.minSideWidth), height: 160)
             panel.setFrame(frame, display: true)
             wideFrame = panel.frame

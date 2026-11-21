@@ -721,6 +721,7 @@ function noteRow(note) {
   // ⌘1 to ⌘9 open the first nine pinned notes, which Swift lists first. The key is also what a
   // pinned note is dragged by, which leaves the row's width to the name; ⌥↑ and ⌥↓ do the same
   // from the keyboard.
+  // shortcut: a pinned note past the ninth has no key, so only ⌥↑ and ⌥↓ move it.
   const number = note.pinned ? notes.findIndex(({id}) => id === note.id) + 1 : 0
   const key = element("span", "key", number >= 1 && number <= 9 ? `⌘${number}` : "")
   if (canMove(note)) {
