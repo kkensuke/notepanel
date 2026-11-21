@@ -30,53 +30,63 @@ final class NotePanel: NSPanel {
     // and Redo to a text field. Everything else, including Cmd-Z in the editor and its key repeats,
     // goes on to the editor page.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
-        // Shift is allowed, since on some keyboards "+" needs it.
-        if modifiers.subtracting(.shift) == .command, let key = event.charactersIgnoringModifiers,
-            let step = Self.zoomSteps[key]
-        {
-            onZoom(step)
-            return true
-        }
-        // With Shift, a command is looked up by the character typed, such as "?" for ⇧⌘/.
-        if modifiers.subtracting(.shift) == .command, let typed = event.charactersIgnoringModifiers {
-            let key = modifiers.contains(.shift) ? typed : typed.lowercased()
-            if let command = commands[key] {
+        if let route = route(event) {
+            switch route {
+            case .zoom(let step):
+                onZoom(step)
+                return true
+            case .command(let command):
                 if !event.isARepeat { command() }
                 return true
-            }
-            if modifiers == .command, let action = Self.editActions[key] {
+            case .edit(let action):
                 return NSApp.sendAction(action, to: nil, from: self)
             }
-            // Select All, Undo and Redo, in a text field such as the note's name. In the editor
-            // they must reach CodeMirror, so they go on to the page.
-            if let text = firstResponder as? NSText {
-                switch key.lowercased() {
-                case "a" where modifiers == .command:
-                    text.selectAll(nil)
-                case "z" where modifiers == .command:
-                    if let history = text.undoManager, history.canUndo { history.undo() }
-                case "z":  // With Shift
-                    if let history = text.undoManager, history.canRedo { history.redo() }
-                default:
-                    return super.performKeyEquivalent(with: event)
-                }
-                return true
+        }
+        // Select All, Undo and Redo, in a text field such as the note's name. In the editor they
+        // must reach CodeMirror, so they go on to the page.
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        if modifiers.subtracting(.shift) == .command, let typed = event.charactersIgnoringModifiers,
+            let text = firstResponder as? NSText
+        {
+            switch typed.lowercased() {
+            case "a" where modifiers == .command:
+                text.selectAll(nil)
+            case "z" where modifiers == .command:
+                if let history = text.undoManager, history.canUndo { history.undo() }
+            case "z":  // With Shift
+                if let history = text.undoManager, history.canRedo { history.redo() }
+            default:
+                return super.performKeyEquivalent(with: event)
             }
+            return true
         }
         return super.performKeyEquivalent(with: event)
     }
 
     /// Whether `performKeyEquivalent` always keeps this key for the panel: zoom, a command, or cut,
-    /// copy or paste. Settings won't give a shortcut these keys. Keep it in step with that method.
+    /// copy or paste. Settings won't give a shortcut these keys.
     func takes(_ event: NSEvent) -> Bool {
+        route(event) != nil
+    }
+
+    private enum Route {
+        case zoom(Int)
+        case command(() -> Void)
+        case edit(Selector)
+    }
+
+    /// What a key the panel always keeps does. Shift is allowed, since on some keyboards "+" needs
+    /// it, and with Shift a command is looked up by the character typed, such as "?" for ⇧⌘/.
+    private func route(_ event: NSEvent) -> Route? {
         let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
         guard modifiers.subtracting(.shift) == .command, let typed = event.charactersIgnoringModifiers else {
-            return false
+            return nil
         }
+        if let step = Self.zoomSteps[typed] { return .zoom(step) }
         let key = modifiers.contains(.shift) ? typed : typed.lowercased()
-        return Self.zoomSteps[typed] != nil || commands[key] != nil
-            || (modifiers == .command && Self.editActions[key] != nil)
+        if let command = commands[key] { return .command(command) }
+        if modifiers == .command, let action = Self.editActions[key] { return .edit(action) }
+        return nil
     }
 
     private func runShortcut(_ event: NSEvent) -> Bool {
