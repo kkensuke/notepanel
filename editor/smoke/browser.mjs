@@ -382,8 +382,10 @@ const earlier = [
   {date: new Date(Date.now() - 40 * 86_400_000).toISOString(), text: "older\ntext"},
 ]
 const historyOpen = () => page.evaluate(() => !document.getElementById("history").hidden)
+const historyShown = async () => (await last("historyShown"))?.shown
 await receive("history", {id: "Plan", versions: earlier})
 assert.equal(await historyOpen(), true)
+assert.equal(await historyShown(), true, "Swift hears that the history opened")
 assert.equal(await page.evaluate(() => document.activeElement.id), "history")
 assert.equal(await page.$eval("#editor", e => getComputedStyle(e).opacity), "0", "the note is out of sight")
 assert.match(await page.$eval("#versions li .title", e => e.textContent), /^Today \d+:\d\d$/)
@@ -406,6 +408,7 @@ await page.click("#versions li:first-child")
 assert.equal(await page.$eval("#version", e => e.textContent), "a minute ago")
 await press("Escape")
 assert.equal(await historyOpen(), false)
+assert.equal(await historyShown(), false, "and that Escape closed it")
 assert.equal(await doc(), "now")
 assert.equal(await last("changed"), undefined, "the note never changed")
 // Cmd-Y again closes it, and the switcher or another note takes its place.
@@ -416,6 +419,7 @@ assert.equal(await historyOpen(), false)
 await receive("history", {id: "Plan", versions: earlier})
 await receive("switcher", {notes, force: true})
 assert.equal(await historyOpen(), false)
+assert.equal(await historyShown(), false)
 await press("Escape")
 await receive("history", {id: "Plan", versions: earlier})
 await receive("open", {id: "Count", text: "ab\ncd"})
