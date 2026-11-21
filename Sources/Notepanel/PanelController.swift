@@ -112,7 +112,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     func search() {
         let wasHidden = !panel.isVisible
         show()
-        showSwitcher(find: true, dismiss: wasHidden)
+        showSwitcher(find: true, force: true, dismiss: wasHidden)
     }
 
     /// The switcher is outside the note: the panel grows to the left by the switcher's width when
@@ -490,18 +490,21 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if pinned.indices.contains(number - 1) { open(pinned[number - 1].name) }
     }
 
-    /// ⌘P and the list button: the switcher with the focus in its list, to go from note to note.
-    /// The page closes it if the focus is there already.
+    /// ⌘P: the switcher with the focus in its list, to go from note to note. The page closes it
+    /// if the focus is there already, as it does for ⌘F and the search field.
     private func toggleSwitcher() {
         showSwitcher(find: false)
     }
 
     /// Saves first, so the list has the open note under the name its first line gives it.
-    /// With `find` the focus goes to the search field. With `dismiss`, Escape in the switcher
-    /// hides the panel too.
-    private func showSwitcher(find: Bool, dismiss: Bool = false) {
+    /// With `find` the focus goes to the search field, and else to the list. `force` never closes
+    /// the switcher, and `toggle` closes it wherever the focus is. With `dismiss`, Escape in the
+    /// switcher hides the panel too.
+    private func showSwitcher(find: Bool, force: Bool = false, toggle: Bool = false, dismiss: Bool = false) {
         save()
-        bridge.send("switcher", ["notes": notesForSwitcher(), "find": find, "dismiss": dismiss])
+        bridge.send(
+            "switcher",
+            ["notes": notesForSwitcher(), "find": find, "force": force, "toggle": toggle, "dismiss": dismiss])
     }
 
     /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes
@@ -771,7 +774,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     @objc private func historyClicked() { toggleHistory() }
     @objc private func newNoteClicked() { newNote() }
-    @objc private func browseClicked() { toggleSwitcher() }
+    @objc private func browseClicked() { showSwitcher(find: false, toggle: true) }
     @objc private func openFolderClicked() { openFolder() }
 
     // MARK: - The title

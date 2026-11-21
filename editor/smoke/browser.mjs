@@ -589,6 +589,14 @@ assert.deepEqual(await groups(), [["Inbox"]])
 await press("ArrowDown")
 assert.deepEqual([await queryValue(), await focused()], ["in", "query"])
 await press("Escape")
+// A search is remembered once it's used, without closing the switcher, and a search the field
+// already has is passed over.
+await receive("switcher", {notes: found, find: true})
+await page.keyboard.type("dentist")
+await press("Enter")
+await press("ArrowUp")
+assert.equal(await queryValue(), "in")
+await press("Escape")
 
 // Brought up by the search hot key, the panel goes with the switcher on Escape.
 await receive("switcher", {notes: found, find: true, dismiss: true})
@@ -600,11 +608,23 @@ await receive("switcher", {notes: found, find: true})
 await clear()
 await press("Escape")
 assert.equal(await last("escape"), undefined, "opened in the panel, the switcher closes alone")
-// ⌘P with the focus in the list closes the switcher; from the field it takes the focus there.
+// ⌘P and ⌘F are toggles: with the focus already where the key puts it, the switcher closes, and
+// else the focus goes there. The list button closes it from anywhere; the search hot key never.
 await receive("switcher", {notes: found, find: true})
 await receive("switcher", {notes: found})
 assert.deepEqual([await switcherOpen(), await focused()], [true, "results"])
+await receive("switcher", {notes: found, find: true})
+assert.deepEqual([await switcherOpen(), await focused()], [true, "query"])
+await receive("switcher", {notes: found, find: true, force: true})
+assert.equal(await switcherOpen(), true)
+await receive("switcher", {notes: found, find: true})
+assert.equal(await switcherOpen(), false)
 await receive("switcher", {notes: found})
+await receive("switcher", {notes: found})
+assert.equal(await switcherOpen(), false)
+await receive("switcher", {notes: found, toggle: true})
+await press("Tab")
+await receive("switcher", {notes: found, toggle: true})
 assert.equal(await switcherOpen(), false)
 
 assert.deepEqual(errors, [])

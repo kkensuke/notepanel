@@ -480,21 +480,23 @@ function dragPinned(event, note) {
   addEventListener("mouseup", drop)
 }
 
-// ⌘P and the list button bring the switcher up with the focus in the list, on the open note, so
-// the arrows go from note to note at once. ⌘F and the search hot key bring it up with the focus
-// in the search field. Up already, it takes the focus where it's asked for, and ⌘P with the focus
-// already in the list closes it.
-function showSwitcher(list, find, fromHotKey) {
+// ⌘P brings the switcher up with the focus in the list, on the open note, so the arrows go from
+// note to note at once. ⌘F brings it up with the focus in the search field. Each is a toggle:
+// pressed with the focus already where it puts it, it closes the switcher, and otherwise takes
+// the focus there. The list button closes the switcher wherever the focus is (`toggle`), and the
+// search hot key never does (`force`).
+function showSwitcher(list, {find = false, force = false, toggle = false, dismiss: fromHotKey = false}) {
   notes = list
-  if (isSwitcherOpen() && !find && document.activeElement === results) return closeSwitcher()
+  const target = find ? query : results
+  if (isSwitcherOpen() && !force && (toggle || document.activeElement === target)) return closeSwitcher()
   if (!isSwitcherOpen()) {
     closeHistory()
     dismiss = fromHotKey
     origin = currentId
     query.value = ""
     back = 0
-    // The note keeps the width it has, at the right. Swift widens the panel to the left once the
-    // page says the switcher is up, and that is the switcher's room.
+    // The note keeps the width it has, at the right. Swift gives the switcher its room at the
+    // left once the page says the switcher is up.
     page.style.setProperty("--note-width", `${page.clientWidth}px`)
     for (const part of beside) part.classList.add("beside")
     switcher.hidden = false
@@ -502,16 +504,11 @@ function showSwitcher(list, find, fromHotKey) {
     selected = Math.max(0, notes.findIndex(note => note.id === currentId))
   }
   update()
-  if (find) {
-    query.focus()
-    query.select()
-  } else {
-    results.focus()
-  }
+  target.focus()
+  if (find) query.select()
 }
 
-// Every way out of the switcher comes through here, so here is where a search is remembered.
-// The note in sight stays the open one.
+// The note in sight stays the open one. A search not used yet is remembered here.
 function closeSwitcher() {
   if (!isSwitcherOpen()) return
   remember()
@@ -527,9 +524,10 @@ new ResizeObserver(() => {
   if (!isSwitcherOpen()) for (const part of beside) part.classList.remove("beside")
 }).observe(page)
 
-// What was searched for before, oldest first. In the search field ↑ goes back through them and
-// ↓ comes forward again, as in VS Code, as far as what was typed before going back. `back` is how
-// many back the field is.
+// What was searched for before, oldest first. A search is remembered once it's used, to go to a
+// row, or as the switcher closes. In the search field ↑ goes back through them and ↓ comes
+// forward again, as in VS Code, as far as what was typed before going back. `back` is how many
+// back the field is.
 // shortcut: lasts until the app quits; send it to Swift to keep it.
 const searches = []
 let back = 0
@@ -542,10 +540,13 @@ function remember() {
   if (at >= 0) searches.splice(at, 1)
   searches.push(text)
   if (searches.length > 50) searches.shift()
+  back = 0
 }
 
 function recall(step) {
-  const to = back + step
+  let to = back + step
+  // A search the field already has is no step.
+  while (to > 0 && searches[searches.length - to] === query.value.trim()) to += step
   if (to < 0 || to > searches.length) return
   if (!back) typed = query.value
   back = to
@@ -568,6 +569,7 @@ function show(index) {
   select(index)
   const row = rows[selected]
   if (!row || row === shown) return
+  remember()
   shown = row
   choose(row, true)
 }
@@ -929,7 +931,7 @@ window.receive = ({type, data}) => {
       if (currentId === data) currentId = null
       break
     case "switcher":
-      showSwitcher(lineFeeds(data.notes), data.find === true, data.dismiss === true)
+      showSwitcher(lineFeeds(data.notes), data)
       break
     case "notes":
       if (isSwitcherOpen()) {
