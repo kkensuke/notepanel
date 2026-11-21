@@ -13,6 +13,7 @@
   --link: LinkText;
   --border: rgb(0 0 0 / 0.12);
   --panel: rgb(0 0 0 / 0.04);
+  --rule: rgb(0 0 0 / 0.22);
   --code: color-mix(in srgb, #c2185b 75%, CanvasText);
   --selection: rgb(0 0 0 / 0.09);
   --match: rgb(0 0 0 / 0.045);
@@ -31,6 +32,7 @@
     --muted: rgb(255 255 255 / 0.4);
     --border: rgb(255 255 255 / 0.1);
     --panel: rgb(255 255 255 / 0.05);
+    --rule: rgb(255 255 255 / 0.22);
     --selection: rgb(255 255 255 / 0.1);
     --match: rgb(255 255 255 / 0.05);
     --search: rgb(255 214 10 / 0.32);
@@ -124,6 +126,15 @@ footer {
   display: none;
 }
 
+/* The switcher is a sheet, with the search field and the list. */
+.sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+}
+
 #history:focus {
   outline: none;
 }
@@ -136,35 +147,80 @@ footer {
   padding: 4px 8px 8px;
 }
 
+/* The field's icon stands over the rows' handles, and its text over their names. */
+.field {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: calc(var(--ui-size) * 0.8);
+  white-space: nowrap;
+}
+
 #query {
-  box-sizing: border-box;
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  border: none;
+  background: none;
   color: var(--fg);
   font: var(--ui-size) -apple-system, BlinkMacSystemFont, sans-serif;
   outline: none;
 }
 
-#query:focus {
-  border-color: var(--accent);
-}
-
+/* The room above the list is outside it: what scrolls is rows and nothing else, so a list as
+   tall as some rows shows whole rows wherever it's scrolled to. */
 #results {
   flex: 1;
   min-height: 0;
-  margin: 6px 0 0;
-  padding: 0;
+  margin: 4px 0 0;
+  padding: 0 8px;
   overflow-y: auto;
   list-style: none;
 }
 
-#results li,
-#versions li {
+/* With nothing typed, a row is a note: its handle, its name and its buttons. A row's height is
+   a whole number of pixels at any text size, so that the list can end at a row's edge. */
+#results li {
+  --row: calc(var(--ui-size) * 2);
   display: grid;
   grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  min-height: var(--row);
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: default;
+}
+
+/* While searching, the list is the notes found: each a name with, under it, the lines of its
+   text that matched. The lines are the rows to choose. A name stands where it does with nothing
+   typed, under the search field's text, and its lines start at a rule under its first letter. */
+#results .group {
+  display: block;
+  min-height: 0;
+  padding: 0;
+}
+
+.name,
+.line {
+  --row: calc(var(--ui-size) * 2 - 4px);
+  padding: 0 8px 0 calc(var(--ui-size) + 16px);
+  border-radius: 6px;
+}
+
+/* A line brought into view from above stops a row short of the list's top, so the row over it
+   shows too: its note's name, if it's the first of the note's lines. */
+.line {
+  scroll-margin-top: var(--row);
+}
+
+#versions li {
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
   column-gap: 8px;
   padding: 5px 8px;
@@ -173,12 +229,12 @@ footer {
 }
 
 /* The row under the pointer gets about half the selected row's tint. */
-#results li:hover,
+#results [role="option"]:hover,
 #versions li[role="option"]:hover {
   background: var(--match);
 }
 
-#results li[aria-selected="true"],
+#results [aria-selected="true"],
 #versions li[aria-selected="true"] {
   background: var(--selection);
 }
@@ -193,12 +249,9 @@ footer {
   list-style: none;
 }
 
-#versions li {
-  grid-template-columns: 1fr auto;
-}
-
+#results .empty,
 #versions .empty {
-  display: block;
+  display: flex;
   color: var(--muted);
 }
 
@@ -219,17 +272,35 @@ footer {
   display: none;
 }
 
+/* As tall as the row: the box that cuts a long text short would cut a match's underline off a
+   line of Latin letters, which is no taller than the letters. */
 .title,
 .snippet {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: var(--row);
 }
 
+/* The rule that a note's lines start at is each line's own edge, and as tall as the row, so it
+   runs on from line to line. */
 .snippet {
-  grid-column: 2 / -1;
+  padding-left: 10px;
+  border-left: 1px solid var(--rule);
   color: var(--muted);
-  font-size: calc(var(--ui-size) * 0.85);
+  font-size: calc(var(--ui-size) * 0.87);
+}
+
+/* What matched the search, in a name or a line of text. */
+#results mark {
+  background: none;
+  color: var(--fg);
+  text-decoration-line: underline;
+  text-decoration-color: var(--search-current);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.15em;
 }
 
 .grip {
@@ -288,7 +359,9 @@ body.dragging * {
 }
 
 .action svg,
-.grip svg {
+.grip svg,
+.field svg {
+  flex: none;
   width: var(--ui-size);
   height: var(--ui-size);
   fill: none;

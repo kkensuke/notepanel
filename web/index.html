@@ -11,9 +11,13 @@
     <span id="count"></span>
   </footer>
   <div id="switcher" hidden>
-    <div class="box">
-      <input id="query" type="text" placeholder="Search notes" aria-label="Search notes"
-             aria-controls="results" autocomplete="off" spellcheck="false">
+    <div class="sheet">
+      <label class="field">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></svg>
+        <input id="query" type="text" placeholder="Search notes" aria-label="Search notes"
+               aria-controls="results" autocomplete="off" spellcheck="false">
+        <span id="total" role="status"></span>
+      </label>
       <ul id="results" role="listbox" aria-label="Notes"></ul>
     </div>
   </div>
