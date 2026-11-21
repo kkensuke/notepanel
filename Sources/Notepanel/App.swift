@@ -79,21 +79,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The data folder holds how long the history keeps versions.
         settingsWindow.model.refreshKeepHistory()
         controller.setOptions(
-            fontFamily: defaults.string(forKey: "fontFamily") ?? "",
-            fontSize: defaults.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize,
-            uiFontSize: defaults.object(forKey: "uiFontSize") as? Double ?? Prefs.defaultUIFontSize,
-            showWhitespace: defaults.bool(forKey: "showWhitespace"),
-            indentSize: defaults.object(forKey: "indentSize") as? Int ?? 4)
+            fontFamily: defaults.string(forKey: Prefs.Key.fontFamily) ?? "",
+            fontSize: defaults.object(forKey: Prefs.Key.fontSize) as? Double ?? Prefs.defaultFontSize,
+            uiFontSize: defaults.object(forKey: Prefs.Key.uiFontSize) as? Double ?? Prefs.defaultUIFontSize,
+            showWhitespace: defaults.bool(forKey: Prefs.Key.showWhitespace),
+            indentSize: defaults.object(forKey: Prefs.Key.indentSize) as? Int ?? Prefs.defaultIndentSize)
         controller.setPanelShortcuts(
-            next: Prefs.shortcut("shortcut.nextNote"), previous: Prefs.shortcut("shortcut.previousNote"),
-            defaultFrame: Prefs.shortcut("shortcut.defaultFrame"))
+            next: Prefs.shortcut(Prefs.Key.shortcutNextNote), previous: Prefs.shortcut(Prefs.Key.shortcutPreviousNote),
+            defaultFrame: Prefs.shortcut(Prefs.Key.shortcutDefaultFrame))
         controller.setBackgroundOpacity(
-            defaults.object(forKey: "backgroundOpacity") as? Double ?? Prefs.defaultBackgroundOpacity)
+            defaults.object(forKey: Prefs.Key.backgroundOpacity) as? Double ?? Prefs.defaultBackgroundOpacity)
         // Use Current and Reset change the defaults for ⌃⌘M, which Settings shows.
         settingsWindow.model.refreshPlace()
         // Compared with what was applied last, not with isVisible: setting isVisible saves it to
         // UserDefaults, which runs this again from inside the setter, maybe before isVisible changes.
-        let showIcon = defaults.object(forKey: "showMenuBarIcon") as? Bool ?? true
+        let showIcon = defaults.object(forKey: Prefs.Key.showMenuBarIcon) as? Bool ?? Prefs.defaultShowMenuBarIcon
         if showIcon != showsIcon {
             showsIcon = showIcon
             statusItem.isVisible = showIcon

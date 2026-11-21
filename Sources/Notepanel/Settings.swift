@@ -80,12 +80,12 @@ final class SettingsModel {
     var tab = SettingsTab.general { didSet { stopRecording() } }
     private(set) var openAtLogin = false
     private(set) var loginError: String?
-    let toggleShortcut = ShortcutRecorder(name: "hotkey.toggle", title: "Show or hide notes")
-    let createShortcut = ShortcutRecorder(name: "hotkey.create", title: "New note")
-    let searchShortcut = ShortcutRecorder(name: "hotkey.search", title: "Search notes")
-    let nextShortcut = ShortcutRecorder(name: "shortcut.nextNote", title: "Next note", global: false)
-    let previousShortcut = ShortcutRecorder(name: "shortcut.previousNote", title: "Previous note", global: false)
-    let defaultFrameShortcut = ShortcutRecorder(name: "shortcut.defaultFrame", title: "Default place", global: false)
+    let toggleShortcut = ShortcutRecorder(name: Prefs.Key.hotkeyToggle, title: "Show or hide notes")
+    let createShortcut = ShortcutRecorder(name: Prefs.Key.hotkeyCreate, title: "New note")
+    let searchShortcut = ShortcutRecorder(name: Prefs.Key.hotkeySearch, title: "Search notes")
+    let nextShortcut = ShortcutRecorder(name: Prefs.Key.shortcutNextNote, title: "Next note", global: false)
+    let previousShortcut = ShortcutRecorder(name: Prefs.Key.shortcutPreviousNote, title: "Previous note", global: false)
+    let defaultFrameShortcut = ShortcutRecorder(name: Prefs.Key.shortcutDefaultFrame, title: "Default place", global: false)
     /// Whether the panel's own commands use a key. The app sets it, as it has the panel.
     var panelTakes: (NSEvent) -> Bool = { _ in false }
     /// The display the panel is on and its default for ⌃⌘M, and setting that default. The app sets
@@ -210,13 +210,13 @@ struct DefaultPlace {
 
 struct SettingsView: View {
     let model: SettingsModel
-    @AppStorage("dataFolder") private var dataFolder = Prefs.defaultDataFolder
-    @AppStorage("fontFamily") private var fontFamily = ""
-    @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
-    @AppStorage("backgroundOpacity") private var backgroundOpacity = Prefs.defaultBackgroundOpacity
-    @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
-    @AppStorage("showWhitespace") private var showWhitespace = false
-    @AppStorage("indentSize") private var indentSize = 4
+    @AppStorage(Prefs.Key.dataFolder) private var dataFolder = Prefs.defaultDataFolder
+    @AppStorage(Prefs.Key.fontFamily) private var fontFamily = ""
+    @AppStorage(Prefs.Key.uiFontSize) private var uiFontSize = Prefs.defaultUIFontSize
+    @AppStorage(Prefs.Key.backgroundOpacity) private var backgroundOpacity = Prefs.defaultBackgroundOpacity
+    @AppStorage(Prefs.Key.showMenuBarIcon) private var showMenuBarIcon = Prefs.defaultShowMenuBarIcon
+    @AppStorage(Prefs.Key.showWhitespace) private var showWhitespace = false
+    @AppStorage(Prefs.Key.indentSize) private var indentSize = Prefs.defaultIndentSize
 
     var body: some View {
         VStack(spacing: 0) {

@@ -177,7 +177,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         guard dataFolder.standardizedFileURL != store.dataFolder.standardizedFileURL else { return }
         titleBar.finishTitle()
         store.setFolder(dataFolder)
-        UserDefaults.standard.removeObject(forKey: "lastNote")
+        UserDefaults.standard.removeObject(forKey: Prefs.Key.lastNote)
         // A note that couldn't be saved in the old folder is still open, and is the new folder's now.
         if store.current == nil { openSomeNote() } else { rememberCurrent() }
     }
@@ -219,9 +219,9 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// It's the same setting as in the settings window.
     private func zoom(_ step: Int) {
         let defaults = UserDefaults.standard
-        let size = defaults.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize
+        let size = defaults.object(forKey: Prefs.Key.fontSize) as? Double ?? Prefs.defaultFontSize
         let new = step == 0 ? Prefs.defaultFontSize : size + Double(step)
-        defaults.set(min(Prefs.fontSizes.upperBound, max(Prefs.fontSizes.lowerBound, new)), forKey: "fontSize")
+        defaults.set(min(Prefs.fontSizes.upperBound, max(Prefs.fontSizes.lowerBound, new)), forKey: Prefs.Key.fontSize)
     }
 
     // MARK: - Messages from the pages
@@ -323,7 +323,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func openSomeNote(keepSwitcher: Bool = false) {
         let names = store.list().map(\.name)
         var candidates = names
-        if let last = UserDefaults.standard.string(forKey: "lastNote"), names.contains(last) {
+        if let last = UserDefaults.standard.string(forKey: Prefs.Key.lastNote), names.contains(last) {
             candidates.insert(last, at: 0)
         }
         for name in candidates {
@@ -515,7 +515,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     private func rememberCurrent() {
-        UserDefaults.standard.set(store.current, forKey: "lastNote")
+        UserDefaults.standard.set(store.current, forKey: Prefs.Key.lastNote)
     }
 
     // MARK: - Window

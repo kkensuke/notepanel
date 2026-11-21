@@ -18,6 +18,29 @@ struct Shortcut: Codable, Equatable {
 
 /// Settings live in UserDefaults. The settings window edits the same keys through @AppStorage.
 enum Prefs {
+    /// The names settings are kept under. They must never change: under a new name, what the
+    /// user set is gone.
+    enum Key {
+        static let dataFolder = "dataFolder"
+        static let fontFamily = "fontFamily"
+        static let fontSize = "fontSize"
+        static let uiFontSize = "uiFontSize"
+        static let backgroundOpacity = "backgroundOpacity"
+        static let showWhitespace = "showWhitespace"
+        static let indentSize = "indentSize"
+        static let showMenuBarIcon = "showMenuBarIcon"
+        static let defaultFrames = "defaultFrames"
+        static let pinned = "pinned"
+        static let lastNote = "lastNote"
+        static let sideWidth = "sideWidth"
+        static let hotkeyToggle = "hotkey.toggle"
+        static let hotkeyCreate = "hotkey.create"
+        static let hotkeySearch = "hotkey.search"
+        static let shortcutNextNote = "shortcut.nextNote"
+        static let shortcutPreviousNote = "shortcut.previousNote"
+        static let shortcutDefaultFrame = "shortcut.defaultFrame"
+    }
+
     static let defaultDataFolder = "~/Library/Application Support/notepanel"
     static let defaultFontSize = 14.0
     static let fontSizes = 9.0...36.0
@@ -32,18 +55,21 @@ enum Prefs {
     /// The note panel's background, not its text: 0 is clear, 1 is solid, and the default in
     /// between is tinycast's glass and scrim.
     static let defaultBackgroundOpacity = 0.5
+    /// The spaces the Tab key adds, 2 or 4.
+    static let defaultIndentSize = 4
+    static let defaultShowMenuBarIcon = true
     /// Global shortcuts, which work from any app.
-    static let hotKeyNames = ["hotkey.toggle", "hotkey.create", "hotkey.search"]
+    static let hotKeyNames = [Key.hotkeyToggle, Key.hotkeyCreate, Key.hotkeySearch]
     static let defaultShortcuts: [String: Shortcut] = [
-        "hotkey.toggle": Shortcut(keyCode: kVK_ANSI_N, modifiers: controlKey | cmdKey, display: "⌃⌘N"),
-        "shortcut.nextNote": Shortcut(keyCode: kVK_Tab, modifiers: controlKey, display: "⌃⇥"),
-        "shortcut.previousNote": Shortcut(keyCode: kVK_Tab, modifiers: controlKey | shiftKey, display: "⌃⇧⇥"),
-        "shortcut.defaultFrame": Shortcut(keyCode: kVK_ANSI_M, modifiers: controlKey | cmdKey, display: "⌃⌘M"),
+        Key.hotkeyToggle: Shortcut(keyCode: kVK_ANSI_N, modifiers: controlKey | cmdKey, display: "⌃⌘N"),
+        Key.shortcutNextNote: Shortcut(keyCode: kVK_Tab, modifiers: controlKey, display: "⌃⇥"),
+        Key.shortcutPreviousNote: Shortcut(keyCode: kVK_Tab, modifiers: controlKey | shiftKey, display: "⌃⇧⇥"),
+        Key.shortcutDefaultFrame: Shortcut(keyCode: kVK_ANSI_M, modifiers: controlKey | cmdKey, display: "⌃⌘M"),
     ]
 
     /// Holds the notes, their history and settings.json, which `NoteStore` keeps there.
     static var dataFolder: URL {
-        let path = UserDefaults.standard.string(forKey: "dataFolder") ?? defaultDataFolder
+        let path = UserDefaults.standard.string(forKey: Key.dataFolder) ?? defaultDataFolder
         return URL(fileURLWithPath: (path as NSString).expandingTildeInPath, isDirectory: true)
     }
 
@@ -51,13 +77,13 @@ enum Prefs {
     /// the standard one. It's relative to the display's bottom-left corner, so it moves with the
     /// display when displays are rearranged.
     static func defaultFrame(for display: String) -> NSRect? {
-        (UserDefaults.standard.dictionary(forKey: "defaultFrames")?[display] as? String).map(NSRectFromString)
+        (UserDefaults.standard.dictionary(forKey: Key.defaultFrames)?[display] as? String).map(NSRectFromString)
     }
 
     static func setDefaultFrame(_ frame: NSRect?, for display: String) {
-        var all = UserDefaults.standard.dictionary(forKey: "defaultFrames") ?? [:]
+        var all = UserDefaults.standard.dictionary(forKey: Key.defaultFrames) ?? [:]
         all[display] = frame.map(NSStringFromRect)
-        UserDefaults.standard.set(all, forKey: "defaultFrames")
+        UserDefaults.standard.set(all, forKey: Key.defaultFrames)
     }
 
     /// A shortcut that was never set has its default; one stored as an empty string is off.
@@ -73,13 +99,13 @@ enum Prefs {
 
     /// Pinned notes by name, kept per notes folder. Not in the folder, so the notes stay plain files.
     static func pinned(in folder: URL) -> [String] {
-        (UserDefaults.standard.dictionary(forKey: "pinned")?[folder.path] as? [String]) ?? []
+        (UserDefaults.standard.dictionary(forKey: Key.pinned)?[folder.path] as? [String]) ?? []
     }
 
     static func setPinned(_ names: [String], in folder: URL) {
-        var all = UserDefaults.standard.dictionary(forKey: "pinned") ?? [:]
+        var all = UserDefaults.standard.dictionary(forKey: Key.pinned) ?? [:]
         all[folder.path] = names.isEmpty ? nil : names
-        UserDefaults.standard.set(all, forKey: "pinned")
+        UserDefaults.standard.set(all, forKey: Key.pinned)
     }
 }
 

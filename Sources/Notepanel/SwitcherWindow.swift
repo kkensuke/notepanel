@@ -19,7 +19,7 @@ final class SwitcherWindow {
     /// The switcher's width, in points. Dragging the switcher's left edge changes it, and it's
     /// kept when the switcher closes.
     private var width = CGFloat(
-        max(Prefs.minSideWidth, UserDefaults.standard.object(forKey: "sideWidth") as? Double ?? Prefs.defaultSideWidth))
+        max(Prefs.minSideWidth, UserDefaults.standard.object(forKey: Prefs.Key.sideWidth) as? Double ?? Prefs.defaultSideWidth))
     /// Where the panel was and where it went, when it moved right to make room for the switcher.
     private var shift: (from: NSRect, to: NSRect)?
 
@@ -73,7 +73,7 @@ final class SwitcherWindow {
         isShown = false
         panel.removeChildWindow(window)
         window.orderOut(nil)
-        UserDefaults.standard.set(Double(width), forKey: "sideWidth")
+        UserDefaults.standard.set(Double(width), forKey: Prefs.Key.sideWidth)
         if let shift, panel.frame == shift.to { panel.setFrame(shift.from, display: true) }
         shift = nil
     }

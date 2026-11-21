@@ -92,21 +92,21 @@ private let editingKeys = [
 ]
 
 private struct KeysView: View {
-    @AppStorage("uiFontSize") private var uiFontSize = Prefs.defaultUIFontSize
+    @AppStorage(Prefs.Key.uiFontSize) private var uiFontSize = Prefs.defaultUIFontSize
 
     var body: some View {
         Form {
             Section("From any app") {
-                setting("Show or hide notes", "hotkey.toggle")
-                setting("New note", "hotkey.create")
-                setting("Search notes", "hotkey.search")
+                setting("Show or hide notes", Prefs.Key.hotkeyToggle)
+                setting("New note", Prefs.Key.hotkeyCreate)
+                setting("Search notes", Prefs.Key.hotkeySearch)
             }
             Section("In the panel, Settings and this list") { rows(windowKeys) }
             Section("In the panel") {
                 rows(panelKeys)
-                setting("Next note", "shortcut.nextNote")
-                setting("Previous note", "shortcut.previousNote")
-                setting("Default place and size, and back", "shortcut.defaultFrame")
+                setting("Next note", Prefs.Key.shortcutNextNote)
+                setting("Previous note", Prefs.Key.shortcutPreviousNote)
+                setting("Default place and size, and back", Prefs.Key.shortcutDefaultFrame)
             }
             Section("In the switcher") { rows(switcherKeys) }
             Section("In earlier versions") { rows(historyKeys) }
