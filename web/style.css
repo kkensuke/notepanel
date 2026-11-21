@@ -183,7 +183,7 @@ footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 16px;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-size: calc(var(--ui-size) * 0.8);
@@ -201,13 +201,13 @@ footer {
   outline: none;
 }
 
-/* The room above the list is outside it: what scrolls is rows and nothing else, so a list as
-   tall as some rows shows whole rows wherever it's scrolled to. */
+/* The rows run from edge to edge, and from the field down to the bottom: the chosen row's frame
+   has no room around it. */
 #results {
   flex: 1;
   min-height: 0;
-  margin: 4px 0 0;
-  padding: 0 8px;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
   list-style: none;
 }
