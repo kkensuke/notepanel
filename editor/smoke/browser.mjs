@@ -639,6 +639,18 @@ await press("Escape")
 await receive("switcher", {notes: found, find: true})
 assert.deepEqual([await queryValue(), await focused()], ["", "query"])
 await press("Escape")
+// When Swift gives the focus back, after a sheet or the note's name, it goes where it was in the
+// switcher: the list, the search field or the note.
+await receive("switcher", {notes: found})
+await receive("focus", "")
+assert.equal(await focused(), "results")
+await press("Tab")
+await receive("focus", "")
+assert.equal(await focused(), "query")
+await page.click(".cm-content")
+await receive("focus", "")
+assert.equal(await page.evaluate(() => document.activeElement.className.includes("cm-content")), true)
+await press("Escape")
 // More than a line selected is no search.
 await press("a", ["Meta"])
 await receive("switcher", {notes: found, find: true})

@@ -950,7 +950,10 @@ window.receive = ({type, data}) => {
       else openHistory(data.versions)
       break
     case "focus":
-      if (isSwitcherOpen()) query.focus()
+      // With the switcher open, the focus goes back to where it was: the list, the note, or the
+      // search field.
+      if (isSwitcherOpen() && document.activeElement === results) results.focus()
+      else if (isSwitcherOpen() && !view.dom.contains(document.activeElement)) query.focus()
       else if (isHistoryOpen()) historyView.focus()
       else view.focus()
       break
