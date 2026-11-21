@@ -13,7 +13,10 @@ await page.setViewport({width: 480, height: 400})
 await page.evaluateOnNewDocument(() => {
   Object.defineProperty(navigator, "platform", {get: () => "MacIntel"})
   window.sent = []
-  window.webkit = {messageHandlers: {native: {postMessage: m => window.sent.push(m)}}}
+  window.webkit = {messageHandlers: {native: {postMessage: m => {
+    window.sent.push(m)
+    if (m.type === "switcherShown") window.switcherShown = m.shown
+  }}}}
 })
 const errors = []
 page.on("pageerror", e => errors.push(e.message))
@@ -23,13 +26,25 @@ await page.waitForFunction(() => window.sent.some(m => m.type === "ready"))
 const sent = () => page.evaluate(() => window.sent)
 const last = async type => (await sent()).filter(m => m.type === type).at(-1)
 const clear = () => page.evaluate(() => (window.sent = []))
-const receive = (type, data) => page.evaluate((type, data) => window.receive({type, data}), type, data)
+// Swift's part in the switcher: while it's up, the panel is 200 px wider, to the left.
+let wide = false
+const native = async () => {
+  const shown = await page.evaluate(() => window.switcherShown === true)
+  if (shown === wide) return
+  wide = shown
+  await page.setViewport({width: wide ? 680 : 480, height: 400})
+}
+const receive = async (type, data) => {
+  await page.evaluate((type, data) => window.receive({type, data}), type, data)
+  await native()
+}
 const doc = () => page.evaluate(() => document.querySelector(".cm-content").innerText)
 const changedText = async () => (await last("changed"))?.text
 const press = async (key, mods = []) => {
   for (const m of mods) await page.keyboard.down(m)
   await page.keyboard.press(key)
   for (const m of mods.reverse()) await page.keyboard.up(m)
+  await native()
 }
 const pause = ms => new Promise(r => setTimeout(r, ms))
 
@@ -233,7 +248,7 @@ const notes = [
   {id: "Meeting notes", title: "Meeting notes", text: "agenda", pinned: false},
   {id: "Ideas", title: "Ideas", text: "a milk frother", pinned: false},
 ]
-await receive("switcher", {notes, force: false})
+await receive("switcher", {notes, find: true})
 assert.equal(await page.evaluate(() => document.activeElement.id), "query")
 await page.keyboard.type("mtg")
 assert.deepEqual(await page.$$eval("#results li .title", els => els.map(e => e.textContent)), ["Meeting notes"])
@@ -242,9 +257,10 @@ await press("a", ["Meta"])
 await press("Backspace")
 await page.keyboard.type("milk")
 assert.deepEqual(await page.$$eval("#results li .title", els => els.map(e => e.textContent)), ["Groceries", "Ideas"])
-await press("ArrowDown")
+// Tab takes the focus to the list, where the arrows show each row's note beside the list.
+await press("Tab")
 await clear()
-await press("Enter")
+await press("ArrowDown")
 assert.equal((await last("select"))?.id, "Ideas")
 await press("Backspace", ["Meta"])
 assert.equal((await last("trash"))?.id, "Ideas")
@@ -254,7 +270,7 @@ await press("Escape")
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
 
 // Every row shows Pin and Trash, so moving the pointer never changes a row's height.
-await receive("switcher", {notes, force: true})
+await receive("switcher", {notes})
 const rowHeights = () => page.$$eval("#results li", els => els.map(e => e.getBoundingClientRect().height))
 const before = await rowHeights()
 await page.hover("#results li:nth-child(3)")
@@ -280,7 +296,7 @@ const pinnedNotes = [
   {id: "C", title: "C", text: "", pinned: false},
 ]
 const titles = () => page.$$eval("#results li .title", els => els.map(e => e.textContent))
-await receive("switcher", {notes: pinnedNotes, force: true})
+await receive("switcher", {notes: pinnedNotes})
 assert.deepEqual(await page.$$eval("#results li", els => els.map(e => e.classList.contains("movable"))), [true, true, false])
 assert.deepEqual(await page.$$eval("#results li .key", els => els.map(e => e.textContent)), ["⌘1", "⌘2", ""])
 await clear()
@@ -298,6 +314,7 @@ await page.mouse.up()
 assert.deepEqual(await titles(), ["A", "B", "C"])
 assert.deepEqual((await last("orderPins"))?.ids, ["A", "B"])
 assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false, "dragging opens nothing")
+await press("Tab")
 await page.keyboard.type("b")
 await clear()
 await press("ArrowUp", ["Alt"])
@@ -305,11 +322,12 @@ assert.equal(await last("orderPins"), undefined, "search results keep their orde
 await press("Escape")
 
 // A note opened for a match in its text opens with the match selected.
-await receive("switcher", {notes, force: true})
+await receive("switcher", {notes, find: true})
 await page.keyboard.type("FROTHER")
 await press("Enter")
 assert.equal((await last("select"))?.id, "Ideas")
 await receive("open", {id: "Ideas", text: "a milk frother", keep: false})
+await press("Escape")
 await page.keyboard.type("jug")
 assert.equal(await changedText(), "a milk jug")
 
@@ -417,7 +435,7 @@ assert.equal(await page.$eval("#versions", e => e.textContent), "No earlier vers
 await receive("history", {id: "Plan", versions: []})
 assert.equal(await historyOpen(), false)
 await receive("history", {id: "Plan", versions: earlier})
-await receive("switcher", {notes, force: true})
+await receive("switcher", {notes})
 assert.equal(await historyOpen(), false)
 assert.equal(await historyShown(), false)
 await press("Escape")
@@ -431,137 +449,118 @@ await receive("status", "")
 assert.equal(await historyOpen(), true, "clearing the message closes nothing")
 await receive("status", "Couldn't open")
 assert.equal(await historyOpen(), false)
-await receive("switcher", {notes, force: true})
+await receive("switcher", {notes})
 // A note renamed while the switcher is open goes by its new name there.
 await receive("renamed", {from: "Ideas", to: "Thoughts"})
 assert.deepEqual(
   await page.$$eval("#results li .title", els => els.map(e => e.textContent)), ["Groceries", "Meeting notes", "Thoughts"])
+// The switcher is beside the note, whose footer stays in sight, so a message leaves it open.
 await receive("status", "Couldn't open")
-assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), true)
+assert.equal(await page.evaluate(() => document.getElementById("switcher").hidden), false)
 assert.equal(await page.$eval("#status", e => getComputedStyle(e.parentElement).opacity), "1", "the footer is in sight")
+await press("Escape")
 
-// A search wants every word, in a note's name or in its text. Each note found is its name over
-// the lines of its text that have a word, and the lines are the rows to choose.
+// ⌘P brings the switcher up outside the note, which keeps its width, with the focus in the list
+// on the open note. The arrows go from note to note, each showing beside the list.
 const found = [
   {id: "Budget 2026", title: "Budget 2026", text: "# Budget 2026\n\nHardware budget was cut.\n| Q1 | budget review |", pinned: true},
   {id: "Weekly plan", title: "Weekly plan", text: "- Send the ＢＵＤＧＥＴ draft\r\n- Plan the review", pinned: false},
   {id: "Inbox", title: "Inbox", text: "call the dentist", pinned: false},
 ]
+const weekly = "- Send the ＢＵＤＧＥＴ draft\n- Plan the review"
 const groups = () => page.$$eval("#results .group", els => els.map(e =>
   [e.querySelector(".title").textContent, ...[...e.querySelectorAll(".line")].map(line => line.textContent)]))
 const chosen = () => page.$eval("#results [aria-selected='true']", e => e.textContent)
 const queryValue = () => page.$eval("#query", e => e.value)
 const switcherOpen = () => page.evaluate(() => !document.getElementById("switcher").hidden)
+const focused = () => page.evaluate(() => document.activeElement.id)
+const noteMarks = () => page.$$eval("#editor .cm-searchMatch", els =>
+  els.map(e => [e.textContent, e.classList.contains("cm-searchMatch-selected")]))
+const places = () => page.evaluate(() =>
+  [innerWidth, document.getElementById("switcher").offsetWidth, document.getElementById("editor").getBoundingClientRect().left])
 await receive("status", "")
-await receive("switcher", {notes: found, force: true})
+await receive("open", {id: "Weekly plan", text: weekly})
+await receive("switcher", {notes: found})
+assert.deepEqual([await focused(), await chosen()], ["results", "Weekly plan"])
 assert.equal(await page.$eval("#total", e => e.textContent), "3 notes")
+assert.deepEqual(await places(), [680, 200, 200])
+await clear()
+await press("ArrowDown")
+assert.equal((await last("select"))?.id, "Inbox")
+await receive("open", {id: "Inbox", text: found[2].text, keep: false})
+assert.deepEqual([await switcherOpen(), await focused()], [true, "results"])
+assert.match(await doc(), /call the dentist/)
+// Return closes the switcher on the note in sight, and the panel is as wide as it was.
+await clear()
+await press("Enter")
+assert.equal(await switcherOpen(), false)
+assert.equal(await last("select"), undefined)
+assert.deepEqual((await places()).filter((_, at) => at !== 1), [480, 0])
+
+// ⌘F brings it up with the focus in the search field. A search wants every word, in a note's
+// name or in its text. The note in sight is listed first, and its matches are marked as the
+// search is typed, so the switcher is the find for one note too.
+await receive("open", {id: "Weekly plan", text: weekly})
+await receive("switcher", {notes: found, find: true})
+assert.equal(await focused(), "query")
 await page.keyboard.type("review　budget")
 assert.deepEqual(await groups(), [
-  ["Budget 2026", "Hardware budget was cut.", "Q1 | budget review |"],
   ["Weekly plan", "Send the ＢＵＤＧＥＴ draft", "Plan the review"],
+  ["Budget 2026", "Hardware budget was cut.", "Q1 | budget review |"],
 ])
 assert.equal(await page.$eval("#total", e => e.textContent), "2 notes")
 assert.deepEqual(
   await page.$$eval("#results mark", els => els.map(e => e.textContent)),
-  ["Budget", "budget", "budget", "review", "ＢＵＤＧＥＴ", "review"])
-// The arrows go through the lines and pass the names, which aren't rows. From the search field
-// ↓ goes into the list, and the row's note is asked for, to show beside the list.
+  ["ＢＵＤＧＥＴ", "review", "Budget", "budget", "budget", "review"])
 assert.deepEqual(await page.$$eval("#results .name", els => els.map(e => e.getAttribute("role"))), [null, null])
-assert.equal(await chosen(), "Hardware budget was cut.")
-const focused = () => page.evaluate(() => document.activeElement.id)
+assert.deepEqual(await noteMarks(), [["ＢＵＤＧＥＴ", false], ["review", false]])
+// Return goes to the next match, with the focus still in the field: through the note in sight,
+// then into the next note. ⇧Return goes back.
 await clear()
-await press("ArrowDown")
-assert.equal(await focused(), "results")
-assert.equal(await chosen(), "Q1 | budget review |")
-assert.equal((await last("select"))?.id, "Budget 2026")
-// The note opens beside the switcher, which stays open and keeps the focus. The search's matches
-// are marked in the note, the row's as the current one, without the find.
-const noteMarks = () => page.$$eval("#editor .cm-searchMatch", els =>
-  els.map(e => [e.textContent, e.classList.contains("cm-searchMatch-selected")]))
+await press("Enter")
+assert.equal((await last("select"))?.id, "Weekly plan")
+await receive("open", {id: "Weekly plan", text: weekly, keep: false})
+assert.deepEqual(await noteMarks(), [["ＢＵＤＧＥＴ", true], ["review", false]])
+assert.deepEqual([await focused(), await chosen()], ["query", "Send the ＢＵＤＧＥＴ draft"])
+await press("Enter")
+await press("Enter")
+assert.deepEqual([(await last("select"))?.id, await chosen()], ["Budget 2026", "Hardware budget was cut."])
+await press("Enter", ["Shift"])
+assert.equal(await chosen(), "Plan the review")
+await press("Enter")
 await receive("open", {id: "Budget 2026", text: found[0].text, keep: false})
-assert.equal(await switcherOpen(), true)
-assert.equal(await focused(), "results")
-assert.deepEqual(await noteMarks(), [["Budget", false], ["budget", false], ["budget", true], ["review", false]])
-assert.equal(await page.$(".cm-search"), null)
-assert.equal(await page.$eval("#switcher", e => e.offsetWidth), 200)
-assert.equal(await page.$eval("#editor", e => e.getBoundingClientRect().left), 200)
-assert.equal(await page.$eval("#editor", e => getComputedStyle(e).opacity), "1", "the note is in sight")
+assert.deepEqual(await noteMarks(), [["Budget", false], ["budget", true], ["budget", false], ["review", false]])
+// The arrows are the field's own and Tab goes to the list and back.
 await press("ArrowDown")
-assert.equal(await chosen(), "Send the ＢＵＤＧＥＴ draft")
-// ↑ on the first row goes back to the search field, and Tab goes between the two.
-await press("ArrowUp")
-await press("ArrowUp")
-assert.equal(await chosen(), "Hardware budget was cut.")
-await press("ArrowUp")
-assert.equal(await focused(), "query")
+assert.deepEqual([await focused(), await chosen()], ["query", "Hardware budget was cut."])
 await press("Tab")
-assert.deepEqual([await focused(), await chosen()], ["results", "Hardware budget was cut."])
+assert.equal(await focused(), "results")
 await press("Tab")
 assert.equal(await focused(), "query")
-// A press on a row or a name shows the note and leaves the switcher open.
+// Escape closes the switcher with the cursor on the match, so typing replaces it. The marks go.
+await press("Escape")
+assert.deepEqual([await switcherOpen(), await noteMarks()], [false, []])
+await page.keyboard.type("plan")
+assert.equal(await changedText(), "# Budget 2026\n\nHardware plan was cut.\n| Q1 | budget review |")
+
+// A press on a row or a name shows the note and leaves the switcher open. A note found by its
+// name alone is a row itself.
+await receive("switcher", {notes: found, find: true})
+await page.keyboard.type("budget")
 await clear()
 await page.click("#results .group:nth-child(2) .name")
 assert.equal((await last("select"))?.id, "Weekly plan")
 assert.deepEqual([await focused(), await chosen()], ["results", "Send the ＢＵＤＧＥＴ draft"])
-// Return opens the chosen row's note and closes the switcher, with the match selected, so
-// typing replaces it.
-await clear()
-await press("Enter")
-assert.equal((await last("select"))?.id, "Weekly plan")
-await receive("open", {id: "Weekly plan", text: found[1].text, keep: false})
-assert.equal(await switcherOpen(), false)
-assert.equal(await page.$eval(".cm-search [name=search]", e => e.value), "budget")
-assert.deepEqual(await noteMarks(), [["ＢＵＤＧＥＴ", true]], "the find's own mark, on the match selected")
-await page.keyboard.type("plan")
-assert.equal(await changedText(), "- Send the plan draft\n- Plan the review")
-// That find is the search done, so the switcher opens on all notes again. A find the user
-// started carries over: what the note doesn't have, another may.
-await receive("switcher", {notes: found, force: true})
-assert.equal(await queryValue(), "")
-await press("Escape")
-await press("f", ["Meta"])
-await page.keyboard.type("dentist")
-await receive("switcher", {notes: found, force: true})
-assert.equal(await queryValue(), "dentist")
-assert.deepEqual(await groups(), [["Inbox", "call the dentist"]])
-// A note found by its name alone is a row itself.
+await press("Tab")
+await press("a", ["Meta"])
 await page.keyboard.type("wkpl")
 assert.deepEqual(await groups(), [["Weekly plan"]])
 assert.equal(await chosen(), "Weekly plan")
 await page.keyboard.type("zzz")
 assert.equal(await page.$eval("#results", e => e.textContent), "No notes match")
 await press("Escape")
-// Escape in the note closes its find.
-await press("Escape")
-assert.equal(await page.$(".cm-search"), null)
-
-// The bar at the switcher's right edge sets how wide the switcher is, between 140 px and the
-// panel's width less 160 px. Swift keeps the width.
-const dragBar = async x => {
-  const bar = await (await page.$("#split")).boundingBox()
-  await page.mouse.move(bar.x + bar.width / 2, bar.y + 20)
-  await page.mouse.down()
-  await page.mouse.move(x, bar.y + 20, {steps: 3})
-  await page.mouse.up()
-}
-const sideWidth = () => page.$eval("#switcher", e => e.offsetWidth)
-await receive("switcher", {notes: found, force: true})
-await press("a", ["Meta"])
-await press("Backspace")
-await receive("options", {fontSize: 14, uiFontSize: 15, sideWidth: 240})
-assert.equal(await sideWidth(), 240)
-await clear()
-await dragBar(300)
-assert.deepEqual([await sideWidth(), (await last("sideWidth"))?.width], [300, 300])
-await dragBar(10)
-assert.equal((await last("sideWidth"))?.width, 140)
-await dragBar(470)
-assert.equal((await last("sideWidth"))?.width, 320)
-assert.equal(await page.$eval("#editor", e => e.getBoundingClientRect().left), 320)
-assert.equal(await focused(), "query", "the search field keeps the focus")
-await receive("options", {fontSize: 14, uiFontSize: 15})
-assert.equal(await sideWidth(), 200)
-// The note can be written in with the switcher open. Escape there closes the switcher first.
+// The note can be written in with the switcher up. Escape there closes the switcher first.
+await receive("switcher", {notes: found})
 await page.click(".cm-content")
 await clear()
 await press("Escape")
@@ -569,13 +568,13 @@ assert.equal(await switcherOpen(), false)
 assert.equal(await last("escape"), undefined)
 
 // In the search field ↑ goes back through what was searched for and ↓ comes forward again, as
-// far as what was typed. With nothing to come forward to, ↓ goes into the list.
+// far as what was typed. The list isn't theirs.
 for (const text of ["review", "budget"]) {
-  await receive("switcher", {notes: found, force: true})
+  await receive("switcher", {notes: found, find: true})
   await page.keyboard.type(text)
   await press("Escape")
 }
-await receive("switcher", {notes: found, force: true})
+await receive("switcher", {notes: found, find: true})
 assert.equal(await queryValue(), "")
 await page.keyboard.type("in")
 await press("ArrowUp")
@@ -588,19 +587,25 @@ await press("ArrowDown")
 assert.equal(await queryValue(), "in")
 assert.deepEqual(await groups(), [["Inbox"]])
 await press("ArrowDown")
-assert.equal(await focused(), "results")
+assert.deepEqual([await queryValue(), await focused()], ["in", "query"])
 await press("Escape")
 
 // Brought up by the search hot key, the panel goes with the switcher on Escape.
-await receive("switcher", {notes: found, force: true, dismiss: true})
+await receive("switcher", {notes: found, find: true, dismiss: true})
 await clear()
 await press("Escape")
 assert.equal(await switcherOpen(), false)
 assert.equal((await last("escape"))?.type, "escape")
-await receive("switcher", {notes: found, force: true})
+await receive("switcher", {notes: found, find: true})
 await clear()
 await press("Escape")
 assert.equal(await last("escape"), undefined, "opened in the panel, the switcher closes alone")
+// ⌘P with the focus in the list closes the switcher; from the field it takes the focus there.
+await receive("switcher", {notes: found, find: true})
+await receive("switcher", {notes: found})
+assert.deepEqual([await switcherOpen(), await focused()], [true, "results"])
+await receive("switcher", {notes: found})
+assert.equal(await switcherOpen(), false)
 
 assert.deepEqual(errors, [])
 console.log("smoke test passed")

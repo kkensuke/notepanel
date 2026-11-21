@@ -25,6 +25,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private var saveIconGap: NSLayoutConstraint!
     /// Whether the page shows the history, as it last said.
     private var historyShown = false
+    /// Whether the page shows the switcher, as it last said. While it does, the panel is wider to
+    /// the left by the switcher's width, and `noteWidth` is the width the panel had before.
+    private var switcherShown = false
+    private var noteWidth: CGFloat = 0
     private var buttons: [NSButton] = []
     /// The buttons at the right, as one toolbar item.
     private let buttonsView = ButtonRow()
@@ -108,7 +112,38 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     func search() {
         let wasHidden = !panel.isVisible
         show()
-        showSwitcher(force: true, dismiss: wasHidden)
+        showSwitcher(find: true, dismiss: wasHidden)
+    }
+
+    /// The switcher is outside the note: the panel grows to the left by the switcher's width when
+    /// the page says the switcher is up, and back when it has closed. The page keeps the note at
+    /// the right at the width it had, so the note doesn't move. While the switcher is up, a
+    /// change of the panel's width is the switcher's, and is kept as its width on closing.
+    private func setSwitcherShown(_ shown: Bool) {
+        guard shown != switcherShown else { return }
+        switcherShown = shown
+        var frame = panel.frame
+        if shown {
+            // The wider frame isn't the one to come back to after a restart.
+            panel.setFrameAutosaveName("")
+            noteWidth = frame.width
+            let stored = UserDefaults.standard.object(forKey: "sideWidth") as? Double ?? Prefs.defaultSideWidth
+            let side = CGFloat(max(Prefs.minSideWidth, stored))
+            frame.size.width += side
+            // To the left, as far as the display has room; the rest goes to the right.
+            let least = panel.screen?.visibleFrame.minX ?? frame.minX - side
+            frame.origin.x = max(least, frame.minX - side)
+            panel.minSize = NSSize(width: noteWidth + CGFloat(Prefs.minSideWidth), height: 160)
+            panel.setFrame(frame, display: true)
+        } else {
+            UserDefaults.standard.set(Double(frame.width - noteWidth), forKey: "sideWidth")
+            frame.origin.x = frame.maxX - noteWidth
+            frame.size.width = noteWidth
+            panel.minSize = NSSize(width: 320, height: 160)
+            panel.setFrame(frame, display: true)
+            panel.setFrameAutosaveName(Self.frameName)
+            panel.saveFrame(usingName: Self.frameName)
+        }
     }
 
     /// Ends typing in the title, so the name goes to its note, and saves the note. The switcher
@@ -139,6 +174,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// first size, centered there. Using the pointer's display brings the panel to the display in
     /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
     private func toggleDefaultFrame() {
+        // shortcut: the default frame is the note's, and the switcher's width isn't reckoned in.
+        guard !switcherShown else { return }
         if let previous = frameBeforeDefault, panel.frame == defaultFrame {
             panel.setFrame(previous, display: true)
             frameBeforeDefault = nil
@@ -226,13 +263,10 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if store.current == nil { openSomeNote() } else { rememberCurrent() }
     }
 
-    func setOptions(
-        fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int,
-        sideWidth: Double
-    ) {
+    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int) {
         let new: NSDictionary = [
             "fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize,
-            "showWhitespace": showWhitespace, "indentSize": indentSize, "sideWidth": sideWidth,
+            "showWhitespace": showWhitespace, "indentSize": indentSize,
         ]
         guard new != options else { return }
         options = new
@@ -286,6 +320,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             // store, whose text may not be on disk.
             bridge.send("options", options)
             historyShown = false
+            setSwitcherShown(false)
             showSaveState()
             if store.current == nil { openSomeNote() } else { showNote() }
         case "changed":
@@ -299,9 +334,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             if let id = body["id"] as? String { togglePin(id) }
         case "orderPins":
             if let ids = body["ids"] as? [String] { orderPins(ids) }
-        case "sideWidth":
-            // Kept with the settings, which send it back to the page with the other options.
-            if let width = body["width"] as? Double { UserDefaults.standard.set(width, forKey: "sideWidth") }
+        case "switcherShown":
+            setSwitcherShown(body["shown"] as? Bool ?? false)
         case "openURL":
             // The page is trusted, but a link can say anything, so only web and mail links open.
             guard let string = body["url"] as? String, let url = URL(string: string),
@@ -456,15 +490,18 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if pinned.indices.contains(number - 1) { open(pinned[number - 1].name) }
     }
 
+    /// ⌘P and the list button: the switcher with the focus in its list, to go from note to note.
+    /// The page closes it if the focus is there already.
     private func toggleSwitcher() {
-        showSwitcher(force: false)
+        showSwitcher(find: false)
     }
 
     /// Saves first, so the list has the open note under the name its first line gives it.
-    /// With `dismiss`, Escape in the switcher hides the panel too.
-    private func showSwitcher(force: Bool, dismiss: Bool = false) {
+    /// With `find` the focus goes to the search field. With `dismiss`, Escape in the switcher
+    /// hides the panel too.
+    private func showSwitcher(find: Bool, dismiss: Bool = false) {
         save()
-        bridge.send("switcher", ["notes": notesForSwitcher(), "force": force, "dismiss": dismiss])
+        bridge.send("switcher", ["notes": notesForSwitcher(), "find": find, "dismiss": dismiss])
     }
 
     /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes
@@ -532,6 +569,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
             "p": { [weak self] in self?.toggleSwitcher() },
+            // Finding is the switcher's too: in this note as it's typed, and in the others.
+            "f": { [weak self] in self?.showSwitcher(find: true) },
             "y": { [weak self] in self?.toggleHistory() },
             "w": { [weak self] in self?.hide() },
             "o": { [weak self] in self?.openFolder() },

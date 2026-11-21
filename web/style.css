@@ -66,20 +66,24 @@ body {
   font: var(--ui-size) -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* --side is how wide the switcher is, beside the note: what main.js gives as --side-width, but
-   no narrower than its rows can be read at and no wider than leaves the note room. */
 body {
   display: flex;
   flex-direction: column;
-  --side: clamp(140px, var(--side-width, 200px), calc(100% - 160px));
 }
 
-body:has(#switcher:not([hidden])) #editor {
-  margin-left: var(--side);
-}
-
-body:has(#switcher:not([hidden])) footer {
+footer {
   left: var(--side);
+}
+
+/* While the switcher is open, Swift widens the panel to the left for it, and the note keeps the
+   width it had, at the right: --note-width, which main.js sets. The note is held there until the
+   panel is narrow again. */
+#editor.beside {
+  margin-left: calc(100% - var(--note-width));
+}
+
+footer.beside {
+  left: calc(100% - var(--note-width));
 }
 
 /* The note runs on under the footer and is hidden only behind the footer's texts, whose boxes
@@ -136,13 +140,12 @@ footer {
   display: none;
 }
 
-/* The switcher is a panel at the note's left: a sheet, with the search field and the list, and
-   at its right edge a bar to drag, which sets how wide it is. The note stays in sight beside it
-   and shows the chosen row's note. */
+/* The switcher is a panel at the note's left, in the room the wider panel adds: a sheet, with
+   the search field and the list. The note stays in sight beside it and shows the chosen row's
+   note. */
 #switcher {
-  right: auto;
-  width: var(--side);
-  flex-direction: row;
+  right: var(--note-width);
+  border-right: 1px solid var(--border);
 }
 
 .sheet {
@@ -152,34 +155,6 @@ footer {
   display: flex;
   flex-direction: column;
   background: var(--panel);
-}
-
-#split {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 9px;
-  border-right: 1px solid var(--border);
-  background: var(--panel);
-  cursor: col-resize;
-}
-
-#split::after {
-  content: "";
-  width: 3px;
-  height: 32px;
-  border-radius: 2px;
-  background: var(--border);
-}
-
-#split:hover::after,
-body.splitting #split::after {
-  background: var(--muted);
-}
-
-body.splitting,
-body.splitting * {
-  cursor: col-resize;
 }
 
 /* The list has the focus while the arrows go through its rows; the chosen row says so. */
