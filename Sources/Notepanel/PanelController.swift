@@ -169,7 +169,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     private func placeSide() {
         let page = panel.convertToScreen(bridge.webView.convert(bridge.webView.bounds, to: nil))
         side.setFrame(NSRect(x: page.minX - sideWidth, y: page.minY, width: sideWidth, height: page.height), display: true)
-        side.invalidateShadow()
     }
 
     private func attachSide() {
@@ -343,10 +342,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             scrim.fillColor = color
         }
         // With nothing behind the text, the shadow would outline the letters.
-        for window in [panel, side] {
-            window.hasShadow = fade > 0
-            window.invalidateShadow()
-        }
+        panel.hasShadow = fade > 0
+        panel.invalidateShadow()
     }
 
     /// Cmd-plus and Cmd-minus step the note's text size; Cmd-0 sets it back to the default.
@@ -772,7 +769,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         side.collectionBehavior = panel.collectionBehavior
         side.isOpaque = false
         side.backgroundColor = .clear
-        side.hasShadow = true
+        // As the key window, it would get a shadow drawn round its frame's square corners, not
+        // the glass's round ones.
+        side.hasShadow = false
         side.isReleasedWhenClosed = false
         side.commands = panel.commands
         side.onZoom = panel.onZoom
