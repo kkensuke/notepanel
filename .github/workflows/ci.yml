@@ -21,3 +21,25 @@ jobs:
           for arch in arm64 x86_64; do lipo build/notepanel.app/Contents/MacOS/notepanel -verify_arch "$arch"; done
           codesign --verify --strict build/notepanel.app
           du -sh build/notepanel.app
+
+  editor:
+    # Ubuntu's runner comes with Google Chrome, which the smoke test drives.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: editor
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install
+        run: |
+          node --version
+          npm ci
+      - name: Unit tests
+        run: npm test
+      # web/editor.js is kept in the repository, so a change to editor/src that wasn't built fails here.
+      - name: Built page matches the source
+        run: |
+          npm run build
+          git diff --exit-code -- ../web
+      - name: Smoke test
+        run: npm run smoke
