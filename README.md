@@ -69,7 +69,8 @@ panel), copy the new app to `/Applications`, and open it.
 - **Notes.** `Cmd+N` starts a new note. `Cmd+P`, or the list button at the left of the title
   bar, opens the switcher at the panel's left: a list of your notes, with the open one chosen.
   `Up` and `Down` show each note beside the list, and `Return` or `Esc` closes the switcher on
-  the note in sight. Each row has a pin button and a trash button.
+  the note in sight. Each row has a pin button and a trash button. Drag the switcher's left
+  edge to change its width.
 - **Search.** `Cmd+F` opens the switcher with the cursor in its search field. A note is found if
   it has every word you type, in its name or in its text; capitals and full-width letters match
   plain ones. Each note found is listed by name, over the lines of its text that have a word.

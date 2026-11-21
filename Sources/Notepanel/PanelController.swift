@@ -139,6 +139,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             if shown {
                 // Where the display has no room at the panel's left, the panel moves right while
                 // the switcher is up, and back when it closes, unless it was moved meanwhile.
+                // shortcut: checked only as the switcher opens; a panel moved to the display's
+                // left edge while it's up takes the switcher off the display.
                 let room = panel.frame.minX - (panel.screen?.visibleFrame.minX ?? panel.frame.minX - sideWidth)
                 if room < sideWidth {
                     let from = panel.frame
