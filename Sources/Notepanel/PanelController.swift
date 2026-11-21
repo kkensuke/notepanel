@@ -3,7 +3,7 @@ import NotepanelCore
 
 /// Shows and hides the note panel, and connects it to the note store and the editor page.
 @MainActor
-final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTextFieldDelegate {
+final class PanelController: NSObject, NSWindowDelegate {
     let store: NoteStore
     var toggleSettings: () -> Void = {}
     /// When the panel moves to another display, whose default Settings then shows.
@@ -11,41 +11,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     private let panel: NotePanel
     private let bridge = EditorBridge()
-    /// The switcher's window, at the panel's left, with the same page in a web view of its own.
-    /// Borderless, so its shape is its glass's.
-    private let side = NotePanel(
-        contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-    private let sideBridge = EditorBridge()
-    /// The background under each page, the panel's and the switcher's: glass, with a scrim over it.
-    private var backdrops: [(glass: NSView, scrim: NSBox)] = []
+    /// The background under the note's page.
+    private let backdrop: Backdrop
     private var backgroundOpacity: Double?
-    private let titleField: NSTextField = NameField(string: "")
-    private var titleWidth: NSLayoutConstraint!
-    /// The save icon and the name, as one toolbar item.
-    private let titleView = NSView()
-    /// Also the history button.
-    private let saveIcon = HistoryButton()
-    private var saveIconWidth: NSLayoutConstraint!
-    private var saveIconGap: NSLayoutConstraint!
-    /// Whether the page shows the history, as it last said.
-    private var historyShown = false
-    /// Whether the switcher's page shows the switcher, as it last said.
-    private var switcherShown = false
-    /// The switcher's width, in points. Dragging the switcher's left edge changes it, and it's
-    /// kept when the switcher closes.
-    private var sideWidth = CGFloat(
-        max(Prefs.minSideWidth, UserDefaults.standard.object(forKey: "sideWidth") as? Double ?? Prefs.defaultSideWidth))
-    /// How tall the switcher's window may be, as its page says: ten rows under the search field.
-    private var sideHeight = CGFloat.greatestFiniteMagnitude
-    /// Where the panel was and where it went, when it moved right to make room for the switcher.
-    private var shift: (from: NSRect, to: NSRect)?
-    private var buttons: [NSButton] = []
-    /// The buttons at the right, as one toolbar item.
-    private let buttonsView = ButtonRow()
-    /// The switcher's button, at the left, over the switcher.
-    private let browseView = ButtonRow()
+    private let titleBar: TitleBar
+    private let switcher: SwitcherWindow
     private var previousApp: NSRunningApplication?
-    private var uiFontSize: CGFloat = 15
     private var options: NSDictionary = [:]
     /// Counts the notes shown in the page, which sends the count back with the text typed. Text
     /// typed in a note the panel has since left arrives late, and isn't taken for the open note's.
@@ -55,12 +26,6 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// ⌃⌘M, and the default place for each display that Settings shows and sets.
     let placement: PanelPlacement
 
-    private enum Item {
-        static let browse = NSToolbarItem.Identifier("browse")
-        static let title = NSToolbarItem.Identifier("title")
-        static let buttons = NSToolbarItem.Identifier("buttons")
-    }
-
     init(store: NoteStore) {
         self.store = store
         panel = NotePanel(
@@ -68,14 +33,25 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
             backing: .buffered, defer: false)
         placement = PanelPlacement(panel: panel)
+        // The page draws no background of its own, so the backdrop shows through it.
+        bridge.webView.setValue(false, forKey: "drawsBackground")
+        backdrop = Backdrop(behind: bridge.webView)
+        titleBar = TitleBar(panel: panel, store: store)
+        switcher = SwitcherWindow(panel: panel, notePage: bridge.webView)
         super.init()
+        titleBar.onHistory = { [weak self] in self?.toggleHistory() }
+        titleBar.onBrowse = { [weak self] in self?.showSwitcher(find: false, toggle: true) }
+        titleBar.onNewNote = { [weak self] in self?.newNote() }
+        titleBar.onOpenFolder = { [weak self] in self?.openFolder() }
+        titleBar.onRename = { [weak self] name, proposed in self?.rename(name, to: proposed) }
+        titleBar.focusEditor = { [weak self] in self?.focusEditor() }
         configurePanel()
-        configureSide()
+        switcher.configure()
         store.onStatus = { [weak self] message in self?.bridge.send("status", message ?? "") }
         store.onRenamed = { [weak self] from, to in self?.noteRenamed(from, to) }
-        store.onSaveState = { [weak self] _ in self?.showSaveState() }
+        store.onSaveState = { [weak self] _ in self?.titleBar.showSaveState() }
         bridge.onMessage = { [weak self] type, body in self?.handle(type, body) }
-        sideBridge.onMessage = { [weak self] type, body in self?.handleSwitcher(type, body) }
+        switcher.bridge.onMessage = { [weak self] type, body in self?.handleSwitcher(type, body) }
     }
 
     var isVisible: Bool { panel.isVisible }
@@ -91,7 +67,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         // The switcher went with the panel, and comes back with it.
-        if switcherShown { attachSide() }
+        if switcher.isShown { switcher.attach() }
         focusEditor()
     }
 
@@ -102,9 +78,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             let front = NSWorkspace.shared.frontmostApplication?.processIdentifier
             let movedOn = front != NSRunningApplication.current.processIdentifier && front != previousApp?.processIdentifier
             panel.orderOut(nil)
-            side.orderOut(nil)
-            // The pointer leaves the icon with the panel, and no exit says so.
-            saveIcon.pointing = false
+            switcher.window.orderOut(nil)
+            titleBar.pointerLeft()
             if !movedOn { _ = previousApp?.activate(options: []) }
         }
         store.flush()
@@ -113,7 +88,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// Hides the panel if it's in front, and otherwise brings it forward. The switcher's window
     /// counts as the panel.
     func toggle() {
-        if panel.isVisible && (panel.isKeyWindow || side.isKeyWindow) { hide() } else { show() }
+        if panel.isVisible && (panel.isKeyWindow || switcher.isKey) { hide() } else { show() }
     }
 
     func newNote() {
@@ -130,28 +105,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     /// The switcher is a window of its own, outside the panel, so the note and the title bar stay
     /// as they are. Its page says when the switcher has come up or wants the focus again, and when
-    /// it has closed. While it's up, the window is the panel's child, which moves with it.
+    /// it has closed.
     private func setSwitcherShown(_ shown: Bool) {
-        if shown != switcherShown {
-            switcherShown = shown
+        if shown != switcher.isShown {
             if shown {
-                // Where the display has no room at the panel's left, the panel moves right while
-                // the switcher is up, and back when it closes, unless it was moved meanwhile.
-                // shortcut: checked only as the switcher opens; a panel moved to the display's
-                // left edge while it's up, by hand or by ⌃⌘M, takes the switcher off the display.
-                let room = panel.frame.minX - (panel.screen?.visibleFrame.minX ?? panel.frame.minX - sideWidth)
-                if room < sideWidth {
-                    let from = panel.frame
-                    panel.setFrameOrigin(NSPoint(x: from.minX + sideWidth - room, y: from.minY))
-                    shift = (from, panel.frame)
-                }
+                switcher.open()
             } else {
-                panel.removeChildWindow(side)
-                side.orderOut(nil)
+                switcher.close()
                 bridge.send("marks", "")
-                UserDefaults.standard.set(Double(sideWidth), forKey: "sideWidth")
-                if let shift, panel.frame == shift.to { panel.setFrame(shift.from, display: true) }
-                shift = nil
                 // The note takes the typing the switcher's window had.
                 if panel.isVisible { panel.makeKey() }
                 focusEditor()
@@ -159,35 +120,14 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
         // A switcher brought up after the panel has gone comes back with the panel.
         guard shown, panel.isVisible else { return }
-        attachSide()
-        focusSwitcher()
-    }
-
-    /// The switcher's window goes at the panel's left, flush with it, from under the title bar down
-    /// to the panel's bottom, or as far as its page asks.
-    private func placeSide() {
-        let page = panel.convertToScreen(bridge.webView.convert(bridge.webView.bounds, to: nil))
-        let height = min(page.height, sideHeight)
-        side.setFrame(
-            NSRect(x: page.minX - sideWidth, y: page.maxY - height, width: sideWidth, height: height), display: true)
-    }
-
-    private func attachSide() {
-        placeSide()
-        if side.parent == nil { panel.addChildWindow(side, ordered: .above) }
-        side.orderFront(nil)
-    }
-
-    /// Typing goes to the switcher's page, where it put the focus.
-    private func focusSwitcher() {
-        side.makeKeyAndOrderFront(nil)
-        side.makeFirstResponder(sideBridge.webView)
+        switcher.attach()
+        switcher.focus()
     }
 
     /// Ends typing in the title, so the name goes to its note, and saves the note. The switcher
     /// and the history show what's on disk, and quitting leaves it there.
     func save() {
-        finishTitle()
+        titleBar.finishTitle()
         store.flush()
     }
 
@@ -218,13 +158,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     /// move into the overflow menu. AppKit calls this as the user drags, but not for
     /// setFrame(_:display:), which windowDidResize covers.
     func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        sizeTitle(panelWidth: frameSize.width)
+        titleBar.sizeTitle(panelWidth: frameSize.width)
         return frameSize
     }
 
     func windowDidResize(_ notification: Notification) {
-        sizeTitle()
-        if switcherShown { placeSide() }
+        titleBar.sizeTitle()
+        if switcher.isShown { switcher.place() }
     }
 
     func windowDidChangeScreen(_ notification: Notification) {
@@ -235,7 +175,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     func setFolder(_ dataFolder: URL) {
         guard dataFolder.standardizedFileURL != store.dataFolder.standardizedFileURL else { return }
-        finishTitle()
+        titleBar.finishTitle()
         store.setFolder(dataFolder)
         UserDefaults.standard.removeObject(forKey: "lastNote")
         // A note that couldn't be saved in the old folder is still open, and is the new folder's now.
@@ -250,11 +190,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         guard new != options else { return }
         options = new
         bridge.send("options", new)
-        sideBridge.send("options", new)
-        if CGFloat(uiFontSize) != self.uiFontSize {
-            self.uiFontSize = CGFloat(uiFontSize)
-            applyUIFontSize()
-        }
+        switcher.bridge.send("options", new)
+        titleBar.uiFontSize = CGFloat(uiFontSize)
     }
 
     func setPanelShortcuts(next: Shortcut?, previous: Shortcut?, defaultFrame: Shortcut?) {
@@ -263,26 +200,18 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if let previous { shortcuts.append((previous, true, { [weak self] in self?.cycle(-1) })) }
         if let defaultFrame { shortcuts.append((defaultFrame, false, { [weak self] in self?.placement.toggleDefaultFrame() })) }
         panel.shortcuts = shortcuts
-        side.shortcuts = shortcuts
+        switcher.window.shortcuts = shortcuts
     }
 
-    /// The background's opacity; the text keeps its own. 0 leaves nothing behind the text, the
-    /// default is tinycast's background, and 1 is solid. Up to the default, the glass and the
-    /// scrim fade in together; past it, the scrim gets more opaque.
+    /// The background's opacity, the panel's and the switcher's; the text keeps its own.
     func setBackgroundOpacity(_ opacity: Double) {
         let opacity = min(1, max(0, opacity))
         guard opacity != backgroundOpacity else { return }
         backgroundOpacity = opacity
-        let middle = Prefs.defaultBackgroundOpacity
-        let fade = CGFloat(min(1, opacity / middle))
-        let color = Self.scrimColor(solid: max(0, (opacity - middle) / (1 - middle)))
-        for (glass, scrim) in backdrops {
-            glass.alphaValue = fade
-            scrim.alphaValue = fade
-            scrim.fillColor = color
-        }
+        backdrop.setOpacity(opacity)
+        switcher.backdrop.setOpacity(opacity)
         // With nothing behind the text, the shadow would outline the letters.
-        panel.hasShadow = fade > 0
+        panel.hasShadow = opacity > 0
         panel.invalidateShadow()
     }
 
@@ -304,8 +233,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             // Also after the page reloads: it gets its options again, and the open note from the
             // store, whose text may not be on disk.
             bridge.send("options", options)
-            historyShown = false
-            showSaveState()
+            titleBar.historyShown = false
             if store.current == nil { openSomeNote() } else { showNote() }
         case "changed":
             guard body["opening"] as? Int == opening, let text = body["text"] as? String else { return }
@@ -323,10 +251,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             NSPasteboard.general.setString(text, forType: .string)
         case "escape":
             // The switcher goes first, if it's up beside the note.
-            if switcherShown { closeSwitcher() } else { hide() }
+            if switcher.isShown { closeSwitcher() } else { hide() }
         case "historyShown":
-            historyShown = body["shown"] as? Bool ?? false
-            showSaveState()
+            titleBar.historyShown = body["shown"] as? Bool ?? false
         default:
             break
         }
@@ -338,22 +265,18 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         switch type {
         case "ready":
             // Also after the page reloads, which closes the switcher.
-            sideBridge.send("side", true)
-            sideBridge.send("options", options)
+            switcher.bridge.send("side", true)
+            switcher.bridge.send("options", options)
             setSwitcherShown(false)
         case "select":
             if let id = body["id"] as? String { open(id, keepSwitcher: true, land: body["land"]) }
         case "marks":
             bridge.send("marks", body["query"] as? String ?? "")
         case "switcherShown":
-            if let height = body["height"] as? Double { sideHeight = CGFloat(height) }
+            if let height = body["height"] as? Double { switcher.maxHeight = CGFloat(height) }
             setSwitcherShown(body["shown"] as? Bool ?? false)
         case "sideWidth":
-            // As far as the display goes to the left.
-            guard let width = body["width"] as? Double else { return }
-            let room = panel.frame.minX - (panel.screen?.visibleFrame.minX ?? -.greatestFiniteMagnitude)
-            sideWidth = max(CGFloat(Prefs.minSideWidth), min(CGFloat(width), room))
-            placeSide()
+            if let width = body["width"] as? Double { switcher.setWidth(CGFloat(width)) }
         case "trash":
             if let id = body["id"] as? String { confirmTrash(id) }
         case "pin":
@@ -372,7 +295,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
 
     @discardableResult
     private func open(_ name: String, keepSwitcher: Bool = false, land: Any? = nil) -> Bool {
-        finishTitle()
+        titleBar.finishTitle()
         guard store.open(name) != nil else { return false }
         showNote(keepSwitcher: keepSwitcher, land: land)
         return true
@@ -389,11 +312,11 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         bridge.send("open", message)
         if !keepSwitcher {
             closeSwitcher()
-        } else if land == nil, switcherShown {
-            sideBridge.send("current", name)
+        } else if land == nil, switcher.isShown {
+            switcher.bridge.send("current", name)
         }
         rememberCurrent()
-        updateTitle()
+        titleBar.updateTitle()
     }
 
     /// Opens the last note, else the newest readable one, else a new one, so a note is always open.
@@ -410,7 +333,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
     }
 
     private func createNote(keepSwitcher: Bool = false) {
-        finishTitle()
+        titleBar.finishTitle()
         do {
             _ = try store.create()
             showNote(keepSwitcher: keepSwitcher)
@@ -439,9 +362,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             pins[index] = new
             Prefs.setPinned(pins, in: store.folder)
         }
-        for page in [bridge, sideBridge] { page.send("renamed", ["from": old, "to": new]) }
+        for page in [bridge, switcher.bridge] { page.send("renamed", ["from": old, "to": new]) }
         if store.current == new { rememberCurrent() }
-        updateTitle()
+        titleBar.updateTitle()
     }
 
     private func rename(_ old: String, to proposed: String) {
@@ -468,9 +391,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             MainActor.assumeIsolated {
                 guard let self else { return }
                 if response == .alertFirstButtonReturn { self.trash(name) }
-                if self.switcherShown {
-                    self.focusSwitcher()
-                    self.sideBridge.send("focus", "")
+                if self.switcher.isShown {
+                    self.switcher.focus()
+                    self.switcher.bridge.send("focus", "")
                 } else {
                     self.focusEditor()
                 }
@@ -490,7 +413,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         }
         Prefs.setPinned(Prefs.pinned(in: store.folder).filter { $0 != trashed }, in: store.folder)
         bridge.send("trashed", trashed)
-        sideBridge.send("notes", notesForSwitcher())
+        switcher.bridge.send("notes", notesForSwitcher())
         if store.current == nil { openSomeNote(keepSwitcher: true) }
     }
 
@@ -498,7 +421,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         var pins = Prefs.pinned(in: store.folder)
         if let index = pins.firstIndex(of: name) { pins.remove(at: index) } else { pins.append(name) }
         Prefs.setPinned(pins, in: store.folder)
-        sideBridge.send("notes", notesForSwitcher())
+        switcher.bridge.send("notes", notesForSwitcher())
     }
 
     /// The page sends the pinned notes it shows, in their new order. Pins whose file is missing
@@ -507,7 +430,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         let pins = Prefs.pinned(in: store.folder)
         guard Set(ids).count == ids.count, Set(ids).isSubset(of: pins) else { return }
         Prefs.setPinned(ids + pins.filter { !ids.contains($0) }, in: store.folder)
-        sideBridge.send("notes", notesForSwitcher())
+        switcher.bridge.send("notes", notesForSwitcher())
     }
 
     /// Cmd-1 to Cmd-9 open the first to ninth pinned note.
@@ -543,17 +466,17 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         find: Bool, force: Bool = false, toggle: Bool = false, dismiss: Bool = false, picked: String = ""
     ) {
         save()
-        sideBridge.send(
+        switcher.bridge.send(
             "switcher",
             [
-                "notes": notesForSwitcher(), "current": store.current ?? "", "key": side.isKeyWindow,
+                "notes": notesForSwitcher(), "current": store.current ?? "", "key": switcher.isKey,
                 "find": find, "force": force, "toggle": toggle, "dismiss": dismiss, "picked": picked,
             ])
     }
 
     /// The switcher's page closes the switcher and says so, and then its window goes.
     private func closeSwitcher() {
-        if switcherShown { sideBridge.send("close", "") }
+        if switcher.isShown { switcher.bridge.send("close", "") }
     }
 
     /// ⌘Y: the open note's earlier versions, newest first, to copy from. Nothing there changes
@@ -618,8 +541,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.delegate = self
         // Set explicitly, so clicks where the background is clear reach the panel, not the app behind.
         panel.ignoresMouseEvents = false
-        bridge.webView.setValue(false, forKey: "drawsBackground")
-        panel.contentView = background(behind: bridge.webView)
+        panel.contentView = backdrop.view
         panel.onZoom = { [weak self] step in self?.zoom(step) }
         panel.commands = [
             "n": { [weak self] in self?.newNote() },
@@ -638,65 +560,7 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             panel.commands[String(number)] = { [weak self] in self?.openPinned(number) }
         }
 
-        // The note's name, centered; clicking it renames the note.
-        titleField.isBordered = false
-        titleField.drawsBackground = false
-        titleField.isEditable = true
-        titleField.alignment = .center
-        titleField.lineBreakMode = .byTruncatingTail
-        titleField.cell?.usesSingleLineMode = true
-        titleField.focusRingType = .none
-        titleField.delegate = self
-        titleField.toolTip = "Click to rename"
-        titleField.setAccessibilityLabel("Note name")
-        // An editable field has no width of its own, so it's sized to its name.
-        titleWidth = titleField.widthAnchor.constraint(equalToConstant: 120)
-        // Left of the name, whether its text is saved; clicking it opens the history. The icon
-        // keeps one width for every symbol, so the name doesn't move when the symbol changes.
-        saveIcon.title = ""
-        saveIcon.isBordered = false
-        saveIcon.imagePosition = .imageOnly
-        saveIcon.imageScaling = .scaleNone
-        saveIcon.target = self
-        saveIcon.action = #selector(historyClicked)
-        saveIcon.onPointing = { [weak self] in self?.showSaveState() }
-        // The icon goes over the name's field, which reaches under it when the name is short.
-        for view in [titleField, saveIcon] {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            titleView.addSubview(view)
-        }
-        saveIconWidth = saveIcon.widthAnchor.constraint(equalToConstant: uiFontSize)
-        saveIconGap = titleField.leadingAnchor.constraint(equalTo: saveIcon.trailingAnchor)
-        NSLayoutConstraint.activate([
-            titleWidth, saveIconWidth, saveIconGap,
-            // The icon's frame reaches past the symbol, and stays in the item.
-            saveIcon.leadingAnchor.constraint(equalTo: titleView.leadingAnchor, constant: HistoryButton.margin),
-            saveIcon.centerYAnchor.constraint(equalTo: titleField.centerYAnchor),
-            titleField.trailingAnchor.constraint(equalTo: titleView.trailingAnchor),
-            titleField.topAnchor.constraint(equalTo: titleView.topAnchor),
-            titleField.bottomAnchor.constraint(equalTo: titleView.bottomAnchor),
-        ])
-        let browse = toolbarButton("list.bullet", "Browse Notes (⌘P)", #selector(browseClicked))
-        let right = [
-            toolbarButton("square.and.pencil", "New Note (⌘N)", #selector(newNoteClicked)),
-            toolbarButton("folder", "Open Notes Folder (⌘O)", #selector(openFolderClicked)),
-        ]
-        buttons = [browse] + right
-        browseView.addArrangedSubview(browse)
-        // The spacing the toolbar gave them before macOS 26, which spaces separate items for glass.
-        buttonsView.spacing = 12
-        for button in right { buttonsView.addArrangedSubview(button) }
-        applyUIFontSize()
-
-        // A toolbar sizes the title bar to the title and buttons and keeps the traffic lights
-        // centered beside them; the compact style keeps the space above and below small.
-        let toolbar = NSToolbar(identifier: "notepanel")
-        toolbar.delegate = self
-        toolbar.displayMode = .iconOnly
-        toolbar.allowsUserCustomization = false
-        toolbar.centeredItemIdentifiers = [Item.title]
-        panel.toolbar = toolbar
-        panel.toolbarStyle = .unifiedCompact
+        titleBar.install()
 
         // The panel keeps the size the user gives it; nothing resizes it to fit a note.
         placement.defaultSize = panel.frame.size
@@ -704,231 +568,8 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         panel.setFrameAutosaveName(Self.frameName)
     }
 
-    /// The switcher's window floats with the panel and takes its keys. The page draws the
-    /// switcher's corners as a row's corners and the edge around them, so the chosen row's frame
-    /// fits a bottom corner whole; the glass and the window's shadow follow them.
-    private func configureSide() {
-        side.isFloatingPanel = true
-        side.level = .floating
-        side.hidesOnDeactivate = false
-        side.animationBehavior = .none
-        side.collectionBehavior = panel.collectionBehavior
-        side.isOpaque = false
-        side.backgroundColor = .clear
-        // As the key window, it would get a shadow drawn round its frame's square corners, not
-        // the glass's round ones.
-        side.hasShadow = false
-        side.isReleasedWhenClosed = false
-        side.commands = panel.commands
-        side.onZoom = panel.onZoom
-        sideBridge.webView.setValue(false, forKey: "drawsBackground")
-        side.contentView = background(behind: sideBridge.webView, cornerRadius: 7)
-    }
-
-    /// tinycast's background: glass (a blur before macOS 26) under a scrim. It runs under the
-    /// title bar too, while the page starts below the title bar, where it was before.
-    private func background(behind page: NSView, cornerRadius: CGFloat = 0) -> NSView {
-        let glass = Self.makeGlass(cornerRadius: cornerRadius)
-        let scrim = NSBox()
-        scrim.boxType = .custom
-        scrim.titlePosition = .noTitle
-        scrim.borderWidth = 0
-        scrim.cornerRadius = cornerRadius
-        scrim.fillColor = Self.scrimColor(solid: 0)
-        backdrops.append((glass, scrim))
-        let view = NSView()
-        for backdrop in [glass, scrim] {
-            backdrop.frame = view.bounds
-            backdrop.autoresizingMask = [.width, .height]
-            view.addSubview(backdrop)
-        }
-        page.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(page)
-        NSLayoutConstraint.activate([
-            page.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            page.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            page.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            page.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-        ])
-        return view
-    }
-
-    private static func makeGlass(cornerRadius: CGFloat) -> NSView {
-        if #available(macOS 26, *) {
-            let glass = NSGlassEffectView()
-            if cornerRadius > 0 { glass.cornerRadius = cornerRadius }
-            return glass
-        }
-        let blur = NSVisualEffectView()
-        blur.material = .popover
-        // The app is never active, so the blur would otherwise always look inactive.
-        blur.state = .active
-        if cornerRadius > 0 {
-            // A rounded square, stretched between its corners.
-            let size = 2 * cornerRadius + 1
-            let mask = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-                NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
-                return true
-            }
-            mask.capInsets = NSEdgeInsets(top: cornerRadius, left: cornerRadius, bottom: cornerRadius, right: cornerRadius)
-            mask.resizingMode = .stretch
-            blur.maskImage = mask
-        }
-        return blur
-    }
-
-    /// tinycast's scrim is black at 40% in dark mode and white at 55% in light mode. `solid`,
-    /// from 0 to 1, takes it from there to fully opaque.
-    private static func scrimColor(solid: Double) -> NSColor {
-        NSColor(name: nil) { appearance in
-            let dark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-            let alpha = dark ? 0.4 : 0.55
-            return (dark ? NSColor.black : .white).withAlphaComponent(CGFloat(alpha + (1 - alpha) * solid))
-        }
-    }
-
-    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [Item.browse, .flexibleSpace, Item.title, .flexibleSpace, Item.buttons]
-    }
-
-    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        toolbarDefaultItemIdentifiers(toolbar)
-    }
-
-    func toolbar(
-        _ toolbar: NSToolbar, itemForItemIdentifier identifier: NSToolbarItem.Identifier,
-        willBeInsertedIntoToolbar flag: Bool
-    ) -> NSToolbarItem? {
-        let item = NSToolbarItem(itemIdentifier: identifier)
-        switch identifier {
-        case Item.browse: item.view = browseView
-        case Item.title: item.view = titleView
-        case Item.buttons: item.view = buttonsView
-        default: return nil
-        }
-        // From macOS 26 every toolbar item sits on glass, which put the name and the buttons in capsules.
-        item.isBordered = false
-        return item
-    }
-
-    private func toolbarButton(_ symbol: String, _ label: String, _ action: Selector) -> NSButton {
-        let button = ToolbarButton(title: "", target: self, action: action)
-        button.isBordered = false
-        // Centered in the button's frame, which is wider than the symbol.
-        button.imagePosition = .imageOnly
-        button.identifier = NSUserInterfaceItemIdentifier(symbol)
-        button.toolTip = label
-        button.setAccessibilityLabel(label)
-        return button
-    }
-
-    /// Sizes the title and the toolbar's symbols by the interface text size.
-    private func applyUIFontSize() {
-        titleField.font = .systemFont(ofSize: uiFontSize, weight: .semibold)
-        let configuration = NSImage.SymbolConfiguration(pointSize: uiFontSize + 1, weight: .regular)
-        for button in buttons {
-            guard let symbol = button.identifier?.rawValue else { continue }
-            button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: button.toolTip)?
-                .withSymbolConfiguration(configuration)
-        }
-        saveIconWidth.constant = uiFontSize
-        showSaveState()
-        sizeTitle()
-    }
-
-    /// A dashed circle while the text isn't saved yet, a checked circle once it is, and a red
-    /// warning if saving failed (the footer says why). As the history button, it shows a clock
-    /// when pointed at, but not over a failed save, whose warning stays in sight. While the
-    /// history is open, the clock is in the accent color.
-    private func showSaveState() {
-        let state = store.saveState
-        let (symbol, label): (String, String) =
-            switch state {
-            case .saved: ("checkmark.circle", "Saved")
-            case .editing: ("circle.dashed", "Not saved yet")
-            case .failed: ("exclamationmark.triangle", "Couldn’t save")
-            }
-        let pointing = saveIcon.pointing
-        let clock = historyShown || (pointing && state != .failed)
-        saveIcon.image = NSImage(systemSymbolName: clock ? "clock.arrow.circlepath" : symbol, accessibilityDescription: nil)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: uiFontSize, weight: .regular, scale: .small))
-        saveIcon.contentTintColor =
-            historyShown ? .controlAccentColor
-            : state == .failed ? .systemRed
-            : pointing ? .labelColor : .secondaryLabelColor
-        saveIcon.backdrop =
-            historyShown ? NSColor.controlAccentColor.withAlphaComponent(0.2)
-            : pointing ? .quaternaryLabelColor : nil
-        saveIcon.toolTip = historyShown ? "Close History (⌘Y)" : "\(label) · Show History (⌘Y)"
-        saveIcon.setAccessibilityLabel(historyShown ? "Close History" : "Show History")
-        saveIcon.setAccessibilityValue(label)
-    }
-
-    @objc private func historyClicked() { toggleHistory() }
-    @objc private func newNoteClicked() { newNote() }
-    @objc private func browseClicked() { showSwitcher(find: false, toggle: true) }
-    @objc private func openFolderClicked() { openFolder() }
-
-    // MARK: - The title
-
-    private func updateTitle() {
-        let name = store.current ?? ""
-        panel.title = name
-        guard titleField.currentEditor() == nil else { return }
-        titleField.stringValue = name
-        sizeTitle()
-    }
-
-    /// Leaves room on both sides for the buttons (wider than the traffic lights), so a long name
-    /// stays centered and ends in "…" instead of pushing the buttons into the overflow menu.
-    private func sizeTitle(panelWidth: CGFloat? = nil) {
-        let text = titleField.attributedStringValue.size().width
-        let width = (text + 16).rounded(.up)
-        let gap: CGFloat = 5
-        // shortcut: margins taken from one screenshot (about 20 pt for the toolbar's edge and a gap
-        // before the title); measure the laid-out buttons if another macOS sets them wider.
-        // The left side has the traffic lights and the switcher's button, taken as 78 pt more than
-        // the button; the name gets what the wider side leaves.
-        let buttonsWidth = max(buttonsView.fittingSize.width + 20, browseView.fittingSize.width + 78)
-        let room = (panelWidth ?? panel.frame.width) - 2 * buttonsWidth - HistoryButton.margin - saveIconWidth.constant - gap
-        titleWidth.constant = max(0, min(max(width, 80), 360, room))
-        // The name is centered in its field, so the icon moves in over the space left of it and
-        // stays `gap` from the text, also when a short name leaves the field wider than the text.
-        saveIconGap.constant = gap - max(0, titleWidth.constant - text) / 2
-    }
-
-    /// Ends typing in the title before another note opens, so the name goes to the note it was
-    /// typed for. Otherwise ending later would try to give that name to the newly opened note.
-    private func finishTitle() {
-        if titleField.currentEditor() != nil { focusEditor() }
-    }
-
     private func focusEditor() {
         panel.makeFirstResponder(bridge.webView)
         bridge.send("focus", "")
-    }
-
-    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        if selector == #selector(NSResponder.cancelOperation(_:)) {
-            titleField.abortEditing()
-            updateTitle()
-            focusEditor()
-            return true
-        }
-        if selector == #selector(NSResponder.insertNewline(_:)) {
-            focusEditor()  // Ends editing, which renames the note.
-            return true
-        }
-        return false
-    }
-
-    /// A name typed here is the user's own, so the file stops following the note's first line.
-    func controlTextDidEndEditing(_ notification: Notification) {
-        if let current = store.current, titleField.stringValue != current {
-            rename(current, to: titleField.stringValue)
-        }
-        // Set directly: the field may still count as editing here. A refused name reverts.
-        titleField.stringValue = store.current ?? ""
-        sizeTitle()
     }
 }
