@@ -145,7 +145,6 @@ footer {
    note. */
 #switcher {
   right: var(--note-width);
-  border-right: 1px solid var(--border);
 }
 
 .sheet {
@@ -178,7 +177,7 @@ footer {
   padding: 4px 8px 8px;
 }
 
-/* The field's icon stands over the rows' handles, and its text over their names. */
+/* The field's icon stands over the rows' names. */
 .field {
   flex: none;
   display: flex;
@@ -218,7 +217,7 @@ footer {
 #results li {
   --row: calc(var(--ui-size) * 2);
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   column-gap: 8px;
   min-height: var(--row);
@@ -239,7 +238,7 @@ footer {
 .name,
 .line {
   --row: calc(var(--ui-size) * 2 - 4px);
-  padding: 0 8px 0 calc(var(--ui-size) + 16px);
+  padding: 0 8px;
   border-radius: 6px;
 }
 
@@ -334,17 +333,6 @@ footer {
   text-underline-offset: 0.15em;
 }
 
-.grip {
-  display: grid;
-  color: var(--muted);
-  cursor: grab;
-}
-
-/* Every row keeps the handle's space, so the names line up. */
-#results li:not(.movable) .grip {
-  visibility: hidden;
-}
-
 body.dragging,
 body.dragging * {
   cursor: grabbing;
@@ -359,6 +347,11 @@ body.dragging * {
 .key {
   color: var(--muted);
   font-size: calc(var(--ui-size) * 0.8);
+}
+
+/* A pinned note is dragged by its key. */
+.movable .key {
+  cursor: grab;
 }
 
 .action {
@@ -390,7 +383,6 @@ body.dragging * {
 }
 
 .action svg,
-.grip svg,
 .field svg {
   flex: none;
   width: var(--ui-size);

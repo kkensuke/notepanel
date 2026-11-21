@@ -458,7 +458,7 @@ function movePinned(from, to, save = true) {
   if (save) savePinOrder()
 }
 
-// Dragging a pinned note's handle moves it among the pinned notes; the order is saved on release.
+// Dragging a pinned note by its key moves it among the pinned notes; the order is saved on release.
 function dragPinned(event, note) {
   event.preventDefault()
   event.stopPropagation()
@@ -574,12 +574,6 @@ function show(index) {
   choose(row, true)
 }
 
-// Return in the search field goes to the next match, as in a find: to the chosen row at first,
-// then to the row after the one in sight, and from the last round to the first.
-function step(by) {
-  if (rows.length) show(shown ? (selected + by + rows.length) % rows.length : selected)
-}
-
 // Once the note is open, the cursor goes on the place it was chosen for, in the middle of the
 // note, and the search's matches are marked.
 function land({place, term}) {
@@ -663,7 +657,6 @@ function marked(tag, className, text, ranges) {
 
 // Line icons drawn with the text color; a pinned note's pin is filled.
 const icons = {
-  grip: '<path d="M5 7h14M5 12h14M5 17h14"/>',
   pin: '<path d="M9 3.5h6M10 3.5v5.2l-3.2 3.1c-.4.4-.1 1.2.5 1.2h9.4c.6 0 .9-.8.5-1.2L14 8.7V3.5Z"/><path d="M12 13v8"/>',
   copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5v-2a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/>',
   open: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13M17.5 13.5v4a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h4"/>',
@@ -714,21 +707,22 @@ function option(tag, className, note, at) {
 function noteRow(note) {
   const item = option("li", "", note, -1)
   item.classList.toggle("movable", canMove(note))
-  // Mouse only: ⌥↑ and ⌥↓ do the same from the keyboard.
-  const grip = element("span", "grip", "")
-  grip.title = "Drag to reorder (⌥↑ ⌥↓)"
-  grip.setAttribute("aria-hidden", "true")
-  grip.innerHTML = `<svg viewBox="0 0 24 24">${icons.grip}</svg>`
-  grip.addEventListener("mousedown", event => dragPinned(event, note))
-  const actions = element("span", "actions", "")
-  // ⌘1 to ⌘9 open the first nine pinned notes, which Swift lists first.
+  // ⌘1 to ⌘9 open the first nine pinned notes, which Swift lists first. The key is also what a
+  // pinned note is dragged by, which leaves the row's width to the name; ⌥↑ and ⌥↓ do the same
+  // from the keyboard.
   const number = note.pinned ? notes.findIndex(({id}) => id === note.id) + 1 : 0
+  const key = element("span", "key", number >= 1 && number <= 9 ? `⌘${number}` : "")
+  if (canMove(note)) {
+    key.title = "Drag to reorder (⌥↑ ⌥↓)"
+    key.addEventListener("mousedown", event => dragPinned(event, note))
+  }
+  const actions = element("span", "actions", "")
   actions.append(
-    element("span", "key", number >= 1 && number <= 9 ? `⌘${number}` : ""),
+    key,
     actionButton("pin", note.pinned ? "Unpin" : "Pin", () => post("pin", {id: note.id}), Boolean(note.pinned)),
     actionButton("trash", "Move to Trash (⌘⌫)", () => post("trash", {id: note.id})),
   )
-  item.append(grip, element("span", "title", note.title), actions)
+  item.append(element("span", "title", note.title), actions)
   return item
 }
 
@@ -769,9 +763,10 @@ query.addEventListener("input", () => {
 })
 
 // Keys in the search field and in the list, which don't pass the focus to each other with the
-// arrows: Tab does. In the field ↑ and ↓ go through the searches made before, and Return goes to
-// the next match, ⇧Return to the one before. In the list ↑ and ↓ go through the rows, each row's
-// note showing beside the list, and Return closes the switcher on the chosen row's note.
+// arrows. In the field ↑ and ↓ go through the searches made before, and Return takes the focus
+// to the top of the list. In the list ↑ and ↓ go through the rows, each row's note showing
+// beside the list, and Return closes the switcher on the chosen row's note. Tab goes from one
+// to the other.
 function onKey(event) {
   // Keys that confirm or cancel an input method's composition belong to it.
   if (event.isComposing || event.keyCode === 229) return
@@ -791,8 +786,12 @@ function onKey(event) {
     if (inList) query.focus()
     else results.focus()
   } else if (event.key === "Enter") {
-    if (!inList) step(event.shiftKey ? -1 : 1)
-    else if (!row || row === shown) closeSwitcher()
+    if (!inList) {
+      if (rows.length) {
+        results.focus()
+        show(0)
+      }
+    } else if (!row || row === shown) closeSwitcher()
     else choose(row)
   } else if (event.key === "Escape") {
     if (dismiss) post("escape")

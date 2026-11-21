@@ -55,7 +55,7 @@ private let panelKeys = [
 private let switcherKeys = [
     ("Go from note to note", "⌘P, then ↑ / ↓"),
     ("Find in this note and the others", "⌘F, then type"),
-    ("Next / previous match", "↩ / ⇧↩ in the search field"),
+    ("To the first match, then on through them", "↩ in the search field, then ↑ / ↓"),
     ("Earlier / later searches", "↑ / ↓ in the search field"),
     ("From the search field to the list and back", "Tab"),
     ("Open it", "↩"),
