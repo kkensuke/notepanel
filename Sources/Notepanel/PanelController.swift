@@ -347,7 +347,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Opens the next or previous note in the switcher's order, wrapping around. A note that
     /// can't be read, such as one that isn't UTF-8 text, is passed over, so cycling goes on.
     private func cycle(_ step: Int) {
-        let names = orderedNotes().map(\.name)
+        let names = orderedNotes()
         guard let current = store.current, let index = names.firstIndex(of: current) else { return }
         let count = names.count
         let others = (1..<count).map { names[((index + step * $0) % count + count) % count] }
@@ -357,11 +357,9 @@ final class PanelController: NSObject, NSWindowDelegate {
     /// Every rename comes through here, from the store: the user's, a file following its
     /// first line, and a conflict copy.
     private func noteRenamed(_ old: String, _ new: String) {
-        var pins = Prefs.pinned(in: store.folder)
-        if let index = pins.firstIndex(of: old) {
-            pins[index] = new
-            Prefs.setPinned(pins, in: store.folder)
-        }
+        let pins = Prefs.pinned(in: store.folder)
+        let renamed = pinsRenaming(pins, old, to: new)
+        if renamed != pins { Prefs.setPinned(renamed, in: store.folder) }
         for page in [bridge, switcher.bridge] { page.send("renamed", ["from": old, "to": new]) }
         if store.current == new { rememberCurrent() }
         titleBar.updateTitle()
@@ -418,26 +416,22 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     private func togglePin(_ name: String) {
-        var pins = Prefs.pinned(in: store.folder)
-        if let index = pins.firstIndex(of: name) { pins.remove(at: index) } else { pins.append(name) }
-        Prefs.setPinned(pins, in: store.folder)
+        Prefs.setPinned(pinsToggling(Prefs.pinned(in: store.folder), name), in: store.folder)
         switcher.bridge.send("notes", notesForSwitcher())
     }
 
-    /// The page sends the pinned notes it shows, in their new order. Pins whose file is missing
-    /// aren't shown, so they keep their place after the others.
+    /// The page sends the pinned notes it shows, in their new order.
     private func orderPins(_ ids: [String]) {
-        let pins = Prefs.pinned(in: store.folder)
-        guard Set(ids).count == ids.count, Set(ids).isSubset(of: pins) else { return }
-        Prefs.setPinned(ids + pins.filter { !ids.contains($0) }, in: store.folder)
+        guard let pins = pinsReordered(Prefs.pinned(in: store.folder), shown: ids) else { return }
+        Prefs.setPinned(pins, in: store.folder)
         switcher.bridge.send("notes", notesForSwitcher())
     }
 
     /// Cmd-1 to Cmd-9 open the first to ninth pinned note.
     private func openPinned(_ number: Int) {
         let pins = Set(Prefs.pinned(in: store.folder))
-        let pinned = orderedNotes().filter { pins.contains($0.name) }
-        if pinned.indices.contains(number - 1) { open(pinned[number - 1].name) }
+        let pinned = orderedNotes().filter { pins.contains($0) }
+        if pinned.indices.contains(number - 1) { open(pinned[number - 1]) }
     }
 
     /// ⌘P: the switcher with the focus in its list, to go from note to note. The page closes it
@@ -494,22 +488,19 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     /// Pinned notes first, in the order the user gave them, then the rest, newest first. The
     /// switcher, cycling and Cmd-1 to Cmd-9 share it.
-    private func orderedNotes() -> [NoteInfo] {
-        let pins = Prefs.pinned(in: store.folder)
-        let notes = store.list()
-        let pinned = pins.compactMap { name in notes.first { $0.name == name } }
-        return pinned + notes.filter { !pins.contains($0.name) }
+    private func orderedNotes() -> [String] {
+        pinnedFirst(store.list().map(\.name), pins: Prefs.pinned(in: store.folder))
     }
 
     // shortcut: reads every note on each open of the switcher; fine for hundreds of notes.
     private func notesForSwitcher() -> [[String: Any]] {
         let pins = Set(Prefs.pinned(in: store.folder))
-        return orderedNotes().map { note in
+        return orderedNotes().map { name in
             [
-                "id": note.name,
-                "title": note.name,
-                "pinned": pins.contains(note.name),
-                "text": note.name == store.current ? store.text : (store.read(note.name) ?? ""),
+                "id": name,
+                "title": name,
+                "pinned": pins.contains(name),
+                "text": name == store.current ? store.text : (store.read(name) ?? ""),
             ]
         }
     }

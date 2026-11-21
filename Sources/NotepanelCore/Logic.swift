@@ -182,3 +182,35 @@ public enum KeepHistory: String, Sendable {
     /// The age past which versions go, or nil to keep them.
     public var limit: TimeInterval? { self == .oneYear ? 365 * 24 * 60 * 60 : nil }
 }
+
+// MARK: - Pins
+
+// Pinned notes are kept by name, in the order the user gave them. These work out what that list
+// becomes; the app keeps it.
+
+/// A renamed note keeps its place.
+public func pinsRenaming(_ pins: [String], _ old: String, to new: String) -> [String] {
+    var pins = pins
+    if let index = pins.firstIndex(of: old) { pins[index] = new }
+    return pins
+}
+
+/// A note pinned goes at the end; pinned again, it's taken away.
+public func pinsToggling(_ pins: [String], _ name: String) -> [String] {
+    var pins = pins
+    if let index = pins.firstIndex(of: name) { pins.remove(at: index) } else { pins.append(name) }
+    return pins
+}
+
+/// The switcher sends the pinned notes it shows, in their new order. Pins whose file is missing
+/// aren't shown, so they keep their place after the others. Nil unless `shown` is some of the
+/// pins, each once.
+public func pinsReordered(_ pins: [String], shown: [String]) -> [String]? {
+    guard Set(shown).count == shown.count, Set(shown).isSubset(of: pins) else { return nil }
+    return shown + pins.filter { !shown.contains($0) }
+}
+
+/// Pinned notes first, in the order the user gave them, then the rest in the order they came.
+public func pinnedFirst(_ names: [String], pins: [String]) -> [String] {
+    pins.filter(names.contains) + names.filter { !pins.contains($0) }
+}
