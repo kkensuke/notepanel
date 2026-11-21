@@ -7,7 +7,8 @@ const pageURL = new URL("../../web/index.html", import.meta.url).href
 const chrome = process.env.CHROME ?? (process.platform === "darwin"
   ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   : "/usr/bin/google-chrome")
-const browser = await puppeteer.launch({executablePath: chrome, args: ["--no-sandbox"]})
+// A busy CI runner can take longer than the default 30 s to start Chrome.
+const browser = await puppeteer.launch({executablePath: chrome, args: ["--no-sandbox"], timeout: 120_000})
 const errors = []
 // The page as Swift loads it, which keeps what it posts in `sent`.
 // Each in a window of its own, as in the app, so that neither is a tab out of sight and paused.
