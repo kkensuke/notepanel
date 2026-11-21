@@ -36,6 +36,26 @@ const icons = {
 
 export const iconSVG = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]}</svg>`
 
+// A Copy button shows a tick for a moment after it copied.
+export function flashCopied(button) {
+  button.innerHTML = iconSVG("check")
+  clearTimeout(button.timer)
+  button.timer = setTimeout(() => (button.innerHTML = iconSVG("copy")), 1500)
+}
+
+// Follows the mouse until its button is let go. The body has `className` meanwhile, for the cursor.
+export function drag(className, move, drop = () => {}) {
+  document.body.classList.add(className)
+  const up = () => {
+    removeEventListener("mousemove", move)
+    removeEventListener("mouseup", up)
+    document.body.classList.remove(className)
+    drop()
+  }
+  addEventListener("mousemove", move)
+  addEventListener("mouseup", up)
+}
+
 export function actionButton(name, label, onClick, pressed) {
   const button = document.createElement("button")
   button.className = `action ${name}`

@@ -33,7 +33,7 @@ import {
   toggleTask,
   countCharacters,
 } from "./logic.js"
-import {post, $, iconSVG, actionButton} from "./dom.js"
+import {post, $, actionButton, flashCopied} from "./dom.js"
 import {footerHeight, countElement} from "./footer.js"
 
 const editorElement = $("editor")
@@ -192,12 +192,9 @@ const linkPopup = hoverTooltip(
 function linkButtons(view, url, urlFrom) {
   const dom = document.createElement("div")
   dom.className = "cm-linkButtons"
-  let timer = 0
   const copy = actionButton("copy", "Copy Link", () => {
     post("copy", {text: url})
-    copy.innerHTML = iconSVG("check")
-    clearTimeout(timer)
-    timer = setTimeout(() => (copy.innerHTML = iconSVG("copy")), 1500)
+    flashCopied(copy)
   })
   dom.append(actionButton("open", "Open Link (⌘-click)", () => post("openURL", {url})), copy)
   return {
@@ -209,7 +206,7 @@ function linkButtons(view, url, urlFrom) {
       const top = (row.top + row.bottom - dom.parentElement.offsetHeight) / 2
       return {left: row.left, right: row.left, top, bottom: top}
     },
-    destroy: () => clearTimeout(timer),
+    destroy: () => clearTimeout(copy.timer),
   }
 }
 

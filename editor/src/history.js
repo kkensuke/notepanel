@@ -1,6 +1,6 @@
 // The history: the open note's earlier versions, over the note, to copy from.
 import {versionLabel} from "./logic.js"
-import {post, $, element, iconSVG, actionButton} from "./dom.js"
+import {post, $, element, actionButton, flashCopied} from "./dom.js"
 import {view} from "./editor.js"
 
 const historyView = $("history")
@@ -32,11 +32,11 @@ export function closeHistory() {
 
 function renderHistory() {
   const now = new Date()
-  const rows = versions.map((version, index) => versionRow(version, index, now))
-  versionList.replaceChildren(...(rows.length ? rows : [element("li", "empty", "No earlier versions")]))
+  const items = versions.map((version, index) => versionRow(version, index, now))
+  versionList.replaceChildren(...(items.length ? items : [element("li", "empty", "No earlier versions")]))
   versionText.textContent = versions[chosen]?.text ?? ""
   versionText.scrollTop = 0
-  const active = rows[chosen]
+  const active = items[chosen]
   if (active) historyView.setAttribute("aria-activedescendant", active.id)
   else historyView.removeAttribute("aria-activedescendant")
   active?.scrollIntoView({block: "nearest"})
@@ -64,10 +64,7 @@ function copyVersion(index) {
   if (!version) return
   post("copy", {text: version.text})
   const button = versionList.children[index]?.querySelector(".action.copy")
-  if (!button) return
-  button.innerHTML = iconSVG("check")
-  clearTimeout(button.timer)
-  button.timer = setTimeout(() => (button.innerHTML = iconSVG("copy")), 1500)
+  if (button) flashCopied(button)
 }
 
 function chooseVersion(index) {

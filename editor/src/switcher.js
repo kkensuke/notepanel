@@ -1,7 +1,7 @@
 // The switcher: this page in a window of its own, beside the panel. It asks Swift to show a row's
 // note, and the note's page puts the cursor there and marks what the search found.
 import {rankNotes, snippetAt} from "./logic.js"
-import {post, $, element, marked, actionButton} from "./dom.js"
+import {post, $, element, marked, actionButton, drag} from "./dom.js"
 
 const switcher = $("switcher")
 const query = $("query")
@@ -44,21 +44,13 @@ function dragPinned(event, note) {
   event.preventDefault()
   event.stopPropagation()
   if (event.button !== 0) return
-  document.body.classList.add("dragging")
   const move = ({clientY}) => {
-    const rows = [...results.children].slice(0, pinnedCount())
-    const over = rows.findIndex(row => clientY < row.getBoundingClientRect().bottom)
+    const items = [...results.children].slice(0, pinnedCount())
+    const over = items.findIndex(item => clientY < item.getBoundingClientRect().bottom)
     // The rows show copies of the notes, so the note is found by its id.
-    movePinned(notes.findIndex(({id}) => id === note.id), over < 0 ? rows.length - 1 : over, false)
+    movePinned(notes.findIndex(({id}) => id === note.id), over < 0 ? items.length - 1 : over, false)
   }
-  const drop = () => {
-    removeEventListener("mousemove", move)
-    removeEventListener("mouseup", drop)
-    document.body.classList.remove("dragging")
-    savePinOrder()
-  }
-  addEventListener("mousemove", move)
-  addEventListener("mouseup", drop)
+  drag("dragging", move, savePinOrder)
 }
 
 // ⌘P brings the switcher up with the focus in the list, on the open note (`current`), so the
@@ -119,15 +111,7 @@ $("edge").addEventListener("mousedown", event => {
   if (event.button !== 0) return
   const start = event.screenX
   const width = innerWidth
-  document.body.classList.add("resizing")
-  const move = ({screenX}) => post("sideWidth", {width: width + start - screenX})
-  const drop = () => {
-    removeEventListener("mousemove", move)
-    removeEventListener("mouseup", drop)
-    document.body.classList.remove("resizing")
-  }
-  addEventListener("mousemove", move)
-  addEventListener("mouseup", drop)
+  drag("resizing", ({screenX}) => post("sideWidth", {width: width + start - screenX}))
 })
 
 // What was searched for before, oldest first. A search is remembered once it's used, to go to a
@@ -213,19 +197,24 @@ function select(index) {
 }
 
 
-// A row to choose, added to `rows`: an option of the list. A press of the mouse shows its note
-// beside the switcher, and a double click closes the switcher on it, as Return does in the list.
+// A press of the mouse on `node` shows the note of the row `index()` gives beside the switcher,
+// and a double click closes the switcher on it, as Return does in the list.
+function showsOnPress(node, index) {
+  node.addEventListener("mousedown", event => {
+    event.preventDefault()
+    results.focus()
+    show(index())
+  })
+  node.addEventListener("dblclick", closeSwitcher)
+}
+
+// A row to choose, added to `rows`: an option of the list.
 function option(tag, className, note, at) {
   const row = {note, at, item: element(tag, className, "")}
   row.item.id = `note-${rows.length}`
   row.item.setAttribute("role", "option")
   row.item.setAttribute("aria-selected", "false")
-  row.item.addEventListener("mousedown", event => {
-    event.preventDefault()
-    results.focus()
-    show(rows.indexOf(row))
-  })
-  row.item.addEventListener("dblclick", closeSwitcher)
+  showsOnPress(row.item, () => rows.indexOf(row))
   rows.push(row)
   return row.item
 }
@@ -274,14 +263,7 @@ function group(note) {
     line.append(marked("span", "snippet", snippet.text, snippet.ranges))
     item.append(line)
   }
-  if (note.lines.length) {
-    name.addEventListener("mousedown", event => {
-      event.preventDefault()
-      results.focus()
-      show(first)
-    })
-    name.addEventListener("dblclick", closeSwitcher)
-  }
+  if (note.lines.length) showsOnPress(name, () => first)
   return item
 }
 
