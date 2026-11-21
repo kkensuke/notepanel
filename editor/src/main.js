@@ -59,6 +59,8 @@ const switcher = $("switcher")
 const query = $("query")
 const results = $("results")
 const total = $("total")
+const split = $("split")
+const preview = $("preview")
 const historyView = $("history")
 const versionList = $("versions")
 const versionText = $("version")
@@ -366,7 +368,7 @@ function openNote(id, text, keepSwitcher) {
 
 const defaultFont = `"SF Mono", ui-monospace, Menlo, monospace`
 
-function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, indentSize: indent}) {
+function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, indentSize: indent, noteShare: share}) {
   const family = String(fontFamily ?? "").replace(/["\\;{}]/g, "").trim()
   const root = document.documentElement.style
   root.setProperty("--font", family ? `"${family}", ${defaultFont}` : defaultFont)
@@ -374,6 +376,7 @@ function applyOptions({fontFamily, fontSize, uiFontSize, showWhitespace: show, i
   root.setProperty("--ui-size", `${Number(uiFontSize) || 15}px`)
   showWhitespace = show === true
   indentSize = indent === 2 ? 2 : 4
+  setNoteShare(Number.isFinite(share) ? Math.min(1, Math.max(0, share)) : 0.4)
   view.dispatch({effects: settings.reconfigure(settingsExtensions())})
   view.requestMeasure()
 }
@@ -479,17 +482,31 @@ function closeSwitcher() {
   view.focus()
 }
 
-// Opens a row's note at the row's line, with the line's word for the note's find.
-function choose({note, at}) {
-  const place = note.matches[at]
-  jump = {id: note.id, place, term: place && searchTerms(query.value)[place.term]}
+// Opens a row's note: at the row's line, or where a click in the preview says.
+function choose({note, at}, place = note.matches[at]) {
+  // The word for the note's find: the line's, or for a click in a line's preview the first typed.
+  const term = at < 0 ? undefined : searchTerms(query.value)[place.term ?? 0]
+  jump = {id: note.id, place, term, top: note === rows[selected]?.note ? previewTop(place) : null}
   post("select", {id: note.id})
 }
 
-// Once the note is open, the cursor goes on the place it was chosen for, in the middle of the
-// panel, and the note's find opens on the word found there: its matches are marked, and ⌘G and
-// ⇧⌘G go on through them.
-function land({id, place, term}) {
+// Where the preview has the note's text, so that the text is in the same place as the note
+// opens: a position in the first line that shows and how far under the page's top it is, and how
+// far under it `place` ends, if that shows.
+function previewTop(place) {
+  if (!preview.offsetHeight) return null
+  const top = switcher.getBoundingClientRect().top
+  const pos = previewView.lineBlockAtHeight(preview.getBoundingClientRect().top - previewView.documentTop).from
+  const coords = previewView.coordsAtPos(pos)
+  const end = place && previewView.coordsAtPos(place.to)
+  return coords && {pos, y: coords.top - top, end: end ? end.bottom - top : 0}
+}
+
+// Once the note is open, the cursor goes on the place it was chosen for, and the note's find
+// opens on the word found there: the matches are marked as the preview had them, and ⌘G and ⇧⌘G
+// go on through them. The text stays where the preview had it, or goes up by as much as the find
+// would cover of the place.
+function land({id, place, term, top}) {
   const effects = []
   if (term) {
     openSearchPanel(view)
@@ -498,13 +515,18 @@ function land({id, place, term}) {
   }
   let {from = -1, to = -1} = place ?? {}
   // A match's place is from the text the list had. If the file has changed since, the first
-  // match will do.
+  // match will do. A click's place is empty, and is good wherever it's in the text.
   if (to > from && fold(view.state.sliceDoc(from, to)) !== term) {
     from = fold(view.state.doc.toString()).indexOf(term)
     to = from + term.length
   }
   const selection = from < 0 || to > view.state.doc.length ? undefined : {anchor: from, head: to}
-  if (selection) effects.push(EditorView.scrollIntoView(from, {y: "center"}))
+  if (top && top.pos <= view.state.doc.length && (!selection || top.end)) {
+    const covered = selection ? Math.max(0, top.end - view.scrollDOM.getBoundingClientRect().height) : 0
+    effects.push(EditorView.scrollIntoView(top.pos, {y: "start", yMargin: top.y - covered}))
+  } else if (selection) {
+    effects.push(EditorView.scrollIntoView(from, {y: "center"}))
+  }
   view.dispatch({selection, effects})
   // The find took the focus as it opened.
   view.focus()
@@ -526,6 +548,7 @@ function update() {
   }
   total.textContent = `${ranked.length} ${ranked.length === 1 ? "note" : "notes"}`
   results.replaceChildren(...(items.length ? items : [element("li", "empty", "No notes match")]))
+  sizeSheet()
   select(selected)
 }
 
@@ -540,6 +563,7 @@ function select(index) {
   } else {
     query.removeAttribute("aria-activedescendant")
   }
+  showPreview()
 }
 
 function element(tag, className, text) {
@@ -560,6 +584,90 @@ function marked(tag, className, text, ranges) {
   node.append(text.slice(end))
   return node
 }
+
+// Under the sheet is the chosen row's note, laid out as the note itself is, so the switcher
+// shows what Return opens: the note from its top, or at the row's line, with the matches marked
+// as the note's find will have them. A click opens the note at the place clicked.
+const matchMark = Decoration.mark({class: "cm-searchMatch"})
+const shownMatchMark = Decoration.mark({class: "cm-searchMatch cm-searchMatch-selected"})
+const previewExtensions = [
+  EditorState.readOnly.of(true),
+  EditorView.editable.of(false),
+  EditorView.lineWrapping,
+  hangingIndents,
+  markdown({base: markdownLanguage}),
+  syntaxHighlighting(highlight),
+  theme,
+  EditorView.domEventHandlers({
+    mousedown(event, preview) {
+      const row = rows[selected]
+      const at = preview.posAtCoords({x: event.clientX, y: event.clientY})
+      // Focus stays in the search field.
+      event.preventDefault()
+      if (row && at !== null && event.button === 0) choose(row, {from: at, to: at})
+      return true
+    },
+  }),
+]
+const previewView = new EditorView({parent: preview, state: EditorState.create({extensions: previewExtensions})})
+
+function showPreview() {
+  if (!preview.offsetHeight) return
+  const row = rows[selected]
+  const match = row?.note.matches[row.at]
+  const marks = new RangeSetBuilder()
+  if (match)
+    row.note.matches.forEach((other, index) => marks.add(other.from, other.to, index === row.at ? shownMatchMark : matchMark))
+  // With no note to choose, the open note stays in sight.
+  const doc = row ? row.note.text : view.state.doc
+  previewView.setState(EditorState.create({doc, extensions: [previewExtensions, EditorView.decorations.of(marks.finish())]}))
+  // The view keeps the last note's scroll position. A note shows from its top; a line comes one
+  // line under the preview's top, where the note's find, once open at the panel's bottom, doesn't
+  // cover it.
+  previewView.scrollDOM.scrollTop = 0
+  if (match)
+    previewView.dispatch({effects: EditorView.scrollIntoView(match.from, {y: "start", yMargin: previewView.defaultLineHeight})})
+}
+
+// How much of the switcher's height the chosen note's text takes. Dragging the bar under the
+// list sets it: from none, which leaves the list alone, as far as leaving the search field and
+// the pinned notes' rows. Swift keeps it, and sends it with the options.
+let noteShare = 0.4
+
+function setNoteShare(share) {
+  noteShare = share
+  switcher.style.setProperty("--note-share", share)
+}
+
+// The room the sheet keeps: the search field and the pinned notes' rows, two rows at the least.
+function sizeSheet() {
+  const top = results.firstElementChild?.offsetTop ?? results.offsetTop
+  const least = top + Math.max(pinnedCount(), 2) * (rows[0]?.item.offsetHeight ?? 0)
+  switcher.style.setProperty("--sheet-least", `${least + split.offsetHeight}px`)
+}
+
+split.addEventListener("mousedown", event => {
+  // Focus stays in the search field.
+  event.preventDefault()
+  if (event.button !== 0) return
+  document.body.classList.add("splitting")
+  const move = ({clientY}) => {
+    const box = switcher.getBoundingClientRect()
+    const height = box.bottom - clientY
+    // Under 24 px is none: a strip that thin shows no line whole.
+    setNoteShare(height < 24 ? 0 : Math.min(1, height / box.height))
+  }
+  const drop = () => {
+    removeEventListener("mousemove", move)
+    removeEventListener("mouseup", drop)
+    document.body.classList.remove("splitting")
+    // The chosen row stays in sight in a list that got shorter, and its note in a preview that grew.
+    select(selected)
+    post("noteShare", {share: noteShare})
+  }
+  addEventListener("mousemove", move)
+  addEventListener("mouseup", drop)
+})
 
 // Line icons drawn with the text color; a pinned note's pin is filled.
 const icons = {

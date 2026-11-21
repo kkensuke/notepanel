@@ -126,13 +126,50 @@ footer {
   display: none;
 }
 
-/* The switcher is a sheet, with the search field and the list. */
+/* The switcher is a sheet, with the search field and the list, and under it the chosen note's
+   text, across the panel as the note's own text is once it opens. Dragging the bar between them
+   sets how much of the switcher the text takes: --note-share, from none, as far as leaving the
+   search field and the pinned notes' rows, which is --sheet-least. main.js sets both. */
 .sheet {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--panel);
+}
+
+#preview {
+  flex: none;
+  height: calc(var(--note-share, 0.4) * 100%);
+  max-height: calc(100% - var(--sheet-least, 0px));
+}
+
+/* The bar keeps its place at the panel's bottom when the text takes no room. */
+#split {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: 9px;
+  border-top: 1px solid var(--border);
+  cursor: row-resize;
+}
+
+#split::after {
+  content: "";
+  width: 32px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+#split:hover::after,
+body.splitting #split::after {
+  background: var(--muted);
+}
+
+body.splitting,
+body.splitting * {
+  cursor: row-resize;
 }
 
 #history:focus {
@@ -293,7 +330,8 @@ footer {
   font-size: calc(var(--ui-size) * 0.87);
 }
 
-/* What matched the search, in a name or a line of text. */
+/* What matched the search, in a name or a line of text. The preview marks its matches as the
+   note's find does. */
 #results mark {
   background: none;
   color: var(--fg);

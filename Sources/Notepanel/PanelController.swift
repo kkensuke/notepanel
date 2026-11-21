@@ -221,10 +221,13 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         if store.current == nil { openSomeNote() } else { rememberCurrent() }
     }
 
-    func setOptions(fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int) {
+    func setOptions(
+        fontFamily: String, fontSize: Double, uiFontSize: Double, showWhitespace: Bool, indentSize: Int,
+        noteShare: Double
+    ) {
         let new: NSDictionary = [
             "fontFamily": fontFamily, "fontSize": fontSize, "uiFontSize": uiFontSize,
-            "showWhitespace": showWhitespace, "indentSize": indentSize,
+            "showWhitespace": showWhitespace, "indentSize": indentSize, "noteShare": noteShare,
         ]
         guard new != options else { return }
         options = new
@@ -291,6 +294,9 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
             if let id = body["id"] as? String { togglePin(id) }
         case "orderPins":
             if let ids = body["ids"] as? [String] { orderPins(ids) }
+        case "noteShare":
+            // Kept with the settings, which send it back to the page with the other options.
+            if let share = body["share"] as? Double { UserDefaults.standard.set(share, forKey: "noteShare") }
         case "openURL":
             // The page is trusted, but a link can say anything, so only web and mail links open.
             guard let string = body["url"] as? String, let url = URL(string: string),

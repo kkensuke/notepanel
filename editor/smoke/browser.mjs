@@ -504,6 +504,51 @@ await press("Escape")
 await press("Escape")
 assert.equal(await page.$(".cm-search"), null)
 
+// Under the list is the chosen row's note, at the row's line, with every match marked as the
+// note's find will mark them.
+const previewMarks = () => page.$$eval("#preview .cm-searchMatch", els =>
+  els.map(e => [e.textContent, e.classList.contains("cm-searchMatch-selected")]))
+await receive("switcher", {notes: found, force: true})
+assert.match(await page.$eval("#preview .cm-content", e => e.innerText), /^# Budget 2026/)
+assert.deepEqual(await previewMarks(), [])
+await page.keyboard.type("budget review")
+assert.deepEqual(await previewMarks(), [["Budget", false], ["budget", true], ["budget", false], ["review", false]])
+await press("ArrowDown")
+await press("ArrowDown")
+assert.match(await page.$eval("#preview .cm-content", e => e.innerText), /^- Send the ＢＵＤＧＥＴ draft/)
+assert.deepEqual(await previewMarks(), [["ＢＵＤＧＥＴ", true], ["review", false]])
+// A press in the note's text opens the note there.
+await clear()
+await page.click("#preview .cm-line:last-child")
+assert.equal((await last("select"))?.id, "Weekly plan")
+await press("a", ["Meta"])
+await press("Backspace")
+// The bar under the list sets how much of the switcher the text takes: from none, as far as
+// leaving the search field and the pinned notes' rows, two rows at the least. Swift keeps it.
+const previewHeight = () => page.$eval("#preview", e => e.offsetHeight)
+const dragBar = async y => {
+  const bar = await (await page.$("#split")).boundingBox()
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(bar.x + bar.width / 2, y, {steps: 3})
+  await page.mouse.up()
+}
+assert.equal(await previewHeight(), 160)
+await receive("options", {fontSize: 14, uiFontSize: 15, noteShare: 0.25})
+assert.equal(await previewHeight(), 100)
+await clear()
+await dragBar(390)
+assert.equal(await previewHeight(), 0)
+assert.equal((await last("noteShare"))?.share, 0)
+await dragBar(0)
+assert.equal((await last("noteShare"))?.share, 1)
+assert.equal(
+  await page.$eval("#results", e => e.clientHeight), 2 * (await page.$eval("#results li", e => e.offsetHeight)))
+assert.equal(await page.evaluate(() => document.activeElement.id), "query", "the search field keeps the focus")
+await receive("options", {fontSize: 14, uiFontSize: 15})
+assert.equal(await previewHeight(), 160)
+await press("Escape")
+
 assert.deepEqual(errors, [])
 console.log("smoke test passed")
 await browser.close()
