@@ -319,6 +319,8 @@ public func versionsToKeep(_ dates: [Date], now: Date, limit: TimeInterval?) -> 
 
 ## 7. 変更するファイル
 
+この節は、実装した時点のファイルで書いている。その後のファイルの分け方は `docs/design.md` の表 2 にある。
+
 表9：変更するファイル
 
 | ファイル | 変更 |

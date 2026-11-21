@@ -53,6 +53,8 @@ ponytail の指示に従い、次の順で手段を選ぶ。
 | JavaScript（エディタ・切替画面） | 約 300 行 |
 | HTML・CSS | 約 100 行 |
 
+これは当初の見込みである。機能を加えた現在（v0.4 の後）は、`NotepanelChecks` を除く Swift が約 3200 行、`editor/src` の JavaScript が約 1400 行ある。
+
 CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild で minify すると、約 535 KB（gzip 約 183 KB）になる。ローカルから 1 回読むだけなので、呼び出し速度には影響しない見込み。
 
 ## 4. 構成
@@ -63,7 +65,7 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 ┌──────────────────────────── notepanel.app（LSUIElement） ─────────────────────────────┐
 │                                                                                      │
 │  HotKeys ──toggle/create/search──▶ PanelController ◀──click── StatusItem             │
-│  (RegisterEventHotKey)              │  表示・非表示・フォーカス復帰・高さ調整・名前の編集     │
+│  (RegisterEventHotKey)              │  表示・非表示・フォーカス復帰・ノートの操作             │
 │                                     ▼                                                │
 │                              NotePanel（パネルと切替画面のウインドウ）                 │
 │                               │ キー経路の第 1 段（アプリのコマンド、⌘X/C/V）              │
@@ -80,13 +82,19 @@ CodeMirror 6 に Markdown の色分け（lang-markdown）を含めて esbuild �
 |---|---|---|
 | `AppDelegate` | `App.swift` | 起動、accessory ポリシー、メニューバーアイコン、設定の反映 |
 | `NotePanel` | `NotePanel.swift` | NSPanel のサブクラス。キー入力の第 1 段（§5.6）。パネルと、切替画面のウインドウの両方に使う |
-| `PanelController` | `PanelController.swift` | 表示・非表示・トグル、フォーカス復帰、高さ調整、ツールバー（タイトルとボタン）、ゴミ箱の確認、メッセージの処理、切替画面のウインドウ（2 つのページの中継） |
+| `PanelController` | `PanelController.swift` | 表示・非表示・トグル、フォーカス復帰、ノートの操作（開く、新規、巡回、名前の変更、ゴミ箱の確認、ピン留め）、2 つのページからのメッセージの処理と中継、設定の反映 |
+| `SwitcherWindow` | `SwitcherWindow.swift` | 切替画面のウインドウ：パネルの左への配置、幅と高さ、ディスプレイの左端に場所がないときのパネルの移動 |
+| `TitleBar` | `TitleBar.swift`、`TitleBarViews.swift` | ツールバー（一覧・新規・フォルダを開くのボタン）、ノート名の表示と名前の変更、保存状態のアイコン |
+| `Backdrop` | `Backdrop.swift` | ページの下のガラスと膜、背景の不透明度 |
+| `PanelPlacement` | `PanelPlacement.swift` | ⌃⌘M、ディスプレイごとの既定の位置と大きさ |
 | `HotKeys` | `HotKeys.swift` | `RegisterEventHotKey` の薄い包み。アクセシビリティ権限は不要 |
 | `EditorBridge` | `EditorBridge.swift` | WKWebView の生成と、JSON メッセージの送受信。ノートのページと切替画面のページに 1 つずつ |
-| `Prefs`、設定画面 | `Settings.swift` | `UserDefaults` の読み書き、SwiftUI の設定画面、ショートカットの録画 |
+| `Prefs` | `Prefs.swift` | `UserDefaults` のキーと既定値、その読み書き、ショートカット（`Shortcut`） |
+| 設定画面 | `Settings.swift`、`ShortcutRecorder.swift` | SwiftUI の設定画面、ショートカットの録画 |
+| `KeysWindow` | `KeysWindow.swift` | キー操作の一覧 |
 | `NoteStore` | `NotepanelCore/NoteStore.swift` | 一覧・読み込み・保存・新規・名前変更・ゴミ箱、自動保存、外部変更と衝突の検知 |
-| 純粋関数 | `NotepanelCore/Logic.swift` | 高さの計算、1 行目からの名前、追従の判定、`Untitled N` の命名、名前の検証、衝突時の名前、⌃⌘M で置く位置、ショートカットに使える修飾キー |
-| エディタ | `editor/src/main.js`、`logic.js` | CodeMirror 6 の設定、ノートごとの状態保持、切替画面（同じページを切替画面のウインドウに読み込む）、文字数、Esc の最終処理 |
+| 純粋関数 | `NotepanelCore/Logic.swift` | 1 行目からの名前、追従の判定、`Untitled N` の命名、名前の検証、衝突時の名前、⌃⌘M で置く位置、ショートカットに使える修飾キー、版の名前と間引き、ピン留めの一覧 |
+| エディタ | `editor/src/` | `main.js`（Swift からのメッセージを各部に渡す）、`editor.js`（CodeMirror 6 の設定、ノートごとの状態保持、検索の印、文字数、Esc の最終処理）、`switcher.js`（切替画面。同じページを切替画面のウインドウに読み込む）、`history.js`（以前の版の画面）、`footer.js`（フッターの大きさ）、`dom.js`（各部が使う要素とボタン）、`logic.js`（純粋関数） |
 
 `NotepanelCore` は Foundation と CoreGraphics だけに依存するライブラリにし、`NotepanelChecks` で確かめられるようにする。
 
@@ -526,7 +534,7 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 
 テスト：
 
-- `NotepanelCore`（高さの計算、表示名、命名、名前の検証、保存・衝突・名前変更、⌃⌘M で置く位置、ショートカットの修飾キー）は、アサーションで確かめる実行ファイル `NotepanelChecks` で確かめる（`swift run NotepanelChecks`）。XCTest は Xcode にしか含まれず、Command Line Tools だけでは使えないため。
+- `NotepanelCore`（表示名、命名、名前の検証、保存・衝突・名前変更、履歴、⌃⌘M で置く位置、ショートカットの修飾キー、ピン留めの一覧）は、アサーションで確かめる実行ファイル `NotepanelChecks` で確かめる（`swift run NotepanelChecks`）。XCTest は Xcode にしか含まれず、Command Line Tools だけでは使えないため。
 - エディタの純粋関数（あいまい一致と並べ替え、URL の抽出、上への行挿入、書式記号の付け外し、リンクの挿入、タスクの切り替え、文字数）は Node の `node --test` で確かめる。
 - CI は、`NotepanelChecks`、ユニバーサルビルド、`npm test`、`npm run smoke` を実行し、`web/editor.js` が `editor/src` から作り直したものと一致するかを確かめる。
 - R1〜R6 と IME は実機で確かめる。実機での利用で問題が出なかったため、v0.4 で README の確認手順と、確認用の切り替え（`activateOnShow`）を外した。
@@ -537,12 +545,14 @@ v0.1 の区分（必須・推奨・任意）と、確定した採否を示す。
 notepanel/
 ├── Package.swift
 ├── Sources/
-│   ├── Notepanel/          # App.swift, NotePanel.swift, PanelController.swift,
-│   │                       # HotKeys.swift, EditorBridge.swift, Settings.swift
+│   ├── Notepanel/          # App.swift, PanelController.swift, NotePanel.swift, SwitcherWindow.swift,
+│   │                       # TitleBar.swift, TitleBarViews.swift, Backdrop.swift, PanelPlacement.swift,
+│   │                       # HotKeys.swift, EditorBridge.swift, Prefs.swift, Settings.swift,
+│   │                       # ShortcutRecorder.swift, KeysWindow.swift
 │   ├── NotepanelCore/      # NoteStore.swift, Logic.swift
 │   └── NotepanelChecks/    # main.swift（swift run NotepanelChecks）
 ├── web/                    # index.html, style.css, editor.js, THIRD_PARTY_LICENSES.txt（後の 2 つは生成物）
-├── editor/                 # package.json, build.mjs, src/main.js, src/logic.js, test/
+├── editor/                 # package.json, build.mjs, src/（main.js ほか）, test/, smoke/
 ├── icon/                   # AppIcon.svg, AppIcon.icns（後者は生成物）
 ├── scripts/bundle.sh
 └── docs/design.md
