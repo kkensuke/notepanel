@@ -521,12 +521,12 @@ final class PanelController: NSObject, NSWindowDelegate, NSToolbarDelegate, NSTe
         alert.beginSheetModal(for: panel) { [weak self] response in
             MainActor.assumeIsolated {
                 guard let self else { return }
-                if response == .alertFirstButtonReturn { trash(name) }
-                if switcherShown {
-                    focusSwitcher()
-                    sideBridge.send("focus", "")
+                if response == .alertFirstButtonReturn { self.trash(name) }
+                if self.switcherShown {
+                    self.focusSwitcher()
+                    self.sideBridge.send("focus", "")
                 } else {
-                    focusEditor()
+                    self.focusEditor()
                 }
             }
         }
