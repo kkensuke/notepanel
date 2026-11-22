@@ -109,9 +109,10 @@ panel), copy the new app to `/Applications`, and open it.
 - **Default place.** `Ctrl+Cmd+M` moves the panel to its default place and size on the display
   with the pointer, which also brings it back if it ended up off the screen, and sets the note's
   text to its default size there. Pressed again before you move the panel, even after notepanel
-  has quit, it goes back to where it was, with the text size it had. Each display has its own default. The standard one is the
-  panel's first size, centered, with 14 pt text; to choose your own, put the panel where you want
-  it on that display, give the text the size you want, and click **Use Current** in Settings.
+  has quit, it goes back to where it was, with the text size it had. Each display has its own
+  default. The standard one is the panel's first size, centered, with 14 pt text; to choose your
+  own, put the panel where you want it on that display, give the text the size you want, and click
+  **Use Current** in Settings.
 
 ## Settings
 
