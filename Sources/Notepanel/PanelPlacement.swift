@@ -43,6 +43,12 @@ final class PanelPlacement {
         defaults.set(key.map { Prefs.defaultFontSize(for: $0) } ?? Prefs.defaultFontSize, forKey: Prefs.Key.fontSize)
     }
 
+    /// The note's text size ⌘0 sets: the default for the display the panel is on, as ⌘0 doesn't
+    /// move the panel.
+    var defaultFontSize: Double {
+        panelScreen?.displayKey.map { Prefs.defaultFontSize(for: $0) } ?? Prefs.defaultFontSize
+    }
+
     /// The display the panel is on, as Settings shows it, and its default for ⌃⌘M.
     func defaultPlace() -> DefaultPlace? {
         guard let screen = panelScreen, let key = screen.displayKey else { return nil }
