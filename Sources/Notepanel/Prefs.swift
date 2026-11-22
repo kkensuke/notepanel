@@ -16,6 +16,14 @@ struct Shortcut: Codable, Equatable {
     }
 }
 
+/// What ⌃⌘M changed, so that pressing it again takes it back: the panel's frame and the note's text
+/// size before, nil if it was never set, and the frame it put the panel at.
+struct BeforeDefault: Codable {
+    var frame: NSRect
+    var fontSize: Double?
+    var placed: NSRect
+}
+
 /// Settings live in UserDefaults. The settings window edits the same keys through @AppStorage.
 enum Prefs {
     /// The names settings are kept under. They must never change: under a new name, what the
@@ -30,6 +38,8 @@ enum Prefs {
         static let indentSize = "indentSize"
         static let showMenuBarIcon = "showMenuBarIcon"
         static let defaultFrames = "defaultFrames"
+        static let defaultFontSizes = "defaultFontSizes"
+        static let beforeDefault = "beforeDefault"
         static let pinned = "pinned"
         static let lastNote = "lastNote"
         static let sideWidth = "sideWidth"
@@ -80,10 +90,34 @@ enum Prefs {
         (UserDefaults.standard.dictionary(forKey: Key.defaultFrames)?[display] as? String).map(NSRectFromString)
     }
 
-    static func setDefaultFrame(_ frame: NSRect?, for display: String) {
-        var all = UserDefaults.standard.dictionary(forKey: Key.defaultFrames) ?? [:]
-        all[display] = frame.map(NSStringFromRect)
-        UserDefaults.standard.set(all, forKey: Key.defaultFrames)
+    /// The note's text size ⌃⌘M sets on a display, saved with its frame. A frame saved before the
+    /// text size was saved with it, or none, has the default text size.
+    static func defaultFontSize(for display: String) -> Double {
+        UserDefaults.standard.dictionary(forKey: Key.defaultFontSizes)?[display] as? Double ?? defaultFontSize
+    }
+
+    /// Sets the frame and the text size together, so that Reset clears both.
+    static func setDefaultFrame(_ frame: NSRect?, fontSize: Double?, for display: String) {
+        let defaults = UserDefaults.standard
+        var sizes = defaults.dictionary(forKey: Key.defaultFontSizes) ?? [:]
+        sizes[display] = fontSize
+        defaults.set(sizes, forKey: Key.defaultFontSizes)
+        var frames = defaults.dictionary(forKey: Key.defaultFrames) ?? [:]
+        frames[display] = frame.map(NSStringFromRect)
+        defaults.set(frames, forKey: Key.defaultFrames)
+    }
+
+    /// What ⌃⌘M last changed, until a second press takes it back. Kept here, not in memory, so that
+    /// the second press works after the app quits too.
+    static var beforeDefault: BeforeDefault? {
+        get {
+            UserDefaults.standard.data(forKey: Key.beforeDefault)
+                .flatMap { try? JSONDecoder().decode(BeforeDefault.self, from: $0) }
+        }
+        set {
+            let data = newValue.flatMap { try? JSONEncoder().encode($0) }
+            UserDefaults.standard.set(data, forKey: Key.beforeDefault)
+        }
     }
 
     /// A shortcut that was never set has its default; one stored as an empty string is off.

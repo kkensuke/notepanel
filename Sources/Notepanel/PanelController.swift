@@ -215,12 +215,12 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.invalidateShadow()
     }
 
-    /// Cmd-plus and Cmd-minus step the note's text size; Cmd-0 sets it back to the default.
-    /// It's the same setting as in the settings window.
+    /// Cmd-plus and Cmd-minus step the note's text size; Cmd-0 sets it to the default for the
+    /// panel's display, as ⌃⌘M does. It's the same setting as in the settings window.
     private func zoom(_ step: Int) {
         let defaults = UserDefaults.standard
         let size = defaults.object(forKey: Prefs.Key.fontSize) as? Double ?? Prefs.defaultFontSize
-        let new = step == 0 ? Prefs.defaultFontSize : size + Double(step)
+        let new = step == 0 ? placement.defaultFontSize : size + Double(step)
         defaults.set(min(Prefs.fontSizes.upperBound, max(Prefs.fontSizes.lowerBound, new)), forKey: Prefs.Key.fontSize)
     }
 
