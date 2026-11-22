@@ -26,7 +26,7 @@ other editor, sync them or back them up as you like.
   keeps earlier versions of each note, which `Cmd+Y` shows.
 - **Quick to switch notes.** `Cmd+P` lists your notes at the panel's left and shows each one
   beside the list as you go through them. `Cmd+F` searches the names and text of your notes
-  there, and lists each line that matches. `Ctrl+Tab` goes to the next note. Pinned notes come
+  there, and lists each match. `Ctrl+Tab` goes to the next note. Pinned notes come
   first, in the order you give them, and `Cmd+1` to `Cmd+9` open them.
 
 ## Install
@@ -73,9 +73,9 @@ panel), copy the new app to `/Applications`, and open it.
   edge to change its width.
 - **Search.** `Cmd+F` opens the switcher with the cursor in its search field. A note is found if
   it has every word you type, in its name or in its text; capitals and full-width letters match
-  plain ones. Each note found is listed by name, over the lines of its text that have a word.
-  The open note comes first, and its matches are marked in it as you type, so this is also how
-  you find in one note. `Return` goes to the first line in the list, and `Up` and `Down` go on
+  plain ones. Each note found is listed by name, over its matches, each shown on its line; a line
+  with two matches is listed twice. The open note comes first, and its matches are marked in it
+  as you type, so this is also how you find in one note. `Return` goes to the first line in the list, and `Up` and `Down` go on
   from there, each line shown in its note. With text selected in the note, `Cmd+F` searches for
   it at once. In the search field, `Up` and `Down` bring back your earlier searches. If the
   search shortcut brought the panel up, `Esc` in the switcher hides it again.
@@ -92,6 +92,8 @@ panel), copy the new app to `/Applications`, and open it.
   click the name in the title bar; from then on the name stays as you set it.
 - **Links.** Cmd-click a link to open it. Pointing at a link shows two buttons on its first
   characters: one opens it, the other copies the URL.
+- **Copying code.** While the cursor is in a block between ` ``` ` fences or `:::` lines, a Copy
+  button on the opening fence copies what's between the fences.
 - **Tasks.** Click the box of a task (`- [ ]` or `- [x]`) to tick or clear it. The box stays as
   text; `Cmd+Z` undoes the click.
 - **Dropping files.** Drop a text file, such as a Markdown file, on the note to insert its text
@@ -104,8 +106,9 @@ panel), copy the new app to `/Applications`, and open it.
 - **Size.** The panel keeps the size you give it. `Cmd+Plus` and `Cmd+Minus` change the
   note's text size, and `Cmd+0` resets it.
 - **Default place.** `Ctrl+Cmd+M` moves the panel to its default place and size on the display
-  with the pointer, which also brings it back if it ended up off the screen. Pressed again before
-  you move the panel, it goes back to where it was. Each display has its own default. The standard
+  with the pointer, which also brings it back if it ended up off the screen, and sets the note's
+  text to its default size, as `Cmd+0` does. Pressed again before you move the panel, it goes back
+  to where it was, with the text size it had. Each display has its own default. The standard
   one is the panel's first size, centered; to choose your own, put the panel where you want it on
   that display and click **Use Current** in Settings.
 
@@ -181,7 +184,7 @@ In the panel:
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
-| ⌃⌘M | Panel to its default place and size on the pointer's display; again, back to where it was (change it in Settings) |
+| ⌃⌘M | Panel to its default place and size on the pointer's display, with the default note text size; again, back to where it was (change it in Settings) |
 | ⌘W, Esc | Hide (Esc first closes extra cursors, the switcher or earlier versions) |
 | In the switcher's list: ↑↓, Return | Show the note beside the list, close the switcher on it |
 | In the switcher's search field: Return, ↑↓ | Go to the first row of the list, bring back earlier / later searches |
@@ -249,7 +252,7 @@ Tests:
 
 ```sh
 swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, history
-cd editor && npm test       # editor helpers: search ranking, links, line insertion, formatting, tasks, counts
+cd editor && npm test       # editor helpers: search ranking, links, code blocks, line insertion, formatting, tasks, counts
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
 

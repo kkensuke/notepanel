@@ -8,32 +8,38 @@ final class PanelPlacement {
     /// The panel's size before a saved frame replaces it, which ⌃⌘M goes back to.
     var defaultSize = NSSize.zero
     /// Where ⌃⌘M found the panel and where it put it, so a second press, before the panel moves
-    /// or changes size, takes it back.
+    /// or changes size, takes it back. The note's text size goes back with it; nil if it was never set.
     private var frameBeforeDefault: NSRect?
     private var defaultFrame: NSRect?
+    private var fontSizeBeforeDefault: Double?
 
     init(panel: NSWindow) {
         self.panel = panel
     }
 
     /// ⌃⌘M: the default frame set in Settings for the display with the pointer, or else the panel's
-    /// first size, centered there. Using the pointer's display brings the panel to the display in
-    /// use. Pressed again before the panel moves or changes size, it goes back to where it was.
+    /// first size, centered there, with the note's text at its default size, as ⌘0 sets it. Using
+    /// the pointer's display brings the panel to the display in use. Pressed again before the panel
+    /// moves or changes size, it goes back to where it was, with the text size it had.
     func toggleDefaultFrame() {
+        let defaults = UserDefaults.standard
         if let previous = frameBeforeDefault, panel.frame == defaultFrame {
             panel.setFrame(previous, display: true)
             frameBeforeDefault = nil
+            defaults.set(fontSizeBeforeDefault, forKey: Prefs.Key.fontSize)
             return
         }
         let pointer = NSEvent.mouseLocation
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) ?? NSScreen.main
         else { return }
         frameBeforeDefault = panel.frame
+        fontSizeBeforeDefault = defaults.object(forKey: Prefs.Key.fontSize) as? Double
         let saved = screen.displayKey.flatMap { Prefs.defaultFrame(for: $0) }
         panel.setFrame(
             placeOnDisplay(saved: saved, size: defaultSize, display: screen.frame, visible: screen.visibleFrame),
             display: true)
         defaultFrame = panel.frame
+        defaults.set(Prefs.defaultFontSize, forKey: Prefs.Key.fontSize)
     }
 
     /// The display the panel is on, as Settings shows it, and its default for ⌃⌘M.

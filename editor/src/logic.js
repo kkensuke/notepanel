@@ -81,17 +81,16 @@ function nameLineEnd(text, title) {
   return line.slice(leadLength(line)).trim() === fold(title) ? first.length : 0
 }
 
-// The first match on each line that has one, as its place in `matches`.
-function firstOnLines(text, matches) {
-  const firsts = []
-  let lineEnd = -1
-  matches.forEach((match, index) => {
-    if (match.from < lineEnd) return
-    firsts.push(index)
-    lineEnd = text.indexOf("\n", match.from)
-    if (lineEnd < 0) lineEnd = text.length
+// The matches to list under a note's name, as their places in `matches`: those from `from` on,
+// but for a match in an earlier one, which another word of the search found there too.
+function listed(matches, from) {
+  const places = []
+  let end = from
+  matches.forEach((match, at) => {
+    if (match.from >= end) places.push(at)
+    end = Math.max(end, match.to)
   })
-  return firsts
+  return places
 }
 
 // The notes that have every word of the query, in their name or their text. Names match fuzzily,
@@ -99,8 +98,9 @@ function firstOnLines(text, matches) {
 // then those whose name has more of the words. Notes that match equally keep their order, as all
 // notes do with no query (pinned first, then newest first).
 // Each note comes with `titleRanges`, the parts of its name to mark; `matches`, the places in its
-// text; and `lines`, the lines to list under its name: the first match on each line that has
-// one, as its place in `matches`, but for a first line that is the name itself.
+// text; and `lines`, the matches to list under its name, each as a line of its own, as their
+// places in `matches`: all of them but those in a first line that is the name itself. A line
+// with two matches is listed twice, as in VS Code, so the list goes to each of them.
 // shortcut: folds every note's text on each keystroke (about 8 ms for 500 notes of 4 kB each);
 // keep the folded texts if typing lags.
 export function rankNotes(notes, query, limit = 200) {
@@ -123,7 +123,7 @@ export function rankNotes(notes, query, limit = 200) {
       score: named ? 1000 + inTitle.reduce((sum, match) => sum + match.score, 0) : marked.length,
       titleRanges: mergeRanges(marked.flatMap(match => match.ranges)),
       matches,
-      lines: firstOnLines(note.text, matches).filter(at => matches[at].from >= nameEnd),
+      lines: listed(matches, nameEnd),
     })
   }
   ranked.sort((a, b) => b.score - a.score)
@@ -134,11 +134,10 @@ export function rankNotes(notes, query, limit = 200) {
 const width = text => text.length + (text.match(/[\u2E80-\uFFEF]/g)?.length ?? 0)
 
 // The line a match is on, for a row of the switcher: its text without its markers, up to 120
-// long, with the ranges of the matches in it. A row has room for about 48 letters in a panel of
-// the default width, so if the match ends further on than that, the text is cut to start at the
-// word within 8 characters before the match.
-export function snippetAt(text, matches, at) {
-  const {from, to} = matches[at]
+// long, with the match's range in it. Only that match is marked, since a line with more is a row
+// for each. A row has room for about 48 letters in a panel of the default width, so if the match
+// ends further on than that, the text is cut to start at the word within 8 characters before it.
+export function snippetAt(text, {from, to}) {
   const lineStart = text.lastIndexOf("\n", from - 1) + 1
   let lineEnd = text.indexOf("\n", from)
   if (lineEnd < 0) lineEnd = text.length
@@ -153,8 +152,7 @@ export function snippetAt(text, matches, at) {
   const shift = (cut ? 1 : 0) - start
   return {
     text: (cut ? "…" : "") + text.slice(start, end),
-    ranges: mergeRanges(
-      matches.filter(match => match.from >= start && match.to <= end).map(match => [match.from + shift, match.to + shift])),
+    ranges: [[from + shift, Math.min(to, end) + shift]],
   }
 }
 
@@ -211,6 +209,60 @@ function leadLength(text) {
 // In a ``` block, after its indentation.
 export function textStart(state, line) {
   return inCode(state, line) ? /^\s*/.exec(line.text)[0].length : leadLength(line.text)
+}
+
+// The ``` or ::: block the line at `pos` is in, the innermost, fences included: `fence`, where its
+// opening fence starts, and `code`, its lines between the fences, without the opening fence's
+// indentation. A block that isn't closed runs to the end. null elsewhere, and in a block of
+// indented lines, which has no fence.
+// shortcut: a block in a quote keeps its lines' "> "; take the quote's markers off if that comes up.
+export function codeBlockAt(state, pos) {
+  const {doc} = state
+  const line = doc.lineAt(pos)
+  const block = fencedCode(state, line) ?? colonBlock(state, line.number)
+  if (!block) return null
+  const indent = new RegExp(`^[ \\t]{0,${block.fence - doc.line(block.open).from}}`)
+  const lines = []
+  for (let n = block.open + 1; n <= block.last; n++) lines.push(doc.line(n).text.replace(indent, ""))
+  return {fence: block.fence, code: lines.join("\n")}
+}
+
+// The ``` (or ~~~) block a line is in, by the Markdown parser: where its fence starts, and the
+// numbers of its opening fence's line and of its last line of code.
+function fencedCode(state, line) {
+  for (let node = syntaxTree(state).resolveInner(line.from + textStart(state, line), 1); node; node = node.parent) {
+    if (node.name !== "FencedCode") continue
+    const end = state.doc.lineAt(node.to).number
+    const closed = node.getChildren("CodeMark").length > 1
+    return {fence: node.from, open: state.doc.lineAt(node.from).number, last: closed ? end - 1 : end}
+  }
+  return null
+}
+
+// The ::: block the line numbered `number` is in, the innermost, as fencedCode gives it. A line of
+// colons alone closes the innermost open block if it has as many colons; any other line of three
+// or more opens a block, so "::::" around ":::" nests, as markdown-it and Pandoc read them.
+// Colons in a ``` block are code.
+// shortcut: reads every line each time the cursor moves outside a ``` block (about 2 ms for
+// 10,000 lines); keep the blocks in a StateField if that lags.
+function colonBlock(state, number) {
+  const {doc} = state
+  const open = []
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n)
+    const fence = /^(\s*)(:{3,})(.*)$/.exec(line.text)
+    if (!fence || inCode(state, line)) continue
+    const top = open.at(-1)
+    if (top && !fence[3].trim() && fence[2].length >= top.colons) {
+      open.pop()
+      // Blocks close innermost first, so the first to close around the line is the one it's in.
+      if (top.open <= number && n >= number) return {...top, last: n - 1}
+    } else {
+      open.push({fence: line.from + fence[1].length, open: n, colons: fence[2].length})
+    }
+  }
+  const unclosed = open.findLast(block => block.open <= number)
+  return unclosed ? {...unclosed, last: doc.lines} : null
 }
 
 // The columns a line's wrapped rows hang by: the width of its list and quote markers, with the

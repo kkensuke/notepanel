@@ -9,9 +9,9 @@ const results = $("results")
 const total = $("total")
 
 let notes = []
-// The list's rows, which the arrows go through: a note, or a line of a note's text that has
-// what's typed. `at` is the match the row opens the note at, as its place in the note's matches:
-// the line's first, or -1 on a note with none. `item` is the row's element.
+// The list's rows, which the arrows go through: a note, or a match in a note's text, shown as
+// the line it's on. `at` is the match the row opens the note at, as its place in the note's
+// matches, or -1 on a note with none. `item` is the row's element.
 let rows = []
 let selected = 0
 // The row whose note the list last showed beside itself, while the list is the same.
@@ -158,7 +158,7 @@ function show(index) {
 }
 
 // Ranks the notes for what's typed, and lists them: with nothing typed as rows, and while
-// searching each as its name over the lines of its text that match. What draws a note adds the
+// searching each as its name over its matches, each on its line. What draws a note adds the
 // note's rows to `rows`. As the search field changes, the note's page marks the matches in the
 // note in sight.
 // shortcut: stops after the note that takes the list past 500 rows; the notes after it show
@@ -244,10 +244,10 @@ function noteRow(note) {
   return item
 }
 
-// While searching, a note is its name over the lines of its text that matched. The lines are the
-// rows to choose. The name isn't one: the arrows pass it, and a press on it shows the first
-// line. A note with no line to list is a row itself, and opens at the match in its first line,
-// which its name is, if that's where the word was found.
+// While searching, a note is its name over its matches, each as the line it's on; a line with two
+// matches is there twice. The lines are the rows to choose. The name isn't one: the arrows pass
+// it, and a press on it shows the first line. A note with no line to list is a row itself, and
+// opens at the match in its first line, which its name is, if that's where the word was found.
 function group(note) {
   const item = element("li", "group", "")
   item.setAttribute("role", "presentation")
@@ -258,7 +258,7 @@ function group(note) {
   name.append(marked("span", "title", note.title, note.titleRanges))
   item.append(name)
   for (const at of note.lines) {
-    const snippet = snippetAt(note.text, note.matches, at)
+    const snippet = snippetAt(note.text, note.matches[at])
     const line = option("div", "line", note, at)
     line.append(marked("span", "snippet", snippet.text, snippet.ranges))
     item.append(line)
