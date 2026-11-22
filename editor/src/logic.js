@@ -81,17 +81,16 @@ function nameLineEnd(text, title) {
   return line.slice(leadLength(line)).trim() === fold(title) ? first.length : 0
 }
 
-// The first match on each line that has one, as its place in `matches`.
-function firstOnLines(text, matches) {
-  const firsts = []
-  let lineEnd = -1
-  matches.forEach((match, index) => {
-    if (match.from < lineEnd) return
-    firsts.push(index)
-    lineEnd = text.indexOf("\n", match.from)
-    if (lineEnd < 0) lineEnd = text.length
+// The matches to list under a note's name, as their places in `matches`: those from `from` on,
+// but for a match in an earlier one, which another word of the search found there too.
+function listed(matches, from) {
+  const places = []
+  let end = from
+  matches.forEach((match, at) => {
+    if (match.from >= end) places.push(at)
+    end = Math.max(end, match.to)
   })
-  return firsts
+  return places
 }
 
 // The notes that have every word of the query, in their name or their text. Names match fuzzily,
@@ -99,8 +98,9 @@ function firstOnLines(text, matches) {
 // then those whose name has more of the words. Notes that match equally keep their order, as all
 // notes do with no query (pinned first, then newest first).
 // Each note comes with `titleRanges`, the parts of its name to mark; `matches`, the places in its
-// text; and `lines`, the lines to list under its name: the first match on each line that has
-// one, as its place in `matches`, but for a first line that is the name itself.
+// text; and `lines`, the matches to list under its name, each as a line of its own, as their
+// places in `matches`: all of them but those in a first line that is the name itself. A line
+// with two matches is listed twice, as in VS Code, so the list goes to each of them.
 // shortcut: folds every note's text on each keystroke (about 8 ms for 500 notes of 4 kB each);
 // keep the folded texts if typing lags.
 export function rankNotes(notes, query, limit = 200) {
@@ -123,7 +123,7 @@ export function rankNotes(notes, query, limit = 200) {
       score: named ? 1000 + inTitle.reduce((sum, match) => sum + match.score, 0) : marked.length,
       titleRanges: mergeRanges(marked.flatMap(match => match.ranges)),
       matches,
-      lines: firstOnLines(note.text, matches).filter(at => matches[at].from >= nameEnd),
+      lines: listed(matches, nameEnd),
     })
   }
   ranked.sort((a, b) => b.score - a.score)
@@ -134,11 +134,10 @@ export function rankNotes(notes, query, limit = 200) {
 const width = text => text.length + (text.match(/[\u2E80-\uFFEF]/g)?.length ?? 0)
 
 // The line a match is on, for a row of the switcher: its text without its markers, up to 120
-// long, with the ranges of the matches in it. A row has room for about 48 letters in a panel of
-// the default width, so if the match ends further on than that, the text is cut to start at the
-// word within 8 characters before the match.
-export function snippetAt(text, matches, at) {
-  const {from, to} = matches[at]
+// long, with the match's range in it. Only that match is marked, since a line with more is a row
+// for each. A row has room for about 48 letters in a panel of the default width, so if the match
+// ends further on than that, the text is cut to start at the word within 8 characters before it.
+export function snippetAt(text, {from, to}) {
   const lineStart = text.lastIndexOf("\n", from - 1) + 1
   let lineEnd = text.indexOf("\n", from)
   if (lineEnd < 0) lineEnd = text.length
@@ -153,8 +152,7 @@ export function snippetAt(text, matches, at) {
   const shift = (cut ? 1 : 0) - start
   return {
     text: (cut ? "…" : "") + text.slice(start, end),
-    ranges: mergeRanges(
-      matches.filter(match => match.from >= start && match.to <= end).map(match => [match.from + shift, match.to + shift])),
+    ranges: [[from + shift, Math.min(to, end) + shift]],
   }
 }
 

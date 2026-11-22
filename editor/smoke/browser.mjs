@@ -528,14 +528,15 @@ assert.deepEqual([await switcherOpen(), await last("select", side)], [false, und
 
 // ⌘F brings it up with the focus in the search field. A search wants every word, in a note's
 // name or in its text. The note in sight is listed first, and the note's page marks its matches as
-// the search is typed, so the switcher is the find for one note too.
+// the search is typed, so the switcher is the find for one note too. Each match is a row, which
+// marks only that match: a line with two is listed twice.
 await receive("open", {id: "Weekly plan", text: weekly})
 await receive("switcher", {notes: found, find: true, current: "Weekly plan"}, side)
 assert.equal(await focused(), "query")
 await side.keyboard.type("review　budget")
 assert.deepEqual(await groups(), [
   ["Weekly plan", "Send the ＢＵＤＧＥＴ draft", "Plan the review"],
-  ["Budget 2026", "Hardware budget was cut.", "Q1 | budget review |"],
+  ["Budget 2026", "Hardware budget was cut.", "Q1 | budget review |", "Q1 | budget review |"],
 ])
 assert.equal(await side.$eval("#total", e => e.textContent), "2 notes")
 assert.deepEqual(

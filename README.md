@@ -26,7 +26,7 @@ other editor, sync them or back them up as you like.
   keeps earlier versions of each note, which `Cmd+Y` shows.
 - **Quick to switch notes.** `Cmd+P` lists your notes at the panel's left and shows each one
   beside the list as you go through them. `Cmd+F` searches the names and text of your notes
-  there, and lists each line that matches. `Ctrl+Tab` goes to the next note. Pinned notes come
+  there, and lists each match. `Ctrl+Tab` goes to the next note. Pinned notes come
   first, in the order you give them, and `Cmd+1` to `Cmd+9` open them.
 
 ## Install
@@ -73,9 +73,9 @@ panel), copy the new app to `/Applications`, and open it.
   edge to change its width.
 - **Search.** `Cmd+F` opens the switcher with the cursor in its search field. A note is found if
   it has every word you type, in its name or in its text; capitals and full-width letters match
-  plain ones. Each note found is listed by name, over the lines of its text that have a word.
-  The open note comes first, and its matches are marked in it as you type, so this is also how
-  you find in one note. `Return` goes to the first line in the list, and `Up` and `Down` go on
+  plain ones. Each note found is listed by name, over its matches, each shown on its line; a line
+  with two matches is listed twice. The open note comes first, and its matches are marked in it
+  as you type, so this is also how you find in one note. `Return` goes to the first line in the list, and `Up` and `Down` go on
   from there, each line shown in its note. With text selected in the note, `Cmd+F` searches for
   it at once. In the search field, `Up` and `Down` bring back your earlier searches. If the
   search shortcut brought the panel up, `Esc` in the switcher hides it again.

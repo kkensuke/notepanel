@@ -76,7 +76,7 @@ test("rankNotes puts title matches first and finds the places in the text", () =
   assert.deepEqual(ranked[0].lines, [])
   assert.deepEqual(ranked[1].matches, [{from: 0, to: 4, term: 0}])
   assert.deepEqual(ranked[1].lines, [0])
-  assert.deepEqual(snippetAt(notes[1].text, ranked[2].matches, 0), {text: "buy a milk frother", ranges: [[6, 10]]})
+  assert.deepEqual(snippetAt(notes[1].text, ranked[2].matches[0]), {text: "buy a milk frother", ranges: [[6, 10]]})
   assert.deepEqual(rankNotes(notes, " ").map(n => n.id), ["Groceries", "Ideas", "Milk tea"])
   assert.equal(rankNotes(notes, "", 2).length, 2)
 })
@@ -89,11 +89,11 @@ test("rankNotes wants every word, in the name or the text, whatever their order"
   ]
   const ranked = rankNotes(notes, "会議　予算")
   assert.deepEqual(ranked.map(n => n.id), ["Meeting notes", "Budget"])
-  // Every line with one of the words, in the text's order, each with all its matches.
-  const lines = note => note.lines.map(at => snippetAt(note.text, note.matches, at))
-  assert.deepEqual(lines(ranked[1]).map(line => line.text), ["予算の内訳", "会議で使う予算の表"])
-  assert.deepEqual(lines(ranked[1])[1].ranges, [[0, 2], [5, 7]])
-  assert.equal(ranked[1].matches.length, 3)
+  // Every match, in the text's order, each on its line with only itself marked: a line with two
+  // is there twice.
+  const lines = note => note.lines.map(at => snippetAt(note.text, note.matches[at]))
+  assert.deepEqual(lines(ranked[1]).map(line => line.text), ["予算の内訳", "会議で使う予算の表", "会議で使う予算の表"])
+  assert.deepEqual(lines(ranked[1]).map(line => line.ranges), [[[0, 2]], [[0, 2]], [[5, 7]]])
   // One word in the name and one in the text.
   const mixed = rankNotes(notes, "meeting 木曜")[0]
   assert.deepEqual(mixed.titleRanges, [[0, 7]])
@@ -122,27 +122,39 @@ test("rankNotes finds the name in the first line too, but doesn't list that line
   assert.deepEqual(idea.lines, [0])
 })
 
-test("snippetAt gives the line, or starts near a match that is far into it, and marks every match", () => {
+test("rankNotes lists a word twice on a line twice, but a match in another isn't listed again", () => {
+  const notes = [{id: "n", title: "n", text: "foo bar foo\nfoobar"}]
+  const [twice] = rankNotes(notes, "foo")
+  assert.deepEqual(twice.lines, [0, 1, 2])
+  assert.deepEqual(twice.lines.map(at => snippetAt(twice.text, twice.matches[at]).ranges), [[[0, 3]], [[8, 11]], [[0, 3]]])
+  // "o" is found in "foo" too, as are the words a search repeats.
+  for (const query of ["foo o", "foo foo"]) {
+    const [note] = rankNotes(notes, query)
+    assert.deepEqual(note.lines.map(at => note.matches[at].from), [0, 8, 12], query)
+  }
+})
+
+test("snippetAt gives the line, or starts near a match that is far into it, and marks the match", () => {
   const near = "Each client of the service gets an API key"
-  assert.deepEqual(snippetAt(near, [{from: 35, to: 38, term: 0}], 0), {text: near, ranges: [[35, 38]]})
+  assert.deepEqual(snippetAt(near, {from: 35, to: 38, term: 0}), {text: near, ranges: [[35, 38]]})
   const text = "Each client of the service that we run for them gets an API key, and an API key rotates"
   const matches = rankNotes([{id: "n", title: "n", text}], "api")[0].matches
-  const snippet = snippetAt(text, matches, 0)
-  assert.equal(snippet.text, "…an API key, and an API key rotates")
-  assert.deepEqual(snippet.ranges.map(([from, to]) => snippet.text.slice(from, to)), ["API", "API"])
+  const snippets = matches.map(match => snippetAt(text, match))
+  assert.deepEqual(snippets.map(snippet => snippet.text), ["…an API key, and an API key rotates", "…and an API key rotates"])
+  assert.deepEqual(snippets.map(snippet => snippet.ranges), [[[4, 7]], [[8, 11]]])
   // Japanese is twice as wide, and has no spaces to start at.
   const kana = "あ".repeat(24) + "予算"
-  assert.equal(snippetAt(kana, [{from: 24, to: 26, term: 0}], 0).text, "…" + "あ".repeat(8) + "予算")
-  assert.equal(snippetAt(kana.slice(4), [{from: 20, to: 22, term: 0}], 0).text, kana.slice(4))
+  assert.equal(snippetAt(kana, {from: 24, to: 26, term: 0}).text, "…" + "あ".repeat(8) + "予算")
+  assert.equal(snippetAt(kana.slice(4), {from: 20, to: 22, term: 0}).text, kana.slice(4))
 })
 
 test("snippetAt leaves out a line's markers, unless the match is in them", () => {
   const text = "  - [ ] 予算案を直す\n## 予算\n> - [x] done"
   const matches = rankNotes([{id: "n", title: "n", text}], "予算")[0].matches
-  assert.deepEqual(snippetAt(text, matches, 0), {text: "予算案を直す", ranges: [[0, 2]]})
-  assert.equal(snippetAt(text, matches, 1).text, "予算")
-  assert.equal(snippetAt(text, [{from: 25, to: 28, term: 0}], 0).text, "[x] done")
-  assert.equal(snippetAt("| 項目 | 予算 |", [{from: 7, to: 9, term: 0}], 0).text, "項目 | 予算 |")
+  assert.deepEqual(snippetAt(text, matches[0]), {text: "予算案を直す", ranges: [[0, 2]]})
+  assert.equal(snippetAt(text, matches[1]).text, "予算")
+  assert.equal(snippetAt(text, {from: 25, to: 28, term: 0}).text, "[x] done")
+  assert.equal(snippetAt("| 項目 | 予算 |", {from: 7, to: 9, term: 0}).text, "項目 | 予算 |")
 })
 
 test("urlAt finds Markdown link targets and bare URLs", () => {
