@@ -92,6 +92,8 @@ panel), copy the new app to `/Applications`, and open it.
   click the name in the title bar; from then on the name stays as you set it.
 - **Links.** Cmd-click a link to open it. Pointing at a link shows two buttons on its first
   characters: one opens it, the other copies the URL.
+- **Copying code.** While the cursor is in a block between ` ``` ` fences or `:::` lines, a Copy
+  button on the opening fence copies what's between the fences.
 - **Tasks.** Click the box of a task (`- [ ]` or `- [x]`) to tick or clear it. The box stays as
   text; `Cmd+Z` undoes the click.
 - **Dropping files.** Drop a text file, such as a Markdown file, on the note to insert its text
@@ -250,7 +252,7 @@ Tests:
 
 ```sh
 swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, history
-cd editor && npm test       # editor helpers: search ranking, links, line insertion, formatting, tasks, counts
+cd editor && npm test       # editor helpers: search ranking, links, code blocks, line insertion, formatting, tasks, counts
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
 

@@ -212,7 +212,7 @@ assert.equal((await last("openURL"))?.url, "https://example.com/a")
 // Pointing at a link shows Open and Copy on its URL's first characters, in the link's own row.
 await clear()
 await page.mouse.move(box.x, box.y)
-await page.waitForSelector(".cm-linkButtons")
+await page.waitForSelector(".cm-tooltip-hover .cm-rowButtons")
 await pause(50)
 const urlStart = await page.evaluate(() => {
   const node = [...document.querySelector(".cm-line").querySelectorAll("span")]
@@ -226,15 +226,47 @@ const urlStart = await page.evaluate(() => {
 const popup = await page.$eval(".cm-tooltip-hover", e => e.getBoundingClientRect().toJSON())
 assert.ok(Math.abs(popup.x - urlStart.x) < 2, "the popup starts where the URL starts")
 assert.ok(Math.abs(popup.y + popup.height / 2 - urlStart.y) < 3, "the popup sits on the link's row")
-const copyIcon = await page.$eval(".cm-linkButtons .copy", e => e.innerHTML)
-await page.click(".cm-linkButtons .copy")
+const copyIcon = await page.$eval(".cm-tooltip-hover .cm-rowButtons .copy", e => e.innerHTML)
+await page.click(".cm-tooltip-hover .cm-rowButtons .copy")
 assert.equal((await last("copy"))?.text, "https://example.com/a")
-assert.notEqual(await page.$eval(".cm-linkButtons .copy", e => e.innerHTML), copyIcon, "Copy turns into a check")
-await page.click(".cm-linkButtons .open")
+assert.notEqual(await page.$eval(".cm-tooltip-hover .cm-rowButtons .copy", e => e.innerHTML), copyIcon, "Copy turns into a check")
+await page.click(".cm-tooltip-hover .cm-rowButtons .open")
 assert.equal((await last("openURL"))?.url, "https://example.com/a")
 await page.mouse.move(box.x, box.y + 200)
 await pause(50)
-assert.equal(await page.$(".cm-linkButtons"), null, "the popup goes when the pointer leaves the link")
+assert.equal(await page.$(".cm-tooltip-hover .cm-rowButtons"), null, "the popup goes when the pointer leaves the link")
+
+// With the cursor in a ``` or ::: block, fences included, a Copy button sits on the opening
+// fence's first characters, and copies the lines between the fences. It goes with the cursor.
+await receive("open", {id: "Setup", text: "Setup\n- install\n    ```sh\n    npm ci\n    ```\n:::tip\nread it\n:::"})
+const codeButton = () => page.$(".cm-tooltip.cm-rowButtons")
+// Where the text of the line numbered `n` starts, after its indentation.
+const lineStart = n => page.evaluate(n => {
+  const walker = document.createTreeWalker(document.querySelectorAll(".cm-line")[n - 1], NodeFilter.SHOW_TEXT)
+  let node
+  while ((node = walker.nextNode()) && !/\S/.test(node.textContent));
+  const range = document.createRange()
+  range.setStart(node, node.textContent.search(/\S/))
+  range.setEnd(node, node.textContent.search(/\S/) + 1)
+  const r = range.getBoundingClientRect()
+  return {x: r.x, y: r.y + r.height / 2}
+}, n)
+const fence = await lineStart(3)
+const code = await lineStart(4)
+await page.mouse.click(code.x + 30, code.y)
+await page.waitForSelector(".cm-tooltip.cm-rowButtons")
+const button = await (await codeButton()).evaluate(e => e.getBoundingClientRect().toJSON())
+assert.ok(Math.abs(button.x - fence.x) < 2, "the button starts where the fence starts")
+assert.ok(Math.abs(button.y + button.height / 2 - fence.y) < 3, "the button sits on the fence's row")
+await clear()
+await (await codeButton()).$eval(".copy", e => e.click())
+assert.equal((await last("copy"))?.text, "npm ci", "the code, without the fence's indentation")
+await press("ArrowUp")
+await press("ArrowUp")
+assert.equal(await codeButton(), null, "no button out of the block")
+await press("ArrowDown", ["Meta"])
+await (await codeButton()).$eval(".copy", e => e.click())
+assert.equal((await last("copy"))?.text, "read it")
 
 // The switcher is the same page in a window of its own, which Swift tells it's the switcher's.
 // It's the switcher and nothing else, out to its window's edges.

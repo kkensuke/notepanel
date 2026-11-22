@@ -13,6 +13,7 @@ import {
   MatchDecorator,
   ViewPlugin,
   hoverTooltip,
+  showTooltip,
 } from "@codemirror/view"
 import {defaultKeymap, historyKeymap, history, indentWithTab, selectLine} from "@codemirror/commands"
 import {highlightSelectionMatches, selectNextOccurrence, selectSelectionMatches} from "@codemirror/search"
@@ -28,6 +29,7 @@ import {
   hangIndent,
   textStart,
   insertLineAbove,
+  codeBlockAt,
   toggleMark,
   insertLink,
   toggleTask,
@@ -74,16 +76,17 @@ const theme = EditorView.theme({
     background: "var(--whitespace)",
     mask: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="20"><path stroke="black" fill="none" d="M1 10H196L190 5M190 15L196 10M197 4L197 16"/></svg>') right 90% / auto 100% no-repeat`,
   },
-  // The link popup: as tall as a row at any note font size, so it covers no other line.
-  ".cm-tooltip.cm-tooltip-hover": {
+  // The buttons over a link and over a block's fence: as tall as a row at any note font size, so
+  // they cover no other line.
+  ".cm-tooltip": {
     border: "1px solid var(--border)",
     borderRadius: "7px",
     backgroundColor: "var(--tooltip)",
     boxShadow: "0 2px 8px rgb(0 0 0 / 0.2)",
   },
-  ".cm-linkButtons": {display: "flex", gap: "1px", padding: "0 2px", fontSize: "var(--size)"},
-  ".cm-linkButtons .action": {padding: "2px", fontSize: "inherit"},
-  ".cm-linkButtons .action svg": {width: "1em", height: "1em"},
+  ".cm-rowButtons": {display: "flex", gap: "1px", padding: "0 2px", fontSize: "var(--size)"},
+  ".cm-rowButtons .action": {padding: "2px", fontSize: "inherit"},
+  ".cm-rowButtons .action svg": {width: "1em", height: "1em"},
   ".cm-taskBox": {cursor: "pointer", borderRadius: "3px"},
   ".cm-taskBox:hover": {backgroundColor: "var(--selection)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
@@ -190,23 +193,62 @@ const linkPopup = hoverTooltip(
 )
 
 function linkButtons(view, url, urlFrom) {
-  const dom = document.createElement("div")
-  dom.className = "cm-linkButtons"
   const copy = actionButton("copy", "Copy Link", () => {
     post("copy", {text: url})
     flashCopied(copy)
   })
-  dom.append(actionButton("open", "Open Link (⌘-click)", () => post("openURL", {url})), copy)
+  const open = actionButton("open", "Open Link (⌘-click)", () => post("openURL", {url}))
+  return onRow(view, urlFrom, [open, copy])
+}
+
+// A popup of `buttons` from `pos` on, in that row.
+function onRow(view, pos, buttons) {
+  const dom = document.createElement("div")
+  dom.className = "cm-rowButtons"
+  dom.append(...buttons)
   return {
     dom,
-    // CodeMirror puts the popup's top at this rectangle's bottom; this centers it on the row.
+    // CodeMirror puts the popup's top at this rectangle's bottom; this centers it on the row. A
+    // hover popup is in a box of CodeMirror's, and the fence's popup is the box itself.
     getCoords() {
-      const row = view.coordsAtPos(urlFrom, 1)
+      const row = view.coordsAtPos(pos, 1)
       if (!row) return null
-      const top = (row.top + row.bottom - dom.parentElement.offsetHeight) / 2
+      const top = (row.top + row.bottom - dom.closest(".cm-tooltip").offsetHeight) / 2
       return {left: row.left, right: row.left, top, bottom: top}
     },
-    destroy: () => clearTimeout(copy.timer),
+    // A Copy button's tick has a timer.
+    destroy: () => buttons.forEach(button => clearTimeout(button.timer)),
+  }
+}
+
+// While the cursor is in a ``` or ::: block, fences included, a Copy button on its opening
+// fence's first characters copies the lines between the fences. Moving in the block keeps the
+// button, and its tick.
+const codeCopy = StateField.define({
+  create: state => codeButton(state, null),
+  update(button, transaction) {
+    const {state, startState} = transaction
+    // The parser tells which lines are in a ``` block, and it may finish after the change.
+    const changed = transaction.docChanged || transaction.selection || syntaxTree(state) !== syntaxTree(startState)
+    return changed ? codeButton(state, button) : button
+  },
+  provide: field => showTooltip.from(field),
+})
+
+function codeButton(state, button) {
+  const block = codeBlockAt(state, state.selection.main.head)
+  if (!block) return null
+  if (button?.pos === block.fence) return button
+  return {
+    pos: block.fence,
+    create(view) {
+      const copy = actionButton("copy", "Copy Code", () => {
+        // The block as it is now, since typing in it keeps the button.
+        post("copy", {text: codeBlockAt(view.state, view.state.selection.main.head).code})
+        flashCopied(copy)
+      })
+      return onRow(view, block.fence, [copy])
+    },
   }
 }
 
@@ -273,6 +315,7 @@ const extensions = [
   EditorView.scrollMargins.of(() => ({bottom: footerHeight})),
   hangingIndents,
   linkPopup,
+  codeCopy,
   markdown({base: markdownLanguage}),
   syntaxHighlighting(highlight),
   theme,

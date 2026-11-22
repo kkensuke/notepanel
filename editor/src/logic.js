@@ -211,6 +211,60 @@ export function textStart(state, line) {
   return inCode(state, line) ? /^\s*/.exec(line.text)[0].length : leadLength(line.text)
 }
 
+// The ``` or ::: block the line at `pos` is in, the innermost, fences included: `fence`, where its
+// opening fence starts, and `code`, its lines between the fences, without the opening fence's
+// indentation. A block that isn't closed runs to the end. null elsewhere, and in a block of
+// indented lines, which has no fence.
+// shortcut: a block in a quote keeps its lines' "> "; take the quote's markers off if that comes up.
+export function codeBlockAt(state, pos) {
+  const {doc} = state
+  const line = doc.lineAt(pos)
+  const block = fencedCode(state, line) ?? colonBlock(state, line.number)
+  if (!block) return null
+  const indent = new RegExp(`^[ \\t]{0,${block.fence - doc.line(block.open).from}}`)
+  const lines = []
+  for (let n = block.open + 1; n <= block.last; n++) lines.push(doc.line(n).text.replace(indent, ""))
+  return {fence: block.fence, code: lines.join("\n")}
+}
+
+// The ``` (or ~~~) block a line is in, by the Markdown parser: where its fence starts, and the
+// numbers of its opening fence's line and of its last line of code.
+function fencedCode(state, line) {
+  for (let node = syntaxTree(state).resolveInner(line.from + textStart(state, line), 1); node; node = node.parent) {
+    if (node.name !== "FencedCode") continue
+    const end = state.doc.lineAt(node.to).number
+    const closed = node.getChildren("CodeMark").length > 1
+    return {fence: node.from, open: state.doc.lineAt(node.from).number, last: closed ? end - 1 : end}
+  }
+  return null
+}
+
+// The ::: block the line numbered `number` is in, the innermost, as fencedCode gives it. A line of
+// colons alone closes the innermost open block if it has as many colons; any other line of three
+// or more opens a block, so "::::" around ":::" nests, as markdown-it and Pandoc read them.
+// Colons in a ``` block are code.
+// shortcut: reads every line each time the cursor moves outside a ``` block (about 2 ms for
+// 10,000 lines); keep the blocks in a StateField if that lags.
+function colonBlock(state, number) {
+  const {doc} = state
+  const open = []
+  for (let n = 1; n <= doc.lines; n++) {
+    const line = doc.line(n)
+    const fence = /^(\s*)(:{3,})(.*)$/.exec(line.text)
+    if (!fence || inCode(state, line)) continue
+    const top = open.at(-1)
+    if (top && !fence[3].trim() && fence[2].length >= top.colons) {
+      open.pop()
+      // Blocks close innermost first, so the first to close around the line is the one it's in.
+      if (top.open <= number && n >= number) return {...top, last: n - 1}
+    } else {
+      open.push({fence: line.from + fence[1].length, open: n, colons: fence[2].length})
+    }
+  }
+  const unclosed = open.findLast(block => block.open <= number)
+  return unclosed ? {...unclosed, last: doc.lines} : null
+}
+
 // The columns a line's wrapped rows hang by: the width of its list and quote markers, with the
 // indentation and spaces around them. 0 for other lines and in a ``` block.
 export function hangIndent(state, line) {

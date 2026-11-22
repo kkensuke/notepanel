@@ -11,6 +11,7 @@ import {
   linkAt,
   hangIndent,
   textStart,
+  codeBlockAt,
   insertLineAbove,
   toggleMark,
   insertLink,
@@ -307,6 +308,26 @@ test("textStart skips indentation, list and quote markers and a heading's #s, bu
   const state = EditorState.create({doc, extensions: markdown({base: markdownLanguage})})
   const starts = lines.map((_, i) => textStart(state, state.doc.line(i + 1)))
   assert.deepEqual(starts, lines.map(([, start]) => start))
+})
+
+test("codeBlockAt finds the ``` or ::: block a line is in, fences included, and its code", () => {
+  // Each line of a note, with the code of the block it's in, or null.
+  const blocks = lines => {
+    const state = EditorState.create({doc: lines.join("\n"), extensions: markdown({base: markdownLanguage})})
+    return lines.map((_, i) => codeBlockAt(state, state.doc.line(i + 1).from)?.code ?? null)
+  }
+  const fenced = ["text", "```js", "let a", "", "  b", "```", "after"]
+  assert.deepEqual(blocks(fenced), [null, ...Array(5).fill("let a\n\n  b"), null])
+  // In a list, the code loses the fence's indentation. Indented code has no fence.
+  const listed = ["- item", "    ```sh", "    echo", "      more", "    ```", "", "    indented"]
+  assert.deepEqual(blocks(listed), [null, ...Array(4).fill("echo\n  more"), null, null])
+  // ::: blocks nest by their colons, hold ``` blocks, whose colons are code, and run to the end
+  // if they aren't closed.
+  const colons = ["::::details Title", ":::message", "inner", ":::", "```", ":::", "```", "::::", "::: tip", "open"]
+  const inner = ":::message\ninner\n:::\n```\n:::\n```"
+  assert.deepEqual(blocks(colons), [inner, "inner", "inner", "inner", ":::", ":::", ":::", inner, "open", "open"])
+  const state = EditorState.create({doc: "a\n  ```\n  b\n  ```", extensions: markdown({base: markdownLanguage})})
+  assert.equal(codeBlockAt(state, 5).fence, 4, "the fence starts after its indentation")
 })
 
 test("countCharacters counts graphemes and skips line breaks", () => {
