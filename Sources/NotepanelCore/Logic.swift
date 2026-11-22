@@ -85,6 +85,13 @@ public func placeOnDisplay(saved: CGRect?, size: CGSize, display: CGRect, visibl
         width: size.width, height: size.height)
 }
 
+/// Whether the panel is still where ⌃⌘M put it. Within a point: the frame AppKit saves for the
+/// panel, which it gets back when the app starts, may be rounded.
+public func isSameFrame(_ a: CGRect, _ b: CGRect) -> Bool {
+    abs(a.minX - b.minX) < 1 && abs(a.minY - b.minY) < 1 && abs(a.width - b.width) < 1
+        && abs(a.height - b.height) < 1
+}
+
 /// The modifier keys of a shortcut.
 public struct ShortcutModifiers: OptionSet, Sendable {
     public let rawValue: Int

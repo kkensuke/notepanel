@@ -164,6 +164,12 @@ equal(
     placeOnDisplay(saved: CGRect(x: 0, y: 0, width: 2000, height: 400), size: firstSize, display: display, visible: visible),
     centered)
 equal(placeOnDisplay(saved: nil, size: firstSize, display: display, visible: visible), centered)
+// A second ⌃⌘M goes back while the panel is where the first put it, give or take a saved frame's
+// rounding, but not once it has moved or changed size by a point.
+let placed = CGRect(x: 1540, y: 200, width: 600, height: 400)
+check(isSameFrame(placed, CGRect(x: 1540.5, y: 199.5, width: 600, height: 400)), "rounded frame")
+check(!isSameFrame(placed, CGRect(x: 1541, y: 200, width: 600, height: 400)), "moved a point")
+check(!isSameFrame(placed, CGRect(x: 1540, y: 200, width: 600, height: 401)), "taller by a point")
 
 // MARK: - Shortcuts
 

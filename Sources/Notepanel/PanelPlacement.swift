@@ -7,11 +7,6 @@ final class PanelPlacement {
     private let panel: NSWindow
     /// The panel's size before a saved frame replaces it, which ⌃⌘M goes back to.
     var defaultSize = NSSize.zero
-    /// Where ⌃⌘M found the panel and where it put it, so a second press, before the panel moves
-    /// or changes size, takes it back. The note's text size goes back with it; nil if it was never set.
-    private var frameBeforeDefault: NSRect?
-    private var defaultFrame: NSRect?
-    private var fontSizeBeforeDefault: Double?
 
     init(panel: NSWindow) {
         self.panel = panel
@@ -20,26 +15,29 @@ final class PanelPlacement {
     /// ⌃⌘M: the default frame and text size set in Settings for the display with the pointer, or
     /// else the panel's first size, centered there, with the default text size. Using the pointer's
     /// display brings the panel to the display in use. Pressed again before the panel moves or
-    /// changes size, it goes back to where it was, with the text size it had.
+    /// changes size, it goes back to where it was, with the text size it had, also after the app
+    /// quits. It doesn't go back to a frame no display shows any more, as after unplugging one.
     func toggleDefaultFrame() {
         let defaults = UserDefaults.standard
-        if let previous = frameBeforeDefault, panel.frame == defaultFrame {
-            panel.setFrame(previous, display: true)
-            frameBeforeDefault = nil
-            defaults.set(fontSizeBeforeDefault, forKey: Prefs.Key.fontSize)
+        if let before = Prefs.beforeDefault, isSameFrame(panel.frame, before.placed),
+            NSScreen.screens.contains(where: { $0.frame.intersects(before.frame) })
+        {
+            panel.setFrame(before.frame, display: true)
+            Prefs.beforeDefault = nil
+            defaults.set(before.fontSize, forKey: Prefs.Key.fontSize)
             return
         }
         let pointer = NSEvent.mouseLocation
         guard let screen = NSScreen.screens.first(where: { NSMouseInRect(pointer, $0.frame, false) }) ?? NSScreen.main
         else { return }
-        frameBeforeDefault = panel.frame
-        fontSizeBeforeDefault = defaults.object(forKey: Prefs.Key.fontSize) as? Double
+        let frame = panel.frame
+        let fontSize = defaults.object(forKey: Prefs.Key.fontSize) as? Double
         let key = screen.displayKey
         let saved = key.flatMap { Prefs.defaultFrame(for: $0) }
         panel.setFrame(
             placeOnDisplay(saved: saved, size: defaultSize, display: screen.frame, visible: screen.visibleFrame),
             display: true)
-        defaultFrame = panel.frame
+        Prefs.beforeDefault = BeforeDefault(frame: frame, fontSize: fontSize, placed: panel.frame)
         defaults.set(key.map { Prefs.defaultFontSize(for: $0) } ?? Prefs.defaultFontSize, forKey: Prefs.Key.fontSize)
     }
 
