@@ -98,7 +98,7 @@ private struct KeysView: View {
                 rows(panelKeys)
                 setting("Next note", Prefs.Key.shortcutNextNote)
                 setting("Previous note", Prefs.Key.shortcutPreviousNote)
-                setting("Default place and size, and back", Prefs.Key.shortcutDefaultFrame)
+                setting("Default place, size and text size, and back", Prefs.Key.shortcutDefaultFrame)
             }
             Section("In the switcher") { rows(switcherKeys) }
             Section("In earlier versions") { rows(historyKeys) }

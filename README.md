@@ -104,8 +104,9 @@ panel), copy the new app to `/Applications`, and open it.
 - **Size.** The panel keeps the size you give it. `Cmd+Plus` and `Cmd+Minus` change the
   note's text size, and `Cmd+0` resets it.
 - **Default place.** `Ctrl+Cmd+M` moves the panel to its default place and size on the display
-  with the pointer, which also brings it back if it ended up off the screen. Pressed again before
-  you move the panel, it goes back to where it was. Each display has its own default. The standard
+  with the pointer, which also brings it back if it ended up off the screen, and sets the note's
+  text to its default size, as `Cmd+0` does. Pressed again before you move the panel, it goes back
+  to where it was, with the text size it had. Each display has its own default. The standard
   one is the panel's first size, centered; to choose your own, put the panel where you want it on
   that display and click **Use Current** in Settings.
 
@@ -181,7 +182,7 @@ In the panel:
 | ⌃Tab / ⌃⇧Tab | Next / previous note, pinned notes first (change them in Settings) |
 | ⌘1 … ⌘9 | Open the first … ninth pinned note |
 | ⌘+ / ⌘− / ⌘0 | Bigger / smaller / default note text |
-| ⌃⌘M | Panel to its default place and size on the pointer's display; again, back to where it was (change it in Settings) |
+| ⌃⌘M | Panel to its default place and size on the pointer's display, with the default note text size; again, back to where it was (change it in Settings) |
 | ⌘W, Esc | Hide (Esc first closes extra cursors, the switcher or earlier versions) |
 | In the switcher's list: ↑↓, Return | Show the note beside the list, close the switcher on it |
 | In the switcher's search field: Return, ↑↓ | Go to the first row of the list, bring back earlier / later searches |
