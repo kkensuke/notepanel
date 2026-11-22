@@ -30,6 +30,7 @@ enum Prefs {
         static let indentSize = "indentSize"
         static let showMenuBarIcon = "showMenuBarIcon"
         static let defaultFrames = "defaultFrames"
+        static let defaultFontSizes = "defaultFontSizes"
         static let pinned = "pinned"
         static let lastNote = "lastNote"
         static let sideWidth = "sideWidth"
@@ -80,10 +81,21 @@ enum Prefs {
         (UserDefaults.standard.dictionary(forKey: Key.defaultFrames)?[display] as? String).map(NSRectFromString)
     }
 
-    static func setDefaultFrame(_ frame: NSRect?, for display: String) {
-        var all = UserDefaults.standard.dictionary(forKey: Key.defaultFrames) ?? [:]
-        all[display] = frame.map(NSStringFromRect)
-        UserDefaults.standard.set(all, forKey: Key.defaultFrames)
+    /// The note's text size ⌃⌘M sets on a display, saved with its frame. A frame saved before the
+    /// text size was saved with it, or none, has the default text size.
+    static func defaultFontSize(for display: String) -> Double {
+        UserDefaults.standard.dictionary(forKey: Key.defaultFontSizes)?[display] as? Double ?? defaultFontSize
+    }
+
+    /// Sets the frame and the text size together, so that Reset clears both.
+    static func setDefaultFrame(_ frame: NSRect?, fontSize: Double?, for display: String) {
+        let defaults = UserDefaults.standard
+        var sizes = defaults.dictionary(forKey: Key.defaultFontSizes) ?? [:]
+        sizes[display] = fontSize
+        defaults.set(sizes, forKey: Key.defaultFontSizes)
+        var frames = defaults.dictionary(forKey: Key.defaultFrames) ?? [:]
+        frames[display] = frame.map(NSStringFromRect)
+        defaults.set(frames, forKey: Key.defaultFrames)
     }
 
     /// A shortcut that was never set has its default; one stored as an empty string is off.

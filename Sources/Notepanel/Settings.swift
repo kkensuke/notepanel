@@ -211,6 +211,8 @@ struct DefaultPlace {
     var menuBar: CGFloat
     /// From the display's top-left corner, y down.
     var frame: NSRect
+    /// The note's text size there, in points.
+    var fontSize: Double
     /// Set with Use Current, rather than the standard place and size.
     var custom: Bool
 }
@@ -333,12 +335,13 @@ struct SettingsView: View {
                 Spacer()
                 Button("Reset", action: model.useStandardFrame)
                     .disabled(model.place?.custom != true)
-                    .help("Use the standard place on this display")
+                    .help("Use the standard place and text size on this display")
                 Button("Use Current", action: model.useCurrentFrame)
-                    .help("Use the panel’s place and size now, on this display")
+                    .help("Use the panel’s place, size and text size now, on this display")
             }
         }
-        // The notes' text size has no control here: ⌘+, ⌘− and ⌘0 in the panel change it.
+        // The notes' text size has no control here: ⌘+, ⌘− and ⌘0 in the panel change it, and Use
+        // Current saves it with the default place.
         Section("Appearance") {
             Picker("Note font", selection: $fontFamily) {
                 Text("Default (SF Mono)").tag("")
@@ -388,12 +391,15 @@ struct SettingsView: View {
         }
     }
 
-    /// "Custom · 620 × 410 at (100, 60)", or "Standard · 480 × 360, centered", with the window's size.
+    /// "Custom · 620 × 410 at (100, 60) · 16 pt", or "Standard · 480 × 360, centered · 14 pt", with
+    /// the window's size and the note's text size.
     private func placeSummary(_ place: DefaultPlace) -> String {
         let frame = place.frame
         let size = "\(Int(frame.width)) × \(Int(frame.height))"
-        return place.custom
+        let position = place.custom
             ? "Custom · \(size) at (\(Int(frame.minX)), \(Int(frame.minY)))" : "Standard · \(size), centered"
+        // A no-break space keeps "16 pt" together if the line wraps.
+        return "\(position) · \(Int(place.fontSize))\u{00A0}pt"
     }
 
     private func chooseFolder() {
