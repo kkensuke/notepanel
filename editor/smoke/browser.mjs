@@ -236,8 +236,8 @@ await page.mouse.move(box.x, box.y + 200)
 await pause(50)
 assert.equal(await page.$(".cm-tooltip-hover .cm-rowButtons"), null, "the popup goes when the pointer leaves the link")
 
-// With the cursor in a ``` or ::: block, fences included, a Copy button sits on the opening
-// fence's first characters, and copies the lines between the fences. It goes with the cursor.
+// Pointing at a ``` or ::: block, fences included, shows a Copy button on the opening fence's
+// first characters, which copies the lines between the fences. It goes when the pointer leaves.
 await receive("open", {id: "Setup", text: "Setup\n- install\n    ```sh\n    npm ci\n    ```\n:::tip\nread it\n:::"})
 const codeButton = () => page.$(".cm-tooltip.cm-rowButtons")
 // Where the text of the line numbered `n` starts, after its indentation.
@@ -253,21 +253,29 @@ const lineStart = n => page.evaluate(n => {
 }, n)
 const fence = await lineStart(3)
 const code = await lineStart(4)
-await page.mouse.click(code.x + 30, code.y)
+await page.mouse.move(code.x + 30, code.y)
 await page.waitForSelector(".cm-tooltip.cm-rowButtons")
 await pause(50)
 const button = await (await codeButton()).evaluate(e => e.getBoundingClientRect().toJSON())
 assert.ok(Math.abs(button.x - fence.x) < 2, `the button starts where the fence starts: ${button.x}, ${fence.x}`)
 assert.ok(Math.abs(button.y + button.height / 2 - fence.y) < 3, `the button sits on the fence's row: ${button.y}, ${fence.y}`)
+// The pointer goes up to the button, and the button stays.
 await clear()
-await (await codeButton()).$eval(".copy", e => e.click())
+await page.mouse.move(button.x + button.width / 2, button.y + button.height / 2, {steps: 5})
+await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2)
 assert.equal((await last("copy"))?.text, "npm ci", "the code, without the fence's indentation")
-await press("ArrowUp")
-await press("ArrowUp")
-assert.equal(await codeButton(), null, "no button out of the block")
-await press("ArrowDown", ["Meta"])
+const item = await lineStart(2)
+await page.mouse.move(item.x + 10, item.y)
+await pause(50)
+assert.equal(await codeButton(), null, "no button off the block")
+const colons = await lineStart(7)
+await page.mouse.move(colons.x + 10, colons.y)
+await page.waitForSelector(".cm-tooltip.cm-rowButtons")
 await (await codeButton()).$eval(".copy", e => e.click())
 assert.equal((await last("copy"))?.text, "read it")
+await page.mouse.move(colons.x + 10, colons.y + 300)
+await pause(50)
+assert.equal(await codeButton(), null, "no button below the note")
 
 // The switcher is the same page in a window of its own, which Swift tells it's the switcher's.
 // It's the switcher and nothing else, out to its window's edges.

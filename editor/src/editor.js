@@ -221,33 +221,61 @@ function onRow(view, pos, buttons) {
   }
 }
 
-// While the cursor is in a ``` or ::: block, fences included, a Copy button on its opening
-// fence's first characters copies the lines between the fences. Moving in the block keeps the
-// button, and its tick.
+// Pointing at a ``` or ::: block, fences included, shows a Copy button on its opening fence's
+// first characters, which copies the lines between the fences. It's a popup of its own rather
+// than a hover one: CodeMirror puts all hover popups in one box, which the buttons of a link in
+// the block would join. Moving over the block keeps the button, and its tick; writing hides it.
+const pointAt = StateEffect.define()
 const codeCopy = StateField.define({
-  create: state => codeButton(state, null),
+  create: () => null,
   update(button, transaction) {
-    const {state, startState} = transaction
-    // The parser tells which lines are in a ``` block, and it may finish after the change.
-    const changed = transaction.docChanged || transaction.selection || syntaxTree(state) !== syntaxTree(startState)
-    return changed ? codeButton(state, button) : button
+    for (const effect of transaction.effects) if (effect.is(pointAt)) return effect.value
+    return transaction.docChanged ? null : button
   },
   provide: field => showTooltip.from(field),
 })
 
-function codeButton(state, button) {
-  const block = codeBlockAt(state, state.selection.main.head)
-  if (!block) return null
-  if (button?.pos === block.fence) return button
+const codePointer = ViewPlugin.define(view => {
+  // The line the pointer was last on, so the note is read again only when it goes to another.
+  let line = 0
+  const point = block => {
+    if (view.state.field(codeCopy)?.pos === block?.fence) return
+    view.dispatch({effects: pointAt.of(block && copyButton(block))})
+  }
+  // The button is in the editor's element, on the fence's row, so pointing at it keeps it.
+  const move = event => {
+    const pos = view.posAtCoords({x: event.clientX, y: event.clientY})
+    const at = pos === null ? 0 : view.state.doc.lineAt(pos).number
+    if (at === line) return
+    line = at
+    point(pos === null ? null : codeBlockAt(view.state, pos))
+  }
+  const leave = () => {
+    line = 0
+    point(null)
+  }
+  view.dom.addEventListener("mousemove", move)
+  view.dom.addEventListener("mouseleave", leave)
   return {
-    pos: block.fence,
+    update(update) {
+      if (update.docChanged) line = 0
+    },
+    destroy() {
+      view.dom.removeEventListener("mousemove", move)
+      view.dom.removeEventListener("mouseleave", leave)
+    },
+  }
+})
+
+function copyButton({fence, code}) {
+  return {
+    pos: fence,
     create(view) {
       const copy = actionButton("copy", "Copy Code", () => {
-        // The block as it is now, since typing in it keeps the button.
-        post("copy", {text: codeBlockAt(view.state, view.state.selection.main.head).code})
+        post("copy", {text: code})
         flashCopied(copy)
       })
-      return onRow(view, block.fence, [copy])
+      return onRow(view, fence, [copy])
     },
   }
 }
@@ -316,6 +344,7 @@ const extensions = [
   hangingIndents,
   linkPopup,
   codeCopy,
+  codePointer,
   markdown({base: markdownLanguage}),
   syntaxHighlighting(highlight),
   theme,
