@@ -26,10 +26,17 @@ other editor, sync them or back them up as you like.
 - **Plain files.** Each note is a `.md` file named after its first line.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
   keeps earlier versions of each note, which `Cmd+Y` shows.
+
+  <img src="docs/img/history.png" width="483"
+       alt="A note's earlier versions, newest first, with the chosen version's text below them">
+
 - **Quick to switch notes.** `Cmd+P` lists your notes at the panel's left and shows each one
   beside the list as you go through them. `Cmd+F` searches the names and text of your notes
   there, and lists each match. `Ctrl+Tab` goes to the next note. Pinned notes come
   first, in the order you give them, and `Cmd+1` to `Cmd+9` open them.
+
+  <img src="docs/img/search.png" width="680"
+       alt="A search at the panel's left listing each note's matching lines, with the matches marked in the open note">
 
 ## Install
 
