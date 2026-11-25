@@ -39,6 +39,8 @@ function popup(math, className = "cm-math") {
     create(view) {
       const dom = document.createElement("div")
       dom.className = className
+      // A click on the popup leaves the focus in the note.
+      dom.addEventListener("mousedown", event => event.preventDefault())
       loadKaTeX().then(() => {
         try {
           // A copy of the macros, since KaTeX adds what the math defines with \gdef to them.

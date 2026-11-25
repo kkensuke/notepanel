@@ -301,6 +301,10 @@ await page.waitForSelector(".cm-math-cursor .katex")
 assert.deepEqual(await mathShown(), ["a^2"])
 const mathPopup = await page.$eval(".cm-math-cursor", e => e.getBoundingClientRect().toJSON())
 assert.ok(mathPopup.y > squared.y && mathPopup.y < squared.y + 20, `the popup is under the math's row: ${mathPopup.y}, ${squared.y}`)
+// A click on the popup leaves the focus in the note.
+await page.mouse.click(mathPopup.x + mathPopup.width / 2, mathPopup.y + mathPopup.height / 2)
+await pause(50)
+assert.equal(await page.evaluate(() => document.activeElement.className.includes("cm-content")), true)
 // Pointing at other math shows that too, with the physics package's commands read as it has them.
 const expval = await charAt("\\expval", 3)
 await page.mouse.move(expval.x, expval.y)
