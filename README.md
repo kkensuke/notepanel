@@ -96,7 +96,9 @@ panel), copy the new app to `/Applications`, and open it.
 - **Copying code.** Pointing at a block between ` ``` ` fences or `:::` lines shows a Copy button
   on the opening fence, which copies what's between the fences.
 - **Math.** With the cursor in or next to math, the math shows typeset under it, or over it where
-  there's no room under. Pointing at math for a moment shows it too. Nothing in the note changes.
+  there's no room under. Pointing at math shows it at once, and a display shows on pointing at any
+  of its lines, as a code block's Copy button does. Math in a link's text shows only with the cursor.
+  Nothing in the note changes.
   Math is `$…$` or `\(…\)` in a line, `$$…$$` or `\[…\]` over any lines, or one of LaTeX's displays
   with nothing around it: `equation`, `align`, `alignat` or `gather`, with or without `*`, so an
   equation pasted from LaTeX shows as it is; its `\label` shows nothing. Other dollars stay text:

@@ -1,8 +1,8 @@
 // The math the cursor or the pointer is in, typeset by KaTeX in a popup under it. The note itself
 // stays as written.
-import {StateField} from "@codemirror/state"
-import {hoverTooltip, showTooltip, repositionTooltips} from "@codemirror/view"
-import {mathAt} from "./logic.js"
+import {StateField, StateEffect} from "@codemirror/state"
+import {hoverTooltip, showTooltip, repositionTooltips, ViewPlugin} from "@codemirror/view"
+import {mathAt, linkAt} from "./logic.js"
 import {physicsMacros} from "./physics.js"
 
 // KaTeX is as big as the rest of the page, so it's a file of its own beside the page's, loaded
@@ -79,14 +79,64 @@ const cursorMath = StateField.define({
   provide: field => showTooltip.from(field),
 })
 
-// Pointing at math shows it too, unless the cursor's popup already does.
-const pointerMath = hoverTooltip(
+// Whether the cursor's popup shows `math`.
+const shownAtCursor = (view, math) => view.hasFocus && view.state.field(cursorMath)?.pos === math.from
+
+// Pointing at math in a line shows it at once, as pointing at a link shows its buttons; 1, since
+// CodeMirror reads 0 as its default of 300 ms. Not in a link's text: CodeMirror puts the link's
+// buttons and the math in one box, which then sits in neither's place.
+const lineMath = hoverTooltip(
   (view, pos) => {
     const math = mathAt(view.state, pos)
-    const shown = view.hasFocus && view.state.field(cursorMath)
-    return math && math.from !== shown?.pos ? popup(math) : null
+    const line = view.state.doc.lineAt(pos)
+    if (!math || math.display || shownAtCursor(view, math) || linkAt(line.text, pos - line.from)) return null
+    return popup(math)
   },
-  {hideOnChange: true},
+  {hoverTime: 1, hideOnChange: true},
 )
 
-export const math = [cursorMath, pointerMath]
+// Pointing at any line of a display, past its end too, shows it at once, as pointing at a code
+// block shows its Copy button: a popup of its own, which the pointer can move onto.
+const pointAt = StateEffect.define()
+const displayMath = StateField.define({
+  create: () => null,
+  update(shown, transaction) {
+    for (const effect of transaction.effects) if (effect.is(pointAt)) return effect.value
+    return transaction.docChanged || transaction.selection ? null : shown
+  },
+  provide: field => showTooltip.from(field),
+})
+const displayPointer = ViewPlugin.define(view => {
+  // The line the pointer was last on, so the note is read again only when it goes to another.
+  let line = 0
+  const point = math => {
+    if (view.state.field(displayMath)?.pos === math?.from) return
+    view.dispatch({effects: pointAt.of(math && popup(math))})
+  }
+  const move = event => {
+    if (event.target.closest?.(".cm-math")) return
+    const pos = view.posAtCoords({x: event.clientX, y: event.clientY})
+    const at = pos === null ? 0 : view.state.doc.lineAt(pos).number
+    if (at === line) return
+    line = at
+    const math = pos === null ? null : mathAt(view.state, pos)
+    point(math?.display && !shownAtCursor(view, math) ? math : null)
+  }
+  const leave = () => {
+    line = 0
+    point(null)
+  }
+  view.dom.addEventListener("mousemove", move)
+  view.dom.addEventListener("mouseleave", leave)
+  return {
+    update(update) {
+      if (update.docChanged || update.selectionSet) line = 0
+    },
+    destroy() {
+      view.dom.removeEventListener("mousemove", move)
+      view.dom.removeEventListener("mouseleave", leave)
+    },
+  }
+})
+
+export const math = [cursorMath, lineMath, displayMath, displayPointer]
