@@ -538,6 +538,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.styleMask.insert(.fullSizeContentView)
         panel.minSize = NSSize(width: 320, height: 160)
         panel.standardWindowButton(.zoomButton)?.isHidden = true
+        // To accessibility, a non-activating panel is a system dialog, which window managers such as
+        // Rectangle move but don't resize.
+        panel.setAccessibilitySubrole(.floatingWindow)
         panel.delegate = self
         // Set explicitly, so clicks where the background is clear reach the panel, not the app behind.
         panel.ignoresMouseEvents = false
