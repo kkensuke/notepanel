@@ -114,7 +114,8 @@ panel), copy the new app to `/Applications`, and open it.
   **Use Current** in Settings.
 - **Window managers.** While the panel or the switcher has the focus, notepanel is the active app,
   so a tool that places the focused window, such as Rectangle, places the panel. The switcher goes
-  with it.
+  with it. At the display's left edge the panel leaves the switcher no room, and the switcher ends
+  up off the display, so close it before placing the panel there.
 
 ## Settings
 

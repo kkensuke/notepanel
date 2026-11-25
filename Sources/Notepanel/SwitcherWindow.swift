@@ -50,7 +50,7 @@ final class SwitcherWindow {
     /// Where the display has no room at the panel's left, the panel moves right while the switcher
     /// is up, and back when it closes, unless it was moved meanwhile.
     /// shortcut: checked only as the switcher opens; a panel moved to the display's left edge
-    /// while it's up, by hand or by ⌃⌘M, takes the switcher off the display.
+    /// while it's up, by hand, by ⌃⌘M or by a window manager, takes the switcher off the display.
     func open() {
         isShown = true
         let room = roomLeft
