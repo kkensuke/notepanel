@@ -346,7 +346,7 @@ test("mathAt finds $…$, $$…$$, \\(…\\), \\[…\\] and LaTeX's displays, an
   assert.deepEqual(math(String.raw`$a\$|b$`), [String.raw`$a\$b$`, String.raw`a\$b`, false])
   // Prices, a space inside either dollar, a digit after the last, "\$", another line, and code.
   const dollars = ["$5 and $|10", "it costs $|5", "$ a|$", "$a| $", "$a|$1", String.raw`\$a|$`, "$a\n|b$"]
-  const code = ["`$a|$`", "```\n$a|$\n```", "    $a|$"]
+  const code = ["`$a|$`", "```\n$a|$\n```", "    $a|$", "$1|0, `$HOME`"]
   for (const doc of [...dollars, ...code]) assert.equal(math(doc), null, doc)
   assert.deepEqual(math("`$a` costs$b|$"), ["$b$", "b", false], "a dollar in code opens nothing")
 
