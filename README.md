@@ -9,7 +9,8 @@ using.
 Each note is a plain Markdown file in a folder you choose, so you can also open your notes in any
 other editor, sync them or back them up as you like.
 
-<img src="docs/img/note.png" width="480" alt="note">
+<img src="docs/img/note.png" width="480"
+     alt="A note with Markdown marks, a code block's Copy button, and math typeset under the cursor">
 
 ## Features
 
