@@ -265,6 +265,62 @@ function colonBlock(state, number) {
   return unclosed ? {...unclosed, last: doc.lines} : null
 }
 
+// Math as Pandoc reads it, and LaTeX's display environments, which need no "$$" around them. The
+// first two patterns run to the end of the text if the math isn't closed.
+const mathPattern = new RegExp(
+  [
+    // The environments KaTeX reads outside math, \begin and \end included.
+    String.raw`\\begin\{((?:equation|align|alignat|gather)\*?)\}[^]*?(?:\\end\{\1\}|$)`,
+    String.raw`\$\$((?:\\[^]|[^\\])*?)(?:\$\$|$)`,
+    // In a line, with no space after the first "$" or before the last and no digit after it, so
+    // the dollars of "$5 and $10" aren't math.
+    String.raw`\$(?!\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\d)`,
+    // A character after "\", so the dollar of "\$" opens and closes nothing.
+    String.raw`\\.`,
+  ].join("|"),
+  "g",
+)
+
+// Whether the character at `pos` is code: in a ``` block or an indented one, or between backticks.
+function isCode(state, pos) {
+  for (let node = syntaxTree(state).resolveInner(pos, 1); node; node = node.parent)
+    if (/^(?:FencedCode|CodeBlock|InlineCode)$/.test(node.name)) return true
+  return false
+}
+
+// The math `pos` is in or next to: "$…$" in a line, "$$…$$" over any lines, or a LaTeX display
+// environment such as \begin{align}. `from` and `to` span it as written, `tex` is what's between
+// the dollars (an environment's \begin and \end are part of it), and `display` is false for "$…$".
+// Math ends at a blank line, closed or not, so forgetting "$$" doesn't make the rest of a note
+// math. null elsewhere, and for dollars in code.
+// shortcut: reads the lines around `pos` up to a blank one each time the cursor moves; keep the
+// math in a StateField if that lags in a long note with no blank lines.
+// shortcut: math in a quote keeps its lines' "> "; take the quote's markers off if that comes up.
+export function mathAt(state, pos) {
+  const {doc} = state
+  let first = doc.lineAt(pos)
+  let last = first
+  if (!first.text.trim()) return null
+  while (first.number > 1 && doc.line(first.number - 1).text.trim()) first = doc.line(first.number - 1)
+  while (last.number < doc.lines && doc.line(last.number + 1).text.trim()) last = doc.line(last.number + 1)
+  const text = doc.sliceString(first.from, last.to)
+  const at = pos - first.from
+  mathPattern.lastIndex = 0
+  for (let m; (m = mathPattern.exec(text)) && m.index <= at; ) {
+    const [whole, environment, displayed, inline] = m
+    if (whole[0] === "\\" && !environment) continue
+    const tex = environment ? whole : (displayed ?? inline)
+    if (isCode(state, first.from + m.index)) {
+      // The dollar after this one may open math.
+      mathPattern.lastIndex = m.index + 1
+    } else if (at <= m.index + whole.length && tex.trim()) {
+      const from = first.from + m.index
+      return {from, to: from + whole.length, tex, display: inline === undefined}
+    }
+  }
+  return null
+}
+
 // The columns a line's wrapped rows hang by: the width of its list and quote markers, with the
 // indentation and spaces around them. 0 for other lines and in a ``` block.
 export function hangIndent(state, line) {
