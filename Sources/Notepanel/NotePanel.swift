@@ -1,6 +1,7 @@
 import AppKit
 
-/// A floating panel that takes keys without activating the app, so the app underneath stays active.
+/// A floating panel that takes the keys while another app is active. Its controller then makes this
+/// app active, which macOS may take a moment to do, or turn down.
 final class NotePanel: NSPanel {
     /// Cmd-key commands, by character: lowercased without Shift, and as typed with it ("?" for
     /// ⇧⌘/). They don't repeat while the key is held.
@@ -40,7 +41,8 @@ final class NotePanel: NSPanel {
         isReleasedWhenClosed = false
     }
 
-    // While the app is inactive the main menu never sees key equivalents, so the panel routes them:
+    // The panel can be key while the app is inactive, when the main menu never sees key equivalents,
+    // so the panel always routes them itself:
     // its own commands first, then cut, copy and paste to the first responder, and Select All, Undo
     // and Redo to a text field. Everything else, including Cmd-Z in the editor and its key repeats,
     // goes on to the editor page.

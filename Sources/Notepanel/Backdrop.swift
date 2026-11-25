@@ -50,7 +50,7 @@ final class Backdrop {
         }
         let blur = NSVisualEffectView()
         blur.material = .popover
-        // The app is never active, so the blur would otherwise always look inactive.
+        // The panel stays up while another app is active, when the blur would otherwise look inactive.
         blur.state = .active
         if cornerRadius > 0 {
             // A rounded square, stretched between its corners.
