@@ -279,7 +279,7 @@ assert.equal(await codeButton(), null, "no button below the note")
 
 // With the cursor in math, the math shows under it, typeset by KaTeX, which the page loads then.
 const equation = "\\begin{equation}\na = b \\label{eq:a}\n\\end{equation}"
-await receive("open", {id: "Math", text: `It costs $5, or $10.\n\nSo $a^2$ and $\\expval{H}{\\psi}$.\n\n$$\n\\frac{a}{b\n$$\n\n${equation}`})
+await receive("open", {id: "Math", text: `It costs $5, or $10.\n\nSo $a^2$ and $\\expval{H}{\\psi}$.\n\n$$\n\\frac{a}{b\n$$\n\n${equation}\n\n[$x$ and more](https://example.com)`})
 assert.equal(await page.evaluate(() => "katex" in window), false, "KaTeX isn't loaded before math shows")
 // The middle of the character `offset` after where `text` starts in the note.
 const charAt = (text, offset = 0) => page.evaluate((text, offset) => {
@@ -335,6 +335,17 @@ await page.waitForSelector(".cm-math-error")
 assert.match((await mathShown())[0], /^KaTeX parse error: /)
 const price = await charAt("$5", 1)
 await page.mouse.click(price.x, price.y)
+assert.deepEqual(await mathShown(), [])
+// Pointing at any line of a display, past its end too, shows it at once. Math in a link's text
+// shows only the link's buttons.
+const pastEnd = await charAt("a = b", 4)
+await page.mouse.move(pastEnd.x + 300, pastEnd.y)
+await pause(50)
+assert.deepEqual(await mathShown(), [equation])
+const inLink = await charAt("$x$ and", 1)
+await page.mouse.move(inLink.x, inLink.y)
+await page.waitForSelector(".cm-tooltip-hover .cm-rowButtons")
+await pause(50)
 assert.deepEqual(await mathShown(), [])
 await page.mouse.move(price.x, price.y + 300)
 

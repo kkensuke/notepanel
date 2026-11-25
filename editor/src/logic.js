@@ -297,7 +297,8 @@ function isCode(state, pos) {
 // or a LaTeX display environment such as \begin{align}. `from` and `to` span it as written, `tex`
 // is what's between its marks (an environment's \begin and \end are part of it), and `display` is
 // false for the two in a line. Math ends at a blank line, closed or not, so forgetting "$$"
-// doesn't make the rest of a note math. null elsewhere, and for math in code.
+// doesn't make the rest of a note math. null elsewhere, and for math that starts or ends in code,
+// as the dollar of `$HOME` after a price does.
 // shortcut: reads the lines around `pos` up to a blank one each time the cursor moves; keep the
 // math in a StateField if that lags in a long note with no blank lines.
 // shortcut: math in a quote keeps its lines' "> "; take the quote's markers off if that comes up.
@@ -317,11 +318,11 @@ export function mathAt(state, pos) {
     const tex = environment ? whole : (dollars ?? brackets ?? inline)
     // "\" and a character.
     if (tex === undefined) continue
-    if (isCode(state, first.from + m.index)) {
+    const from = first.from + m.index
+    if (isCode(state, from) || isCode(state, from + whole.length - 1)) {
       // What's after this character may open math.
       mathPattern.lastIndex = m.index + 1
     } else if (at <= m.index + whole.length && tex.trim()) {
-      const from = first.from + m.index
       return {from, to: from + whole.length, tex, display: inline === undefined}
     }
   }
