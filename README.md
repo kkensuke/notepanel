@@ -98,7 +98,8 @@ panel), copy the new app to `/Applications`, and open it.
 - **Math.** With the cursor in or next to math, the math shows typeset under it, or over it where
   there's no room under. Pointing at math for a moment shows it too. Nothing in the note changes.
   Math is `$…$` in a line, `$$…$$` over any lines, or one of LaTeX's displays with no dollars around
-  it: `equation`, `align`, `alignat` or `gather`, with or without `*`. Other dollars stay text:
+  it: `equation`, `align`, `alignat` or `gather`, with or without `*`, so an equation pasted from
+  LaTeX shows as it is; its `\label` shows nothing. Other dollars stay text:
   `$…$` is math only with no space after the first `$` or before the last, and no digit after the
   last, so `$5 and $10` isn't math. Neither is `\$`, or a dollar in code. Math ends at a blank line,
   closed or not. If KaTeX can't read the math, the popup says what's wrong. The commands of LaTeX's

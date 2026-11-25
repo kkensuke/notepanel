@@ -20,6 +20,16 @@ function loadKaTeX() {
   }))
 }
 
+// What KaTeX gets besides the math. \label names an equation for LaTeX's references and shows
+// nothing; equations pasted from LaTeX have it, and KaTeX doesn't know it.
+const macros = {
+  ...physicsMacros,
+  "\\label"(context) {
+    context.consumeArg()
+    return ""
+  },
+}
+
 // A popup of `math` typeset, under its last row, or over its first where there's no room under.
 function popup(math, className = "cm-math") {
   return {
@@ -32,7 +42,7 @@ function popup(math, className = "cm-math") {
       loadKaTeX().then(() => {
         try {
           // A copy of the macros, since KaTeX adds what the math defines with \gdef to them.
-          window.katex.render(math.tex, dom, {displayMode: math.display, macros: {...physicsMacros}})
+          window.katex.render(math.tex, dom, {displayMode: math.display, macros: {...macros}})
         } catch (error) {
           // What KaTeX couldn't read, and where.
           dom.textContent = error.message

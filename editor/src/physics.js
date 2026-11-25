@@ -44,8 +44,10 @@ function upTo(context, open, close) {
   for (let depth = 0; ; ) {
     const token = context.popToken()
     if (token.text === "EOF") throw new Error(`\\qty has no closing ${close}`)
-    if (token.text === close && depth-- === 0) return source(tokens)
-    if (token.text === open) depth++
+    if (token.text === close) {
+      if (depth === 0) return source(tokens)
+      depth--
+    } else if (token.text === open) depth++
     tokens.unshift(token)
   }
 }

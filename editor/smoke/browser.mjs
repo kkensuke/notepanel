@@ -278,7 +278,8 @@ await pause(50)
 assert.equal(await codeButton(), null, "no button below the note")
 
 // With the cursor in math, the math shows under it, typeset by KaTeX, which the page loads then.
-await receive("open", {id: "Math", text: "It costs $5, or $10.\n\nSo $a^2$ and $\\expval{H}{\\psi}$.\n\n$$\n\\frac{a}{b\n$$"})
+const equation = "\\begin{equation}\na = b \\label{eq:a}\n\\end{equation}"
+await receive("open", {id: "Math", text: `It costs $5, or $10.\n\nSo $a^2$ and $\\expval{H}{\\psi}$.\n\n$$\n\\frac{a}{b\n$$\n\n${equation}`})
 assert.equal(await page.evaluate(() => "katex" in window), false, "KaTeX isn't loaded before math shows")
 // The middle of the character `offset` after where `text` starts in the note.
 const charAt = (text, offset = 0) => page.evaluate((text, offset) => {
@@ -318,6 +319,11 @@ assert.equal(await mathVisibility(), "hidden")
 await page.focus(".cm-content")
 await pause(50)
 assert.equal(await mathVisibility(), "visible")
+// An equation pasted from LaTeX needs no dollars, and its \label shows nothing.
+const pasted = await charAt("a = b")
+await page.mouse.click(pasted.x, pasted.y)
+await page.waitForFunction(equation => document.querySelector(".cm-math-cursor annotation")?.textContent === equation, {}, equation)
+assert.equal(await page.$eval(".cm-math-cursor .katex-html", e => e.textContent.includes("eq:a")), false)
 // Math KaTeX can't read shows what's wrong with it, and the dollars of prices aren't math.
 const fraction = await charAt("\\frac", 3)
 await page.mouse.click(fraction.x, fraction.y)
