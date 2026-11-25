@@ -12,6 +12,7 @@ import {
   hangIndent,
   textStart,
   codeBlockAt,
+  mathAt,
   insertLineAbove,
   toggleMark,
   insertLink,
@@ -328,6 +329,47 @@ test("codeBlockAt finds the ``` or ::: block a line is in, fences included, and 
   assert.deepEqual(blocks(colons), [inner, "inner", "inner", "inner", ":::", ":::", ":::", inner, "open", "open"])
   const state = EditorState.create({doc: "a\n  ```\n  b\n  ```", extensions: markdown({base: markdownLanguage})})
   assert.equal(codeBlockAt(state, 5).fence, 4, "the fence starts after its indentation")
+})
+
+test("mathAt finds $…$, $$…$$, \\(…\\), \\[…\\] and LaTeX's displays, and no dollars that aren't math", () => {
+  // The math at the "|" in a note: as written, its TeX, and whether it's a display.
+  const math = doc => {
+    const state = EditorState.create({doc: doc.replace("|", ""), extensions: markdown({base: markdownLanguage})})
+    const found = mathAt(state, doc.indexOf("|"))
+    return found && [state.sliceDoc(found.from, found.to), found.tex, found.display]
+  }
+  // The cursor next to either dollar is in the math.
+  for (const doc of ["a |$x^2$ b", "a $x|^2$ b", "a $x^2$| b"]) assert.deepEqual(math(doc), ["$x^2$", "x^2", false])
+  assert.equal(math("a| $x^2$ b"), null)
+  assert.equal(math("a $x^2$ |b"), null)
+  assert.deepEqual(math("$a$ and $b|$"), ["$b$", "b", false])
+  assert.deepEqual(math(String.raw`$a\$|b$`), [String.raw`$a\$b$`, String.raw`a\$b`, false])
+  // Prices, a space inside either dollar, a digit after the last, "\$", another line, and code.
+  const dollars = ["$5 and $|10", "it costs $|5", "$ a|$", "$a| $", "$a|$1", String.raw`\$a|$`, "$a\n|b$"]
+  const code = ["`$a|$`", "```\n$a|$\n```", "    $a|$"]
+  for (const doc of [...dollars, ...code]) assert.equal(math(doc), null, doc)
+  assert.deepEqual(math("`$a` costs$b|$"), ["$b$", "b", false], "a dollar in code opens nothing")
+
+  assert.deepEqual(math("$$a=|f$$"), ["$$a=f$$", "a=f", true])
+  assert.deepEqual(math("text\n$$\na=|f\n$$\nmore"), ["$$\na=f\n$$", "\na=f\n", true])
+  // Math that isn't closed ends at the blank line, and two dollars with nothing after aren't math.
+  assert.deepEqual(math("$$\na=|f\n\nnext"), ["$$\na=f", "\na=f", true])
+  assert.equal(math("$$\na=f\n\nne|xt"), null)
+  assert.equal(math("$$|"), null)
+
+  // LaTeX's own marks are math only closed: \(…\) in a line, \[…\] before the blank line.
+  for (const doc of [String.raw`a |\(x^2\) b`, String.raw`a \(x|^2\) b`, String.raw`a \(x^2\)| b`])
+    assert.deepEqual(math(doc), [String.raw`\(x^2\)`, "x^2", false])
+  assert.deepEqual(math("\\[\na=|f\n\\]"), ["\\[\na=f\n\\]", "\na=f\n", true])
+  assert.deepEqual(math(String.raw`\[a \\|] b\]`), [String.raw`\[a \\] b\]`, String.raw`a \\] b`, true], "a line break's \\\\] closes nothing")
+  const open = [String.raw`\(a|`, "\\(a\n|b\\)", String.raw`\[a|`, "\\[a\n\n|b\\]", String.raw`\\(a|\\)`, String.raw`\\[a|\\]`]
+  for (const doc of [...open, "`\\(a|\\)`", String.raw`\[ |\]`]) assert.equal(math(doc), null, doc)
+
+  const align = "\\begin{align}\na &= b\n\\end{align}"
+  assert.deepEqual(math(`see\n${align.replace("&", "|&")}\nit`), [align, align, true])
+  assert.deepEqual(math("\\begin{gather*}\n|a"), ["\\begin{gather*}\na", "\\begin{gather*}\na", true])
+  assert.equal(math("\\begin{itemize}\n|\\item a\n\\end{itemize}"), null)
+  assert.deepEqual(math(`$$\n${align}|\n$$`), [`$$\n${align}\n$$`, `\n${align}\n`, true], "in $$, it's part of the math")
 })
 
 test("countCharacters counts graphemes and skips line breaks", () => {

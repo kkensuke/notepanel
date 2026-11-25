@@ -15,11 +15,13 @@ other editor, sync them or back them up as you like.
 
 - **Opens over everything.** The panel floats above other windows, full-screen apps included, on
   every Space. Hiding it gives the focus back to the app you were in.
-- **Small and light.** The app is about 2 MB.
+- **Small and light.** The app is about 3.5 MB.
 - **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
   rectangular selection, and moving and copying lines. It also highlights Markdown, continues
   lists when you press `Return`, and adds or removes bold, italic and other marks with `Cmd+B`,
   `Cmd+I` and the like.
+- **Shows math.** With the cursor in `$…$`, `$$…$$` or a LaTeX display such as `\begin{align}`, the
+  math shows under it, typeset by KaTeX. The note stays as you wrote it.
 - **Plain files.** Each note is a `.md` file named after its first line.
 - **Hard to lose text.** It saves as you type, never overwrites a file another app changed, and
   keeps earlier versions of each note, which `Cmd+Y` shows.
@@ -93,6 +95,18 @@ panel), copy the new app to `/Applications`, and open it.
   characters: one opens it, the other copies the URL.
 - **Copying code.** Pointing at a block between ` ``` ` fences or `:::` lines shows a Copy button
   on the opening fence, which copies what's between the fences.
+- **Math.** With the cursor in or next to math, the math shows typeset under it, or over it where
+  there's no room under. Pointing at math for a moment shows it too. Nothing in the note changes.
+  Math is `$…$` or `\(…\)` in a line, `$$…$$` or `\[…\]` over any lines, or one of LaTeX's displays
+  with nothing around it: `equation`, `align`, `alignat` or `gather`, with or without `*`, so an
+  equation pasted from LaTeX shows as it is; its `\label` shows nothing. Other dollars stay text:
+  `$…$` is math only with no space after the first `$` or before the last, and no digit after the
+  last, so `$5 and $10` isn't math. Neither is `\$`, or a dollar in code. `$$…$$` and a display end
+  at a blank line, closed or not. `\(…\)` and `\[…\]` are math only when closed; in Markdown they
+  also write plain brackets, so `\[1\]` shows as math too. If KaTeX can't read the math, the popup
+  says what's wrong. The commands of LaTeX's physics package work as they do there, such as
+  `\expval{A}{\psi}`, `\pdv{f}{x}{y}` and `\qty( )`. `\div` stays ÷: the divergence is
+  `\divergence`.
 - **Tasks.** Click the box of a task (`- [ ]` or `- [x]`) to tick or clear it. The box stays as
   text; `Cmd+Z` undoes the click.
 - **Dropping files.** Drop a text file, such as a Markdown file, on the note to insert its text
@@ -244,24 +258,25 @@ Editing:
 | `docs/switcher.md` | The design of the switcher (in Japanese) |
 | `docs/releasing.md` | How to publish a release |
 
-Node is needed only to change the editor page. `web/editor.js` and `web/THIRD_PARTY_LICENSES.txt`,
-the licenses of the packages bundled into it, are kept in the repository:
+Node is needed only to change the editor page. `web/editor.js`, `web/katex` (KaTeX, which the page
+loads when a note first shows math) and `web/THIRD_PARTY_LICENSES.txt`, the licenses of the packages
+in the two, are kept in the repository:
 
 ```sh
 cd editor
 npm ci
-npm run build   # writes ../web/editor.js and ../web/THIRD_PARTY_LICENSES.txt
+npm run build   # writes ../web/editor.js, ../web/katex and ../web/THIRD_PARTY_LICENSES.txt
 ```
 
 Tests:
 
 ```sh
 swift run NotepanelChecks   # NotepanelCore: saving, conflicts, naming, history
-cd editor && npm test       # editor helpers: search ranking, links, code blocks, line insertion, formatting, tasks, counts
+cd editor && npm test       # editor helpers: search ranking, links, code blocks, math, line insertion, formatting, tasks, counts; the physics macros
 cd editor && npm run smoke  # the editor page in headless Chrome, posing as a Mac
 ```
 
-CI runs all three, and fails if `web/editor.js` isn't what `npm run build` makes from `editor/src`.
+CI runs all three, and fails if `web/` isn't what `npm run build` makes.
 
 `NotepanelChecks` is a plain executable of assertions rather than an XCTest target, because XCTest
 comes only with Xcode. The smoke test needs Google Chrome; set `CHROME` to its binary if it isn't
@@ -270,7 +285,7 @@ notepanel's page is listed there.
 
 ## Credits
 
-The editor is [CodeMirror 6](https://codemirror.net).
+The editor is [CodeMirror 6](https://codemirror.net). Math is typeset by [KaTeX](https://katex.org).
 
 ## License
 

@@ -37,6 +37,7 @@ import {
 } from "./logic.js"
 import {post, $, actionButton, flashCopied} from "./dom.js"
 import {footerHeight, countElement} from "./footer.js"
+import {math} from "./math.js"
 
 const editorElement = $("editor")
 
@@ -87,6 +88,18 @@ const theme = EditorView.theme({
   ".cm-rowButtons": {display: "flex", gap: "1px", padding: "0 2px", fontSize: "var(--size)"},
   ".cm-rowButtons .action": {padding: "2px", fontSize: "inherit"},
   ".cm-rowButtons .action svg": {width: "1em", height: "1em"},
+  // Math typeset, under the math in the note: at most as wide as the panel and half as tall, and
+  // scrolled past that.
+  ".cm-math": {padding: "4px 8px", maxWidth: "calc(100vw - 16px)", maxHeight: "50vh", overflow: "auto"},
+  // Nothing shows while KaTeX loads.
+  ".cm-math:empty": {display: "none"},
+  // A display needs no margins here. Its equation numbers follow it in the row: the popup is only
+  // as wide as the math, and KaTeX would put them at its right edge, over the math.
+  ".cm-math .katex-display": {margin: "0"},
+  ".cm-math .katex-display > .katex > .katex-html > .katex-tag": {position: "static", paddingLeft: "2em"},
+  ".cm-math-error": {color: "var(--error)"},
+  // The cursor's math shows while the note has the focus, as the cursor does.
+  "&:not(.cm-focused) .cm-math-cursor": {visibility: "hidden"},
   ".cm-taskBox": {cursor: "pointer", borderRadius: "3px"},
   ".cm-taskBox:hover": {backgroundColor: "var(--selection)"},
   ".cm-searchMatch": {backgroundColor: "var(--search)"},
@@ -345,6 +358,7 @@ const extensions = [
   linkPopup,
   codeCopy,
   codePointer,
+  math,
   markdown({base: markdownLanguage}),
   syntaxHighlighting(highlight),
   theme,

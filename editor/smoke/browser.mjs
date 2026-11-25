@@ -277,6 +277,67 @@ await page.mouse.move(colons.x + 10, colons.y + 300)
 await pause(50)
 assert.equal(await codeButton(), null, "no button below the note")
 
+// With the cursor in math, the math shows under it, typeset by KaTeX, which the page loads then.
+const equation = "\\begin{equation}\na = b \\label{eq:a}\n\\end{equation}"
+await receive("open", {id: "Math", text: `It costs $5, or $10.\n\nSo $a^2$ and $\\expval{H}{\\psi}$.\n\n$$\n\\frac{a}{b\n$$\n\n${equation}`})
+assert.equal(await page.evaluate(() => "katex" in window), false, "KaTeX isn't loaded before math shows")
+// The middle of the character `offset` after where `text` starts in the note.
+const charAt = (text, offset = 0) => page.evaluate((text, offset) => {
+  const walker = document.createTreeWalker(document.querySelector(".cm-content"), NodeFilter.SHOW_TEXT)
+  let node
+  while ((node = walker.nextNode()) && !node.textContent.includes(text));
+  const range = document.createRange()
+  range.setStart(node, node.textContent.indexOf(text) + offset)
+  range.setEnd(node, node.textContent.indexOf(text) + offset + 1)
+  const r = range.getBoundingClientRect()
+  return {x: r.x + r.width / 2, y: r.y + r.height / 2}
+}, text, offset)
+// The TeX of each popup's math, or what it says instead.
+const mathShown = () => page.$$eval(".cm-math", popups =>
+  popups.map(popup => popup.querySelector("annotation")?.textContent ?? popup.textContent))
+const squared = await charAt("$a^2", 1)
+await page.mouse.click(squared.x, squared.y)
+await page.waitForSelector(".cm-math-cursor .katex")
+assert.deepEqual(await mathShown(), ["a^2"])
+const mathPopup = await page.$eval(".cm-math-cursor", e => e.getBoundingClientRect().toJSON())
+assert.ok(mathPopup.y > squared.y && mathPopup.y < squared.y + 20, `the popup is under the math's row: ${mathPopup.y}, ${squared.y}`)
+// A click on the popup leaves the focus in the note.
+await page.mouse.click(mathPopup.x + mathPopup.width / 2, mathPopup.y + mathPopup.height / 2)
+await pause(50)
+assert.equal(await page.evaluate(() => document.activeElement.className.includes("cm-content")), true)
+// Pointing at other math shows that too, with the physics package's commands read as it has them.
+const expval = await charAt("\\expval", 3)
+await page.mouse.move(expval.x, expval.y)
+await page.waitForSelector(".cm-tooltip-hover .cm-math .katex")
+assert.equal(await page.$eval(".cm-tooltip-hover .katex-html", e => e.textContent), "⟨ψ∣H∣ψ⟩")
+assert.equal((await mathShown()).length, 2)
+// Pointing at the cursor's math adds no second popup, and the pointer's goes when it leaves.
+await page.mouse.move(squared.x, squared.y)
+await pause(400)
+assert.deepEqual(await mathShown(), ["a^2"])
+// The cursor's popup hides while the note doesn't have the focus.
+const mathVisibility = () => page.$eval(".cm-math-cursor", e => getComputedStyle(e).visibility)
+await page.evaluate(() => document.activeElement.blur())
+await pause(50)
+assert.equal(await mathVisibility(), "hidden")
+await page.focus(".cm-content")
+await pause(50)
+assert.equal(await mathVisibility(), "visible")
+// An equation pasted from LaTeX needs no dollars, and its \label shows nothing.
+const pasted = await charAt("a = b")
+await page.mouse.click(pasted.x, pasted.y)
+await page.waitForFunction(equation => document.querySelector(".cm-math-cursor annotation")?.textContent === equation, {}, equation)
+assert.equal(await page.$eval(".cm-math-cursor .katex-html", e => e.textContent.includes("eq:a")), false)
+// Math KaTeX can't read shows what's wrong with it, and the dollars of prices aren't math.
+const fraction = await charAt("\\frac", 3)
+await page.mouse.click(fraction.x, fraction.y)
+await page.waitForSelector(".cm-math-error")
+assert.match((await mathShown())[0], /^KaTeX parse error: /)
+const price = await charAt("$5", 1)
+await page.mouse.click(price.x, price.y)
+assert.deepEqual(await mathShown(), [])
+await page.mouse.move(price.x, price.y + 300)
+
 // The switcher is the same page in a window of its own, which Swift tells it's the switcher's.
 // It's the switcher and nothing else, out to its window's edges.
 const side = await open(220)

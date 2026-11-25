@@ -265,6 +265,69 @@ function colonBlock(state, number) {
   return unclosed ? {...unclosed, last: doc.lines} : null
 }
 
+// Math as Pandoc reads it, and LaTeX's display environments, which need no "$$" around them. The
+// first two patterns run to the end of the text if the math isn't closed.
+const mathPattern = new RegExp(
+  [
+    // The environments KaTeX reads outside math, \begin and \end included.
+    String.raw`\\begin\{((?:equation|align|alignat|gather)\*?)\}[^]*?(?:\\end\{\1\}|$)`,
+    String.raw`\$\$((?:\\[^]|[^\\])*?)(?:\$\$|$)`,
+    // LaTeX's own "\[…\]", only closed, since "\[" is also how Markdown writes a plain bracket.
+    // "\" takes the character after it along, so the "\\]" of a line break doesn't close it.
+    String.raw`\\\[((?:\\[^]|[^\\])*?)\\\]`,
+    // In a line, with no space after the first "$" or before the last and no digit after it, so
+    // the dollars of "$5 and $10" aren't math.
+    String.raw`\$(?!\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\d)`,
+    // LaTeX's own "\(…\)", in a line.
+    String.raw`\\\(((?:\\.|[^\\\n])*?)\\\)`,
+    // A character after "\", so the dollar of "\$" opens and closes nothing.
+    String.raw`\\.`,
+  ].join("|"),
+  "g",
+)
+
+// Whether the character at `pos` is code: in a ``` block or an indented one, or between backticks.
+function isCode(state, pos) {
+  for (let node = syntaxTree(state).resolveInner(pos, 1); node; node = node.parent)
+    if (/^(?:FencedCode|CodeBlock|InlineCode)$/.test(node.name)) return true
+  return false
+}
+
+// The math `pos` is in or next to: "$…$" or "\(…\)" in a line, "$$…$$" or "\[…\]" over any lines,
+// or a LaTeX display environment such as \begin{align}. `from` and `to` span it as written, `tex`
+// is what's between its marks (an environment's \begin and \end are part of it), and `display` is
+// false for the two in a line. Math ends at a blank line, closed or not, so forgetting "$$"
+// doesn't make the rest of a note math. null elsewhere, and for math in code.
+// shortcut: reads the lines around `pos` up to a blank one each time the cursor moves; keep the
+// math in a StateField if that lags in a long note with no blank lines.
+// shortcut: math in a quote keeps its lines' "> "; take the quote's markers off if that comes up.
+export function mathAt(state, pos) {
+  const {doc} = state
+  let first = doc.lineAt(pos)
+  let last = first
+  if (!first.text.trim()) return null
+  while (first.number > 1 && doc.line(first.number - 1).text.trim()) first = doc.line(first.number - 1)
+  while (last.number < doc.lines && doc.line(last.number + 1).text.trim()) last = doc.line(last.number + 1)
+  const text = doc.sliceString(first.from, last.to)
+  const at = pos - first.from
+  mathPattern.lastIndex = 0
+  for (let m; (m = mathPattern.exec(text)) && m.index <= at; ) {
+    const [whole, environment, dollars, brackets, dollar, parentheses] = m
+    const inline = dollar ?? parentheses
+    const tex = environment ? whole : (dollars ?? brackets ?? inline)
+    // "\" and a character.
+    if (tex === undefined) continue
+    if (isCode(state, first.from + m.index)) {
+      // What's after this character may open math.
+      mathPattern.lastIndex = m.index + 1
+    } else if (at <= m.index + whole.length && tex.trim()) {
+      const from = first.from + m.index
+      return {from, to: from + whole.length, tex, display: inline === undefined}
+    }
+  }
+  return null
+}
+
 // The columns a line's wrapped rows hang by: the width of its list and quote markers, with the
 // indentation and spaces around them. 0 for other lines and in a ``` block.
 export function hangIndent(state, line) {
