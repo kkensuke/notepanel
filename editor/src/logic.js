@@ -272,9 +272,14 @@ const mathPattern = new RegExp(
     // The environments KaTeX reads outside math, \begin and \end included.
     String.raw`\\begin\{((?:equation|align|alignat|gather)\*?)\}[^]*?(?:\\end\{\1\}|$)`,
     String.raw`\$\$((?:\\[^]|[^\\])*?)(?:\$\$|$)`,
+    // LaTeX's own "\[…\]", only closed, since "\[" is also how Markdown writes a plain bracket.
+    // "\" takes the character after it along, so the "\\]" of a line break doesn't close it.
+    String.raw`\\\[((?:\\[^]|[^\\])*?)\\\]`,
     // In a line, with no space after the first "$" or before the last and no digit after it, so
     // the dollars of "$5 and $10" aren't math.
     String.raw`\$(?!\s)((?:\\.|[^\\$\n])+?)(?<!\s)\$(?!\d)`,
+    // LaTeX's own "\(…\)", in a line.
+    String.raw`\\\(((?:\\.|[^\\\n])*?)\\\)`,
     // A character after "\", so the dollar of "\$" opens and closes nothing.
     String.raw`\\.`,
   ].join("|"),
@@ -288,11 +293,11 @@ function isCode(state, pos) {
   return false
 }
 
-// The math `pos` is in or next to: "$…$" in a line, "$$…$$" over any lines, or a LaTeX display
-// environment such as \begin{align}. `from` and `to` span it as written, `tex` is what's between
-// the dollars (an environment's \begin and \end are part of it), and `display` is false for "$…$".
-// Math ends at a blank line, closed or not, so forgetting "$$" doesn't make the rest of a note
-// math. null elsewhere, and for dollars in code.
+// The math `pos` is in or next to: "$…$" or "\(…\)" in a line, "$$…$$" or "\[…\]" over any lines,
+// or a LaTeX display environment such as \begin{align}. `from` and `to` span it as written, `tex`
+// is what's between its marks (an environment's \begin and \end are part of it), and `display` is
+// false for the two in a line. Math ends at a blank line, closed or not, so forgetting "$$"
+// doesn't make the rest of a note math. null elsewhere, and for math in code.
 // shortcut: reads the lines around `pos` up to a blank one each time the cursor moves; keep the
 // math in a StateField if that lags in a long note with no blank lines.
 // shortcut: math in a quote keeps its lines' "> "; take the quote's markers off if that comes up.
@@ -307,11 +312,13 @@ export function mathAt(state, pos) {
   const at = pos - first.from
   mathPattern.lastIndex = 0
   for (let m; (m = mathPattern.exec(text)) && m.index <= at; ) {
-    const [whole, environment, displayed, inline] = m
-    if (whole[0] === "\\" && !environment) continue
-    const tex = environment ? whole : (displayed ?? inline)
+    const [whole, environment, dollars, brackets, dollar, parentheses] = m
+    const inline = dollar ?? parentheses
+    const tex = environment ? whole : (dollars ?? brackets ?? inline)
+    // "\" and a character.
+    if (tex === undefined) continue
     if (isCode(state, first.from + m.index)) {
-      // The dollar after this one may open math.
+      // What's after this character may open math.
       mathPattern.lastIndex = m.index + 1
     } else if (at <= m.index + whole.length && tex.trim()) {
       const from = first.from + m.index

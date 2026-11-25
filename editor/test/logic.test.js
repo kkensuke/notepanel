@@ -331,7 +331,7 @@ test("codeBlockAt finds the ``` or ::: block a line is in, fences included, and 
   assert.equal(codeBlockAt(state, 5).fence, 4, "the fence starts after its indentation")
 })
 
-test("mathAt finds $…$ in a line, $$…$$ and LaTeX's displays, and no dollars that aren't math", () => {
+test("mathAt finds $…$, $$…$$, \\(…\\), \\[…\\] and LaTeX's displays, and no dollars that aren't math", () => {
   // The math at the "|" in a note: as written, its TeX, and whether it's a display.
   const math = doc => {
     const state = EditorState.create({doc: doc.replace("|", ""), extensions: markdown({base: markdownLanguage})})
@@ -356,6 +356,14 @@ test("mathAt finds $…$ in a line, $$…$$ and LaTeX's displays, and no dollars
   assert.deepEqual(math("$$\na=|f\n\nnext"), ["$$\na=f", "\na=f", true])
   assert.equal(math("$$\na=f\n\nne|xt"), null)
   assert.equal(math("$$|"), null)
+
+  // LaTeX's own marks are math only closed: \(…\) in a line, \[…\] before the blank line.
+  for (const doc of [String.raw`a |\(x^2\) b`, String.raw`a \(x|^2\) b`, String.raw`a \(x^2\)| b`])
+    assert.deepEqual(math(doc), [String.raw`\(x^2\)`, "x^2", false])
+  assert.deepEqual(math("\\[\na=|f\n\\]"), ["\\[\na=f\n\\]", "\na=f\n", true])
+  assert.deepEqual(math(String.raw`\[a \\|] b\]`), [String.raw`\[a \\] b\]`, String.raw`a \\] b`, true], "a line break's \\\\] closes nothing")
+  const open = [String.raw`\(a|`, "\\(a\n|b\\)", String.raw`\[a|`, "\\[a\n\n|b\\]", String.raw`\\(a|\\)`, String.raw`\\[a|\\]`]
+  for (const doc of [...open, "`\\(a|\\)`", String.raw`\[ |\]`]) assert.equal(math(doc), null, doc)
 
   const align = "\\begin{align}\na &= b\n\\end{align}"
   assert.deepEqual(math(`see\n${align.replace("&", "|&")}\nit`), [align, align, true])

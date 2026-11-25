@@ -97,14 +97,16 @@ panel), copy the new app to `/Applications`, and open it.
   on the opening fence, which copies what's between the fences.
 - **Math.** With the cursor in or next to math, the math shows typeset under it, or over it where
   there's no room under. Pointing at math for a moment shows it too. Nothing in the note changes.
-  Math is `$…$` in a line, `$$…$$` over any lines, or one of LaTeX's displays with no dollars around
-  it: `equation`, `align`, `alignat` or `gather`, with or without `*`, so an equation pasted from
-  LaTeX shows as it is; its `\label` shows nothing. Other dollars stay text:
+  Math is `$…$` or `\(…\)` in a line, `$$…$$` or `\[…\]` over any lines, or one of LaTeX's displays
+  with nothing around it: `equation`, `align`, `alignat` or `gather`, with or without `*`, so an
+  equation pasted from LaTeX shows as it is; its `\label` shows nothing. Other dollars stay text:
   `$…$` is math only with no space after the first `$` or before the last, and no digit after the
-  last, so `$5 and $10` isn't math. Neither is `\$`, or a dollar in code. Math ends at a blank line,
-  closed or not. If KaTeX can't read the math, the popup says what's wrong. The commands of LaTeX's
-  physics package work as they do there, such as `\expval{A}{\psi}`, `\pdv{f}{x}{y}` and
-  `\qty( )`. `\div` stays ÷: the divergence is `\divergence`.
+  last, so `$5 and $10` isn't math. Neither is `\$`, or a dollar in code. `$$…$$` and a display end
+  at a blank line, closed or not. `\(…\)` and `\[…\]` are math only when closed; in Markdown they
+  also write plain brackets, so `\[1\]` shows as math too. If KaTeX can't read the math, the popup
+  says what's wrong. The commands of LaTeX's physics package work as they do there, such as
+  `\expval{A}{\psi}`, `\pdv{f}{x}{y}` and `\qty( )`. `\div` stays ÷: the divergence is
+  `\divergence`.
 - **Tasks.** Click the box of a task (`- [ ]` or `- [x]`) to tick or clear it. The box stays as
   text; `Cmd+Z` undoes the click.
 - **Dropping files.** Drop a text file, such as a Markdown file, on the note to insert its text
