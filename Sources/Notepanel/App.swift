@@ -5,7 +5,7 @@ import NotepanelCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static func main() {
-        let app = NSApplication.shared
+        let app = Application.shared
         let delegate = AppDelegate()
         app.delegate = delegate
         // A menu bar app: no Dock icon and no main menu. Info.plist also sets LSUIElement.
@@ -195,4 +195,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(history)
     }
     @objc private func quit() { NSApp.terminate(nil) }
+}
+
+/// Window managers and other tools that act on the focused window ask the app which window that
+/// is. While the switcher's window has the keys, the answer is the panel, its parent, so that they
+/// move and resize the panel, and the switcher's window goes with it. VoiceOver gets the window
+/// that really has the keys.
+final class Application: NSApplication {
+    override func accessibilityFocusedWindow() -> Any? {
+        let panel = NSWorkspace.shared.isVoiceOverEnabled ? nil : (keyWindow as? NotePanel)?.parent
+        return panel ?? super.accessibilityFocusedWindow()
+    }
 }

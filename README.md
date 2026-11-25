@@ -14,8 +14,7 @@ other editor, sync them or back them up as you like.
 ## Features
 
 - **Opens over everything.** The panel floats above other windows, full-screen apps included, on
-  every Space. Showing it doesn't switch apps: the app you were in stays active, and gets the focus
-  back when you hide the panel.
+  every Space. Hiding it gives the focus back to the app you were in.
 - **Small and light.** The app is about 2 MB.
 - **Edits like VS Code.** The editor is CodeMirror 6 with VS Code's keys: multiple cursors,
   rectangular selection, and moving and copying lines. It also highlights Markdown, continues
@@ -113,6 +112,10 @@ panel), copy the new app to `/Applications`, and open it.
   default. The standard one is the panel's first size, centered, with 14 pt text; to choose your
   own, put the panel where you want it on that display, give the text the size you want, and click
   **Use Current** in Settings.
+- **Window managers.** While the panel or the switcher has the focus, notepanel is the active app,
+  so a tool that places the focused window, such as Rectangle, places the panel. The switcher goes
+  with it. At the display's left edge the panel leaves the switcher no room, and the switcher ends
+  up off the display, so close it before placing the panel there.
 
 ## Settings
 

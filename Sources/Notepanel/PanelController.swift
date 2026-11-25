@@ -47,6 +47,10 @@ final class PanelController: NSObject, NSWindowDelegate {
         titleBar.focusEditor = { [weak self] in self?.focusEditor() }
         configurePanel()
         switcher.configure()
+        // The panel tells its delegate when it takes the keys; the switcher's window has none.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(windowDidBecomeKey(_:)), name: NSWindow.didBecomeKeyNotification,
+            object: switcher.window)
         store.onStatus = { [weak self] message in self?.bridge.send("status", message ?? "") }
         store.onRenamed = { [weak self] from, to in self?.noteRenamed(from, to) }
         store.onSaveState = { [weak self] _ in self?.titleBar.showSaveState() }
@@ -60,8 +64,9 @@ final class PanelController: NSObject, NSWindowDelegate {
 
     func show() {
         if !panel.isVisible {
-            let front = NSWorkspace.shared.frontmostApplication
-            previousApp = front?.processIdentifier == NSRunningApplication.current.processIdentifier ? nil : front
+            // The app in front is noted as the panel takes the keys. If it's this app, hiding the
+            // panel leaves the keys with Settings or the keys window.
+            previousApp = nil
             if store.reloadIfChanged() != nil { showNote() }
         }
         panel.makeKeyAndOrderFront(nil)
@@ -146,6 +151,17 @@ final class PanelController: NSObject, NSWindowDelegate {
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         hide()
         return false
+    }
+
+    /// The panel or the switcher's window took the keys. The app becomes active, so that tools that
+    /// act on the active app's focused window, such as window managers, act on the panel. The app
+    /// the keys came from gets them back when the panel hides.
+    func windowDidBecomeKey(_ notification: Notification) {
+        let front = NSWorkspace.shared.frontmostApplication
+        if let front, front.processIdentifier != NSRunningApplication.current.processIdentifier { previousApp = front }
+        // Not activate(), which macOS may turn down when the user hasn't just clicked in the app,
+        // as when a hot key shows the panel.
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     /// Whether the panel's own commands use this key, which Settings won't give a shortcut.
